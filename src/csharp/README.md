@@ -45,9 +45,9 @@ runs, evaluation and benchmarks, batch inference jobs, MCP, OpenTelemetry, OS ke
 credentials, a command-line tool, or an HTTP sidecar. Accounting values are not provider
 invoices or all-wire totals.
 
-Buffered embedding and reranking were exercised against a pinned TEI 1.9.4 CPU deployment on
-2026-10-22. The Voyage, Jina, Cerebras, Hyperbolic, and Nscale adapters have offline
-scripted-response evidence only; their hosted traffic has not been live-verified.
+TEI, Voyage, Jina, Cerebras, Hyperbolic, and Nscale have offline scripted-response evidence
+only. The native TEI live public-API probe against the pinned 1.9.4 CPU deployment remains
+pending; hosted traffic for the other providers has not been live-verified.
 
 ## Reference the Package
 

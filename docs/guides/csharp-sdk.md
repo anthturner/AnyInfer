@@ -407,8 +407,8 @@ disposal and the synchronous facade with caller-owned document IDs.
 --8<-- "examples/csharp-sdk/TeiExample.cs"
 ```
 
-The offline example verifier uses scripted HTTP responses. Buffered C# embedding and reranking were
-exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22. The [TEI
+The offline example verifier uses scripted HTTP responses for buffered C# embedding and
+reranking. Native live verification against a TEI deployment remains pending. The [TEI
 page](../providers/tei.md#use-tei-from-c) shows the matching settings for the two local server
 processes and model discovery.
 

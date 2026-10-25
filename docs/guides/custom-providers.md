@@ -14,6 +14,8 @@ spelling, and a few quirks, you do not. Point the built-in
 [OpenAI-compatible provider](../providers/openai-compat.md) at it:
 
 ```python
+import anyinfer as ai
+
 client = ai.Client(
     [
         ai.ProviderSettings.of(
@@ -23,6 +25,7 @@ client = ai.Client(
         )
     ]
 )
+client.close()
 ```
 
 Write an adapter when there is real protocol translation to do: a different request shape,
@@ -136,8 +139,10 @@ pip install -e ./acme-anyinfer
 ```
 
 ```python
-client = ai.Client([ai.ProviderSettings.of("acme", api_key="env://ACME_API_KEY")])
-client.generate("hello", target="acme:acme-large")
+import anyinfer as ai
+
+with ai.Client([ai.ProviderSettings.of("acme", api_key="env://ACME_API_KEY")]) as client:
+    client.generate("hello", target="acme:acme-large")
 ```
 
 Nothing in the application changed. If your package fails to load (a bad import, an id
@@ -146,14 +151,16 @@ provider mysteriously absent.
 
 ## In the Native C# SDK
 
-A .NET application registers its own adapter in code. Implement
-`AnyInfer.Providers.IProviderAdapter`, adding `IProviderLifecycle`, `IEmbedsText`, or
-`IReranksText` for discovery and retrieval, then either describe it with a `ProviderDescriptor`
-and add that to a `ProviderRegistry` with `Register`, or hand constructed adapters to
-`AsyncClient.FromAdapters` as `ProviderRegistration` values. The same rule applies: the adapter
-translates, and retry, routing, validation, and repair stay in the native client core. An
-endpoint that speaks `/chat/completions` needs no adapter there either, since the C# registry
-includes `openai-compat`. The [C# API reference](/csharp/api/) has the signatures.
+A .NET application registers its own adapter in code. A text-generation adapter implements
+`AnyInfer.Providers.IProviderAdapter` (and therefore `IGeneratesText`), with
+`IProviderLifecycle` when it supports discovery or health. A retrieval-only adapter instead
+implements `IAsyncDisposable` plus `IEmbedsText` and/or `IReranksText`; it does not need a
+generation interface. Describe either shape with a `ProviderDescriptor` and add it to a
+`ProviderRegistry` with `Register`, or hand constructed adapters to `AsyncClient.FromAdapters`
+as `ProviderRegistration` values. The same rule applies: the adapter translates, and retry,
+routing, validation, and repair stay in the native client core. An endpoint that speaks
+`/chat/completions` needs no adapter there either, since the C# registry includes
+`openai-compat`. The [C# API reference](/csharp/api/) has the signatures.
 
 !!! tip "Key Takeaways"
     - An endpoint that speaks `/chat/completions` needs no adapter; `openai-compat` with a

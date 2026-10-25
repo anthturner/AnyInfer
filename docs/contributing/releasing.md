@@ -210,6 +210,26 @@ Commit `website/<sdk>_versions.json`, `website/<sdk>_versioned_docs/` and
 `website/<sdk>_versioned_sidebars/` with the version bump. To undo an archive before it is
 merged, run `python scripts/build_docs.py remove-snapshot --sdk <sdk> --version <version>`.
 
+## Publishing and Recovering the Documentation Site
+
+Documentation ships through `feature/* -> develop -> main`. The `docs-site` workflow on
+`main` builds the static site and deploys it to GitHub Pages at `anyinfer.dev`. A feature
+branch preview or successful local build does not update the public site.
+
+Before a site migration, retain the last successful Pages artifact and its source commit,
+workflow URL, SHA-256 checksum, and build-tool versions. If the workflow artifact has
+expired, rebuild that exact source in an isolated checkout and retain the resulting site
+archive. Check that its root contains `index.html`, `CNAME` with `anyinfer.dev`, and
+`.nojekyll`; serve the extracted archive locally and check its routes before cutover.
+Keep the archive somewhere that survives temporary build-directory cleanup.
+
+After deployment, check the homepage, Downloads, a shared concept, both SDK entrypoints,
+the generated API reference, a legacy URL with its fragment, local search, version menus,
+and `llms.txt` plus a native API text section. If recovery is needed, redeploy the retained
+Pages artifact through the normal Pages deployment mechanism, or revert the site change
+on a reviewed branch and rebuild through the same workflow. Preserve `CNAME`, the Pages
+environment, artifact name, deployment concurrency, and domain settings during recovery.
+
 ## When a Release Goes Wrong
 
 Publishing is the only irreversible step in this repository: a version number on PyPI can

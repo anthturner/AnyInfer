@@ -73,8 +73,7 @@ public static class EmbeddingSpaceExample
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(client);
-        var ranked = await client.RerankAsync(query, candidates, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        var ranked = await client.RerankAsync(query, candidates, cancellationToken: cancellationToken);
         return ranked.Items
             .OrderByDescending(static item => item.Score)
             .Select(static item => item.DocumentId)

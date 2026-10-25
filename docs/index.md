@@ -9,9 +9,11 @@
 
     prompt = "Summarize the Apollo program in one sentence."
 
-    client = ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")])
-    result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")
-    print(result.text)
+    with ai.Client(
+        [ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]
+    ) as client:
+        result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")
+        print(result.text)
     ```
 
 === "Python async"

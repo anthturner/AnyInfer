@@ -83,8 +83,8 @@ The `cookbook.retrieval.*` cases check that:
 ## Hosted and Local Setup (Optional)
 
 - **TEI:** start one TEI server per model, here an embedding model on port 8080 and a reranker on
-  port 8081, and use model IDs that match what each server loaded. Buffered C# embedding and
-  reranking were exercised against a TEI 1.9.4 CPU deployment on 2026-10-22.
+  port 8081, and use model IDs that match what each server loaded. The C# TEI examples are
+  verified against scripted responses; native live verification remains pending.
 - **Voyage AI or Jina AI:** export `VOYAGE_API_KEY` or `JINA_API_KEY` and pass the `Voyage` or
   `Jina` deployment. These hosted adapters are verified offline against scripted responses only.
 

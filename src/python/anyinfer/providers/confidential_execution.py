@@ -1,11 +1,8 @@
-"""`ConfidentialExecutionAdapter` — fails closed unless Tier 3's attested guarantee holds.
+"""Gate local generation on detected confidential-execution readiness.
 
 Composes over an already-configured local adapter (`llama_cpp`, `lm_studio`, `ollama`)
-rather than subclassing any of them, per DESIGN.md §30.4. A caller
-that requests confidential execution and does not get it must see a typed error, never a
-silent downgrade to unattested execution — that would make the guarantee a lie the same
-way a silently-logging Relay would (see `anyinfer_confidential.relay`'s own docstring for
-the parallel).
+rather than subclassing any of them. Generation raises a typed error when the detected
+local conditions do not meet the requested policy; discovery and health remain available.
 
 Enforcement and any pre-flight capability check a caller makes both call
 `anyinfer.local.attestation.confidential_execution_status` — one source of truth, so they
@@ -15,8 +12,8 @@ can never drift out of sync with each other.
 *detection*, not verified attestation: no quote is generated or checked against a vendor
 root of trust. The refusal path is real and the fail-closed posture holds, but a host that
 passes this gate has not proven anything to a remote party — a fabricated device node
-satisfies every probe. Do not present a successful `generate()` here as cryptographic
-assurance to anyone off this machine until quote verification ships.
+satisfies every probe. A successful `generate()` here is not cryptographic assurance to
+a remote party. Hardware quote verification is not implemented.
 """
 
 from __future__ import annotations
@@ -37,11 +34,11 @@ __all__ = ["ConfidentialExecutionAdapter"]
 
 
 class ConfidentialExecutionAdapter:
-    """Wraps a local `ProviderAdapter`, refusing `generate()` unless attestation succeeds.
+    """Wrap a local adapter, refusing generation unless local readiness is detected.
 
     Discovery and health pass straight through to the inner adapter unchanged —
-    attestation is a property of *execution*, not of what models are discoverable or
-    whether the process is reachable at all.
+    The gate checks detected execution conditions, not model availability or process
+    reachability. Passing it does not verify a hardware attestation quote.
     """
 
     def __init__(
@@ -51,11 +48,11 @@ class ConfidentialExecutionAdapter:
         backend: Backend,
         model: ResolvedModel | None = None,
     ) -> None:
-        """Bind the wrapper to one inner adapter and the backend/model it will attest.
+        """Bind the wrapper to one inner adapter and the backend/model it will check.
 
         Args:
             inner: An already-configured local adapter instance to delegate to once
-                attestation succeeds.
+                the local readiness check passes.
             backend: The local backend `inner` runs — passed straight to
                 `confidential_execution_status` on every `generate()` call.
             model: The selected model, when known; also passed straight through. See
@@ -79,11 +76,11 @@ class ConfidentialExecutionAdapter:
         await self._inner.aclose()
 
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
-        """Attest, then generate — or refuse, and never touch the inner adapter at all.
+        """Check local readiness, then generate; refuse before dispatch if it fails.
 
         Raises:
-            anyinfer.errors.ConfidentialExecutionError: The attested guarantee is not
-                available on this host right now. Carries
+            anyinfer.errors.ConfidentialExecutionError: The local readiness conditions
+                are not detected on this host. Carries
                 `ConfidentialExecutionStatus.detail` so a caller can render *why*.
         """
         status = confidential_execution_status(backend=self._backend, model=self._model)

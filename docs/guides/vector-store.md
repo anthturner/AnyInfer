@@ -20,20 +20,29 @@ It is Python-only: the native C# SDK returns an `EmbeddingResult` whose `Embeddi
 import anyinfer as ai
 from anyinfer_store import VectorStore
 
-client = ai.Client([ai.ProviderSettings.of("ollama")])
+documents = {
+    "release-notes": "Pricing is now reported with provenance.",
+    "routing": "Fallback follows the route you configure.",
+}
 store = VectorStore.open("corpus.db")
+try:
+    with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+        for doc_id, text in documents.items():
+            result = client.embed(
+                [text], target="ollama:nomic-embed-text", input_type="document"
+            )
+            store.add(doc_id, result.vectors[0], space=result.space, text=text)
 
-for doc_id, text in documents.items():
-    result = client.embed([text], target="ollama:nomic-embed-text", input_type="document")
-    store.add(doc_id, result.vectors[0], space=result.space, text=text)
-
-query = client.embed(["what did the release notes say about pricing?"],
-                      target="ollama:nomic-embed-text", input_type="query")
-matches = store.query(query.vectors[0], space=query.space, top_k=5)
-for match in matches:
-    print(match.entry.id, match.score, match.entry.text)
-
-store.close()
+        query = client.embed(
+            ["what did the release notes say about pricing?"],
+            target="ollama:nomic-embed-text",
+            input_type="query",
+        )
+        matches = store.query(query.vectors[0], space=query.space, top_k=5)
+        for match in matches:
+            print(match.entry.id, match.score, match.entry.text)
+finally:
+    store.close()
 ```
 
 !!! note "The scale boundary"
@@ -58,13 +67,50 @@ returning a confident-looking, meaningless result.
 Coarse vector search, then a real rerank pass over its top-k candidates:
 
 ```python
-from anyinfer_store import query_and_rerank
+import asyncio
 
-items = await query_and_rerank(
-    store, query.vectors[0], "what did the release notes say about pricing?",
-    space=query.space, client=async_client, rerank_target="cohere:rerank-v3.5",
-    candidate_k=20, top_n=5,
-)
+import anyinfer as ai
+from anyinfer_store import VectorStore, query_and_rerank
+
+
+async def main() -> None:
+    query_text = "what did the release notes say about pricing?"
+    store = VectorStore.open("corpus.db")
+    try:
+        async with ai.AsyncClient(
+            [
+                ai.ProviderSettings.of("ollama"),
+                ai.ProviderSettings.of("cohere", api_key="env://COHERE_API_KEY"),
+            ]
+        ) as client:
+            for doc_id, text in {
+                "release-notes": "Pricing is now reported with provenance.",
+                "routing": "Fallback follows the route you configure.",
+            }.items():
+                document = await client.embed(
+                    [text], target="ollama:nomic-embed-text", input_type="document"
+                )
+                store.add(doc_id, document.vectors[0], space=document.space, text=text)
+            embedded = await client.embed(
+                [query_text], target="ollama:nomic-embed-text", input_type="query"
+            )
+            items = await query_and_rerank(
+                store,
+                embedded.vectors[0],
+                query_text,
+                space=embedded.space,
+                client=client,
+                rerank_target="cohere:rerank-v3.5",
+                candidate_k=20,
+                top_n=5,
+            )
+            for item in items:
+                print(item.document_id, item.score)
+    finally:
+        store.close()
+
+
+asyncio.run(main())
 ```
 
 Reranking needs text: an entry stored without `text=` cannot be reranked, and
@@ -76,10 +122,21 @@ reranking together end to end.
 ## Lifecycle
 
 ```python
-store.remove(doc_id)          # delete one entry
-store.compact()               # reclaim disk space after deletions (VACUUM)
-store.export_jsonl("out.jsonl")   # portable interchange format
-another_store.import_jsonl("out.jsonl")
+from anyinfer_store import VectorStore
+
+store = VectorStore.open("corpus.db")
+try:
+    store.remove("release-notes")
+    store.compact()  # reclaim disk space after deletions (VACUUM)
+    store.export_jsonl("out.jsonl")  # portable interchange format
+finally:
+    store.close()
+
+another_store = VectorStore.open("imported.db")
+try:
+    another_store.import_jsonl("out.jsonl")
+finally:
+    another_store.close()
 ```
 
 A store is one SQLite file; copying it is a valid backup or migration strategy on its own, and

@@ -35,7 +35,7 @@ public static class CookbookStreamingExample
         try
         {
             await using var client = new AsyncClient(providers, route: route);
-            return await StreamAnswerAsync(client, question, output, cancellation.Token).ConfigureAwait(false);
+            return await StreamAnswerAsync(client, question, output, cancellation.Token);
         }
         finally
         {
@@ -63,7 +63,7 @@ public static class CookbookStreamingExample
         await using var stream = client.StreamAsync(question, cancellationToken: cancellationToken);
         try
         {
-            await foreach (var item in stream.WithCancellation(cancellationToken).ConfigureAwait(false))
+            await foreach (var item in stream.WithCancellation(cancellationToken))
             {
                 switch (item)
                 {
@@ -77,42 +77,42 @@ public static class CookbookStreamingExample
                         }
 
                         shown.Append(delta.Text);
-                        await output.WriteAsync(delta.Text).ConfigureAwait(false);
+                        await output.WriteAsync(delta.Text);
                         break;
                     case AttemptFailed failed:
                         // A retry or the next target may follow; any text it streams replaces what is shown.
                         if (shown.Length > 0)
                         {
                             restart = true;
-                            await output.WriteLineAsync().ConfigureAwait(false);
+                            await output.WriteLineAsync();
                         }
 
-                        await output.WriteLineAsync($"[{failed.Record.Target} {failed.Record.Outcome}: {failed.Record.Error?.GetType().Name}]").ConfigureAwait(false);
+                        await output.WriteLineAsync($"[{failed.Record.Target} {failed.Record.Outcome}: {failed.Record.Error?.GetType().Name}]");
                         break;
                 }
             }
 
             var result = stream.Result;
-            await output.WriteLineAsync().ConfigureAwait(false);
-            await output.WriteLineAsync($"[{result.Target} in {result.Timing?.TotalMs:F0} ms, {result.Usage?.TotalTokens?.ToString() ?? "unknown"} tokens]").ConfigureAwait(false);
+            await output.WriteLineAsync();
+            await output.WriteLineAsync($"[{result.Target} in {result.Timing?.TotalMs:F0} ms, {result.Usage?.TotalTokens?.ToString() ?? "unknown"} tokens]");
             return new CookbookStreamOutcome(CookbookStreamStatus.Completed, shown.ToString(), discarded, result, null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await output.WriteLineAsync().ConfigureAwait(false);
-            await output.WriteLineAsync("[cancelled]").ConfigureAwait(false);
+            await output.WriteLineAsync();
+            await output.WriteLineAsync("[cancelled]");
             return new CookbookStreamOutcome(CookbookStreamStatus.Cancelled, shown.ToString(), discarded, null, null);
         }
         catch (StreamProtocolException error)
         {
             // A stream that broke after visible content is not retried: the shown text is incomplete.
-            await output.WriteLineAsync().ConfigureAwait(false);
-            await output.WriteLineAsync($"[answer incomplete: {error.Category}]").ConfigureAwait(false);
+            await output.WriteLineAsync();
+            await output.WriteLineAsync($"[answer incomplete: {error.Category}]");
             return new CookbookStreamOutcome(CookbookStreamStatus.Broken, shown.ToString(), discarded, null, error);
         }
         catch (AllTargetsFailedException error)
         {
-            await output.WriteLineAsync($"[no target answered: {error.Attempts.Count} attempt(s)]").ConfigureAwait(false);
+            await output.WriteLineAsync($"[no target answered: {error.Attempts.Count} attempt(s)]");
             return new CookbookStreamOutcome(CookbookStreamStatus.Failed, shown.ToString(), discarded, null, error);
         }
     }

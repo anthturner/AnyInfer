@@ -146,14 +146,19 @@ readiness, and answers. Later calls reuse the running server. How the plan is tu
 `target="medium"` resolves through the same catalog, and a user's pick can become that
 default; see
 [using a pick as your default tier](../concepts/catalog.md#using-a-pick-as-your-default-tier).
+Close the client after the last local operation so the supervised server can shut down cleanly:
+
+```python
+client.close()
+```
 
 ## Ollama Instead
 
 If you already run Ollama, it needs no supervision at all:
 
 ```python
-client = ai.Client([ai.ProviderSettings.of("ollama")])
-result = client.generate(prompt, target="ollama:qwen3:8b")
+with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+    result = client.generate("Explain TCP slow start.", target="ollama:qwen3:8b")
 ```
 
 Ollama gives you grammar-enforced structured output and per-phase timings; llama-cpp

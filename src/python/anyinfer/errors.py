@@ -231,7 +231,12 @@ class SpendLimitError(AnyInferError):
 
 
 class TransportError(_RetryableProviderError):
-    """Connect, timeout, or TLS failure — no usable response was received."""
+    """Connection, timeout, or TLS failure while acquiring or reading a response.
+
+    A streaming read can fail after delivering deltas. If the router retries, the next
+    attempt can repeat text the consumer has already received; attempt events identify
+    the transition between attempts.
+    """
 
 
 class StreamProtocolError(ProviderError):

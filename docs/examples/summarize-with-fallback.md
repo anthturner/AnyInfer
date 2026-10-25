@@ -27,32 +27,31 @@ SUMMARY_SCHEMA = {
     "required": ["headline", "topics"],
 }
 
-client = ai.Client(
+with ai.Client(
     [
         ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
         ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
         ai.ProviderSettings.of("ollama"),
     ]
-)
-
-result = client.generate(
-    "Summarize this text:\n" + sys.stdin.read(),
-    route=ai.Route(
-        targets=(
-            "anthropic:claude-sonnet-4-5",
-            "openai:gpt-5.2",
-            "ollama:qwen3:8b",
+) as client:
+    result = client.generate(
+        "Summarize this text:\n" + sys.stdin.read(),
+        route=ai.Route(
+            targets=(
+                "anthropic:claude-sonnet-4-5",
+                "openai:gpt-5.2",
+                "ollama:qwen3:8b",
+            ),
+            retry=ai.Retry(max_attempts=2),
         ),
-        retry=ai.Retry(max_attempts=2),
-    ),
-    schema=SUMMARY_SCHEMA,
-    repair=ai.Repair(max_attempts=1),
-)
+        schema=SUMMARY_SCHEMA,
+        repair=ai.Repair(max_attempts=1),
+    )
 
-print(json.dumps(result.structured, indent=2))
-print(f"via {result.target} using {result.structured_mechanism}", file=sys.stderr)
-for attempt in result.attempts:
-    print(f"  {attempt.target}: {attempt.outcome}", file=sys.stderr)
+    print(json.dumps(result.structured, indent=2))
+    print(f"via {result.target} using {result.structured_mechanism}", file=sys.stderr)
+    for attempt in result.attempts:
+        print(f"  {attempt.target}: {attempt.outcome}", file=sys.stderr)
 ```
 
 ## What to Notice

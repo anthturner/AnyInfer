@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.docs_common import Page, build_pages, load_navigation
 from scripts.prepare_docs import (
     _cached_reference_renderer,
+    _convert_material_fence_options,
     _prepare_markdown,
     _rewrite_generated_references,
     _symbol_urls,
@@ -180,6 +181,28 @@ def test_prepare_expands_a_snippet_inside_an_existing_fence_without_nesting(
     )
     assert staged.count("```csharp") == 1
     assert "```csharp\nvar value = 1;\n```" in staged
+
+
+def test_material_fence_highlights_become_docusaurus_ranges_without_changing_code() -> None:
+    source = (
+        '    ```python title="Example" hl_lines="10 12-14"\n'
+        '    print("hl_lines=\\\"body\\\"")\n'
+        "    ```\n"
+        "```python hl_lines='3 5-6'\n"
+        "value = 'unchanged'\n"
+        "```\n"
+        '```python hl_lines="1-3"\npass\n```\n'
+    )
+
+    assert _convert_material_fence_options(source) == (
+        '    ```python title="Example" {10,12-14}\n'
+        '    print("hl_lines=\\\"body\\\"")\n'
+        "    ```\n"
+        "```python {3,5-6}\n"
+        "value = 'unchanged'\n"
+        "```\n"
+        "```python {1-3}\npass\n```\n"
+    )
 
 
 def test_real_material_heading_and_downloads_syntax_becomes_safe_mdx() -> None:

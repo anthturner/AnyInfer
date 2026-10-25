@@ -8,6 +8,7 @@ semantics live in [routing](../concepts/routing.md).
     ```python
     import anyinfer as ai
 
+    prompt = "Summarize this release note in one sentence."
     route = ai.Route(
         targets=(
             "anthropic:claude-sonnet-4-5",  # preferred
@@ -17,8 +18,15 @@ semantics live in [routing](../concepts/routing.md).
         retry=ai.Retry(max_attempts=2),
     )
 
-    result = client.generate(prompt, route=route)
-    print("served by", result.target)
+    with ai.Client(
+        [
+            ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+            ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
+            ai.ProviderSettings.of("ollama"),
+        ]
+    ) as client:
+        result = client.generate(prompt, route=route)
+        print("served by", result.target)
     ```
 
 === "C# SDK (prerelease)"
@@ -44,8 +52,14 @@ checks are separate explicit calls rather than route policy; see the
 === "Python"
 
     ```python
-    client = ai.Client(providers, route=ai.Route(targets=("medium", "small")))
-    result = client.generate(prompt)  # no target= needed
+    import anyinfer as ai
+
+    prompt = "Summarize this release note in one sentence."
+    with ai.Client(
+        [ai.ProviderSettings.of("ollama")],
+        route=ai.Route(targets=("medium", "small")),
+    ) as client:
+        result = client.generate(prompt)  # no target= needed
     ```
 
 === "C#"
@@ -68,10 +82,16 @@ generation call never uses them.
 === "Python"
 
     ```python
-    for attempt in result.attempts:
-        print(f"{attempt.target}: {attempt.outcome}")
-        if attempt.error:
-            print(f"   {attempt.error.type_name}: {attempt.error.detail}")
+    import anyinfer as ai
+
+    prompt = "Summarize this release note in one sentence."
+    route = ai.Route(targets=("ollama:qwen3:8b",))
+    with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+        result = client.generate(prompt, route=route)
+        for attempt in result.attempts:
+            print(f"{attempt.target}: {attempt.outcome}")
+            if attempt.error:
+                print(f"   {attempt.error.type_name}: {attempt.error.detail}")
     ```
 
     <div class="terminal" markdown>
@@ -110,11 +130,16 @@ a stalled cursor.
 === "Python"
 
     ```python
+    import anyinfer as ai
+
+    prompt = "Summarize this release note in one sentence."
+    route = ai.Route(targets=("ollama:qwen3:8b",))
     try:
-        result = client.generate(prompt, route=route)
+        with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+            result = client.generate(prompt, route=route)
     except ai.AllTargetsFailedError as error:
         for attempt in error.attempts:
-            alert(f"{attempt.target}: {attempt.error and attempt.error.detail}")
+            print(f"{attempt.target}: {attempt.error and attempt.error.detail}")
     ```
 
 === "C#"

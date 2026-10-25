@@ -28,7 +28,7 @@ public static class CookbookToolsExample
         async Task<Dictionary<string, object>> LookupOrder(string orderId, CancellationToken token)
         {
             toolUses.Add($"lookup_order {orderId}");
-            var order = await orders.FindAsync(orderId, token).ConfigureAwait(false)
+            var order = await orders.FindAsync(orderId, token)
                 ?? throw new KeyNotFoundException($"Order {orderId} does not exist.");
             return new Dictionary<string, object>
             {
@@ -42,7 +42,7 @@ public static class CookbookToolsExample
         async Task<string> QuoteRefund(string orderId, int units, bool includeShipping = false, CancellationToken token = default)
         {
             toolUses.Add($"quote_refund {orderId} x{units}{(includeShipping ? " +shipping" : "")}");
-            var order = await orders.FindAsync(orderId, token).ConfigureAwait(false)
+            var order = await orders.FindAsync(orderId, token)
                 ?? throw new KeyNotFoundException($"Order {orderId} does not exist.");
             if (units < 1 || units > order.Units)
             {
@@ -73,7 +73,7 @@ public static class CookbookToolsExample
                 target: target,
                 sampling: new Sampling(temperature: 0),
                 maxRounds: 4,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken);
             return new CookbookAssistantReply(generation.Text, toolUses, ledger.Totals(), null);
         }
         catch (ToolLoopException failure)

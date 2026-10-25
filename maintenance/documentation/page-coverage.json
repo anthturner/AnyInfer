@@ -609,7 +609,7 @@
         "tests/test_csharp_docs_examples.py"
       ],
       "unsupported_native": [],
-      "notes": "TEI/Voyage/Jina deployments; TEI live evidence date restated from the repository; Voyage and Jina offline only. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
+      "notes": "TEI/Voyage/Jina deployments are exercised by the native offline runner. Native live public-API verification remains pending; the retained TEI cassettes establish Python traffic only. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/csharp-streaming.md",
@@ -890,7 +890,7 @@
         "batch inference jobs (retrieval input batching is supported)",
         "provider-run tools on built-in descriptors (none declares a server tool; application descriptors can)"
       ],
-      "notes": "C# overview and task index. Start here / Use in a .NET application (installation and quickstart links) and every prior heading anchor kept; existing H2 task sections are now H3 recipes under task-group H2s (connect, generate, embed and rerank, inspect, observe, account and policy). Each recipe includes executed source and links its concept page and /csharp/api/ type pages. New recipes: configuration file, credential references, provider-run tools, retrieval batching, operation routes and embedding spaces, trace/JSONL sinks and payload opt-in, shared ledger and spend store, spend admission, context-window fallback. TEI live evidence is the 2026-10-22 TEI 1.9.4 probe; Voyage/Jina/Cerebras/Hyperbolic/Nscale are offline scripted evidence only. Independent review 2026-10-25: findings corrected."
+      "notes": "C# overview and task index. Start here / Use in a .NET application (installation and quickstart links) and every prior heading anchor kept; existing H2 task sections are now H3 recipes under task-group H2s (connect, generate, embed and rerank, inspect, observe, account and policy). Each recipe includes executed source and links its concept page and /csharp/api/ type pages. New recipes: configuration file, credential references, provider-run tools, retrieval batching, operation routes and embedding spaces, trace/JSONL sinks and payload opt-in, shared ledger and spend store, spend admission, context-window fallback. TEI/Voyage/Jina/Cerebras/Hyperbolic/Nscale native examples have offline scripted evidence only; native TEI live public-API verification remains pending. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/custom-providers.md",
@@ -1452,7 +1452,7 @@
         "src/csharp/AnyInfer.TeiProbe/Program.cs"
       ],
       "unsupported_native": [],
-      "notes": "Python setup plus 'Use TEI from C#': loopback instances and operation-filtered discovery (TeiServersExample) and an explicit verified batch ceiling (RetrievalBatchingExample:embed). Offline cases use scripted /info, /embed, /rerank; the same public calls were exercised live against TEI 1.9.4 CPU on 2026-10-22 (AnyInfer.TeiProbe). Independent review 2026-10-25: findings corrected."
+      "notes": "Python setup plus 'Use TEI from C#': loopback instances and operation-filtered discovery (TeiServersExample) and an explicit verified batch ceiling (RetrievalBatchingExample:embed). Native offline cases use scripted /info, /embed, /rerank; AnyInfer.TeiProbe defines a live public-API probe whose retained maintenance record still marks execution pending. Python TEI 1.9.4 CPU traffic is retained in the sanitized cassettes. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "providers/vertex.md",

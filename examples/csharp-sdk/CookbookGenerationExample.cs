@@ -67,27 +67,27 @@ public static class CookbookGenerationExample
                     schema: SummarySchema,
                     sampling: new Sampling(temperature: 0, maxOutputTokens: 400),
                     metadata: new Dictionary<string, string> { ["release"] = note.Id },
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                    cancellationToken: cancellationToken);
                 var summary = generation.DeserializeStructured<ReleaseSummary>()
                     ?? throw new InvalidOperationException("The validated summary was JSON null.");
                 var outcome = new CookbookSummaryOutcome(note.Id, summary, generation.Target?.ToString(), generation.StructuredMechanism, generation.RepairAttempts, generation.Usage, Trail(generation.Attempts), null);
                 outcomes.Add(outcome);
-                await output.WriteLineAsync($"{note.Id}: [{summary.Risk}] {summary.Headline} (via {outcome.ServedBy}, {outcome.Mechanism}, {outcome.Repairs} repair(s), {generation.Usage?.TotalTokens?.ToString() ?? "unknown"} tokens)").ConfigureAwait(false);
+                await output.WriteLineAsync($"{note.Id}: [{summary.Risk}] {summary.Headline} (via {outcome.ServedBy}, {outcome.Mechanism}, {outcome.Repairs} repair(s), {generation.Usage?.TotalTokens?.ToString() ?? "unknown"} tokens)");
             }
             catch (AllTargetsFailedException failure)
             {
                 outcomes.Add(new CookbookSummaryOutcome(note.Id, null, null, null, 0, null, Trail(failure.Attempts), failure.Category));
-                await output.WriteLineAsync($"{note.Id}: not summarized ({failure.Category})").ConfigureAwait(false);
+                await output.WriteLineAsync($"{note.Id}: not summarized ({failure.Category})");
             }
             catch (SchemaViolationException violation)
             {
                 outcomes.Add(new CookbookSummaryOutcome(note.Id, null, null, null, 0, null, [], violation.Category));
-                await output.WriteLineAsync($"{note.Id}: not summarized ({violation.Category}: {violation.Issues.Count} issue(s))").ConfigureAwait(false);
+                await output.WriteLineAsync($"{note.Id}: not summarized ({violation.Category}: {violation.Issues.Count} issue(s))");
             }
 
             foreach (var attempt in outcomes[^1].Attempts)
             {
-                await output.WriteLineAsync($"  {attempt}").ConfigureAwait(false);
+                await output.WriteLineAsync($"  {attempt}");
             }
         }
 

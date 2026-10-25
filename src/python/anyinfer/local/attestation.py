@@ -1,24 +1,20 @@
 """Tier 3 confidential-execution detection.
 
-Does this box actually have the hardware to back an attested-local-execution guarantee,
-and does it, right now. **Advisory only**, mirroring `hardware.py`'s own discipline
-exactly: detection *proposes*, `ConfidentialExecutionAdapter` (in `providers` — the one
-thing that actually enforces anything) decides, and every probe here is best-effort. A
-missing device node or an
-unparseable `nvidia-smi` line produces "not detected," never a guess dressed up as a fact
-— see DESIGN.md §30.4 for the full design this module implements.
+Reports locally detected TEE and GPU confidential-computing conditions. **Advisory only:**
+the `ConfidentialExecutionAdapter` uses these facts to enforce a local execution policy,
+and every probe here is best-effort. A missing device node or an unparseable `nvidia-smi`
+line produces "not detected." No hardware attestation quote is generated or verified.
 
 This is a hardware-capability question in the same category as `hardware.py`/`backends.py`
 already answer ("what does this box actually have"), so it stays in core, in `local/`, not
 in the `anyinfer-confidential` add-on — it never touches prompt content, so the library's
 "no prompt templating in core" boundary does not apply to it.
 
-**What `end_to_end=True` actually means:** the CPU package this process runs in is inside
-an attestable trusted execution environment (AMD SEV-SNP or Intel TDX; see `CpuTeeKind`
-for why Nitro and SGX are detected but not part of this claim), and if the selected model
-offloads any layers to a GPU, that GPU is itself confidential-computing-capable *and* has
-CC mode enabled — closing the PCIe bridge, not just the CPU leg. Every other field exists
-so a caller can render *why*, not just whether.
+**What `end_to_end=True` means:** local probes report an AMD SEV-SNP or Intel TDX guest;
+if the selected model offloads layers to a GPU, probes also report a capable GPU with CC
+mode enabled. These are local readiness conditions, not proof of a protected execution
+boundary. A fabricated device node can satisfy the probes. Other fields explain which
+conditions were detected.
 """
 
 from __future__ import annotations
@@ -85,7 +81,7 @@ as a second independent source of truth, since both paths describe the same fact
 
 @dataclass(frozen=True, slots=True)
 class ConfidentialExecutionStatus:
-    """What this box can actually guarantee for confidential local execution right now.
+    """Local readiness observations and optional point-in-time weight verification.
 
     Attributes:
         cpu_tee: Detected CPU TEE, or ``None``.
@@ -108,9 +104,10 @@ class ConfidentialExecutionStatus:
             `manifest`/`vendor_public_key` arguments were supplied and verified against
             the running model's weights on disk. ``None`` means "not evaluated" (no
             manifest was supplied), never "failed." **This field alone is not a Tier 4
-            claim** — a hash-and-signature check on an unattested host is a real but
-            weaker guarantee; only `model_verified is True and end_to_end is True`
-            together is the full Tier 4 claim (see `provenance.py`'s module docstring).
+            claim** — a hash-and-signature check verifies the files read, while
+            `end_to_end` reports detected local readiness. Even when both fields are
+            true, no hardware quote has been verified, so the pair does not establish
+            an attested provenance guarantee.
             It is also **point-in-time**: it describes the weights when this status was
             computed, not the weights a server later loads. To bind verification to the
             load itself, pass a `WeightsProvenance` to `LocalServerSupervisor.acquire`,
@@ -141,11 +138,12 @@ def confidential_execution_status(
     manifest: ModelManifest | None = None,
     vendor_public_key: bytes | None = None,
 ) -> ConfidentialExecutionStatus:
-    """Detect what this box can guarantee for confidential local execution.
+    """Detect local execution preconditions and optionally verify a model manifest.
 
-    Never raises: anything that cannot be determined becomes "not detected," never a
-    guess. Callers — including `ConfidentialExecutionAdapter`'s own fail-closed check —
-    treat the result as advice about a hardware fact, not as a decision.
+    Hardware conditions that cannot be determined become "not detected," never a guess.
+    Optional manifest verification requires the `attest` extra and can raise `ConfigError`
+    when it is missing. Callers, including the adapter's fail-closed check, use the local
+    observations to apply their execution policy.
 
     **What this proves, and to whom.** This is TEE *detection*: it reports what the guest
     kernel believes about its own environment. No attestation quote is generated or

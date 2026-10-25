@@ -1,9 +1,11 @@
 # Confidentiality Tiers
 
-BYOK (bring-your-own-key) inference already answers one confidentiality question: your
-application's calls go straight from your process to the provider you configured,
-AnyInfer is never a proxy, and [redaction](../concepts/credentials.md) keeps secrets out
-of logs. That protects your *customer's* data from AnyInfer and from you.
+BYOK (bring-your-own-key) inference answers a narrow deployment question: calls go straight
+from the application's process to the provider it configures, and AnyInfer operates no proxy.
+[Redaction](../concepts/credentials.md) keeps credentials out of AnyInfer logs and errors. In
+a customer-controlled direct deployment, this means no AnyInfer-operated service receives the
+prompt. It does not keep the prompt from the application or its operator, and the configured
+provider still receives it.
 
 It does not protect your own prompt IP (templates, orchestration, few-shot curation)
 from a customer running your client software on infrastructure they own. No purely
@@ -16,16 +18,16 @@ guarantee, cost, and limits are stated once, in the table:
 
 | Tier | What it guarantees | What it costs | Ships in |
 |---|---|---|---|
-| 0 (BYOK) | Your customer's prompt data never passes through AnyInfer or you | Nothing; this is the default | `anyinfer` core |
+| 0 (BYOK) | In a direct deployment, no AnyInfer-operated proxy receives the prompt | The application operator and configured provider still receive it | `anyinfer` core |
 | 1 (`SealedTemplate`) | Your template plaintext resists static extraction from the shipped bundle | No protection against a live debugger or memory inspection | `anyinfer-confidential` |
 | 2 (`AnyInfer Relay`) | Your orchestration logic never ships to the client at all | You're back in the customer's data path for that call | `anyinfer-confidential` |
-| 3 (Attested local execution) | Not even root on the host can read the prompt in transit to or during local inference | Requires specific TEE hardware (SEV-SNP/TDX today) | `anyinfer` core |
-| 4 (Model provenance) | The model weights that ran are exactly what you signed, verified inside Tier 3's boundary | Only a Tier 4 claim when Tier 3 also holds | `anyinfer` core |
+| 3 (Confidential-execution readiness) | Detects the local TEE and GPU-CC conditions that the fail-closed adapter requires | No hardware quote is verified, so this is not a cryptographic guarantee | `anyinfer` core |
+| 4 (Model provenance) | Verifies a signed manifest against weights on disk at check or load time | It is not an attested provenance claim until hardware quotes are verified | `anyinfer[attest]` |
 
 Tiers 1–4 ship with the Python distribution or its add-on packages. The native C# SDK provides
-none of them: it has no sealed templates or Relay, and no local runtime to attest. Tier 0 holds
-for it as it does for any direct client, since its calls also go straight to the configured
-provider.
+none of them: it has no sealed templates or Relay, and no local runtime or
+confidential-execution detector. Tier 0's direct-call property applies to it as it does to any
+direct client, but it does not restrict the application operator or configured provider.
 
 The full design record, including exclusions and open questions, is DESIGN.md §30 in the
 repository.
@@ -226,16 +228,14 @@ with `RELAY_RATE_LIMIT_HEADERS()` as the dialect on a descriptor fronting that e
 enforcement, and a multi-process Relay behind a load balancer gets one set of bounds per
 process — put a real quota gateway in front if you need a global one.
 
-## Tier 3 (Attested Local Execution)
+## Tier 3 (Confidential-Execution Readiness) {#tier-3-attested-local-execution}
 
-The one tier designed for a real cryptographic guarantee, because it targets AnyInfer's
-own [local adapters](../concepts/local.md) instead of a cloud call. What ships today is
-detection rather than attestation — see
-[detection versus cryptographic attestation](#detection-versus-cryptographic-attestation)
-below, and read `end_to_end` as an advisory local signal until then. When the host supports a
-trusted execution environment (AMD SEV-SNP or Intel TDX today), the local runtime can
-run inside it, and `confidential_execution_status()` reports whether the guarantee holds
-right now, on this box:
+This is the path intended to support a real cryptographic guarantee once attestation is
+implemented, because it targets AnyInfer's own [local adapters](../concepts/local.md) instead
+of a cloud call. What ships today is readiness detection — see [detection versus cryptographic
+attestation](#detection-versus-cryptographic-attestation) below. When the host supports a
+trusted execution environment (AMD SEV-SNP or Intel TDX today),
+`confidential_execution_status()` reports the local signals the adapter will require:
 
 ```python
 from anyinfer.local import confidential_execution_status, available_backends
@@ -243,27 +243,29 @@ from anyinfer.local import confidential_execution_status, available_backends
 backend = available_backends()[0]
 status = confidential_execution_status(backend=backend)
 if status.end_to_end:
-    print(f"attested: {status.detail}")
+    print(f"TEE-ready for the local policy: {status.detail}")
 else:
-    print(f"not attested: {status.detail}")   # render this to the caller, don't guess
+    print(f"not TEE-ready: {status.detail}")   # render this to the caller, don't guess
 ```
 
-`ConfidentialExecutionAdapter` wraps a local adapter and enforces the same check as a
-precondition: it refuses to `generate()` unless `end_to_end` is `True`, raising
-[`ConfidentialExecutionError`](../reference/errors.md#confidentialexecutionerror)
-instead of falling back to unattested execution. Enforcement and pre-flight call the
-identical function, so they cannot drift apart.
+`ConfidentialExecutionAdapter` wraps a local adapter and enforces the same detected
+conditions as a precondition: it refuses to `generate()` unless `end_to_end` is `True`,
+raising [`ConfidentialExecutionError`](../reference/errors.md#confidentialexecutionerror)
+instead of silently relaxing its local policy. Enforcement and pre-flight call the identical
+function, so they cannot drift apart. The refusal is real, but it does not turn detection into
+evidence a remote party can trust.
 
 ```python
 from anyinfer.providers.confidential_execution import ConfidentialExecutionAdapter
 
 adapter = ConfidentialExecutionAdapter(inner_llama_cpp_adapter, backend=backend, model=model)
-# adapter.generate(req) now fails closed instead of silently running unattested
+# adapter.generate(req) now fails closed instead of running without the required signals
 ```
 
-`end_to_end=True` means precisely: the CPU package this process runs in is inside an
-attestable TEE, and, if the selected model offloads any layers to a GPU, that GPU is
-confidential-computing-capable *and* has CC mode enabled, closing the PCIe bridge.
+`end_to_end=True` means precisely that the local probes detected an attestable CPU TEE and,
+if the selected model offloads any layers to a GPU, a confidential-computing-capable GPU with
+CC mode enabled. The signals describe the intended CPU and PCIe conditions; they do not prove
+those conditions to another party.
 `ConfidentialExecutionStatus` carries every intermediate fact (`cpu_tee`,
 `gpu_cc_capable`, `gpu_cc_enabled`, `gpu_offload_required`) so an application can render
 a specific reason rather than a bare `False`.
@@ -294,8 +296,8 @@ and not "attested end to end". When CPU quote verification lands it becomes
 "CPU-attested, GPU CC detected but not quote-verified" — the GPU half does not move with
 it.
 
-Neither limit is a reason to avoid Tier 3. The fail-closed refusal is real, and the
-detection is accurate about what it detects.
+The fail-closed refusal is real, and the detector reports only what its probes observe. Treat
+it as a local deployment policy, not evidence of confidentiality against a hostile host.
 
 ### Deployment Scope, Today
 
@@ -308,10 +310,11 @@ detection is accurate about what it detects.
 
 ## Tier 4 (Model Provenance)
 
-Tier 3 proves where a prompt ran; Tier 4 proves what ran inside it, with a signed
-manifest and a hash check. This is verification-only software: AnyInfer never signs
-anything and never touches a private key. You sign your own model manifests with your
-own keys; AnyInfer ships the verifier.
+Tier 4 verifies that a signed manifest matches weights on disk, with an optional load-bound
+check. It does not prove where the model ran, and without verified hardware attestation it does
+not prove a hostile host actually ran those verified bytes. This is verification-only software:
+AnyInfer never signs anything and never touches a private key. You sign your own model
+manifests with your own keys; AnyInfer ships the verifier.
 
 ```python
 from anyinfer.local import ModelManifest, hash_model_weights, verify_model_manifest
@@ -320,14 +323,14 @@ from anyinfer.local import ModelManifest, hash_model_weights, verify_model_manif
 weight_hash = hash_model_weights(model_path)
 # ... sign {model_id, weight_hash, vendor_key_id, signed_at} with your Ed25519 key ...
 
-# At verify time, inside a Tier 3-attested process:
+# At verify time, in the local process:
 ok = verify_model_manifest(manifest, weights_path=model_path, vendor_public_key=public_key)
 ```
 
 `confidential_execution_status()` accepts `manifest=`/`vendor_public_key=` and populates
-`model_verified` on the status. Treat `model_verified is True` as meaningful only when
-`end_to_end is True` too; a hash-and-signature check on an unattested host is a weaker,
-different guarantee.
+`model_verified` on the status. `model_verified is True` means the signature and on-disk hash
+matched at that instant. Combine it with `end_to_end` only as a local policy decision: neither
+field is a cryptographic attestation until quote verification exists.
 
 ### Verify at the Point of Load
 
@@ -355,9 +358,8 @@ Two residual windows remain, and neither closes from inside a library. `llama-se
 the path itself, so the microseconds between the last check and that open are not covered;
 and because llama.cpp maps weights lazily, a writer with access to the *same* file can
 still alter pages that have not been read yet. Both need the bytes to be immutable while
-they load — a read-only mount, or a directory only root can write. That is a property of
-how you deploy, and Tier 3's attested boundary is what makes it checkable rather than
-assumed.
+they load — a read-only mount, or a directory only root can write. That is a deployment
+property; today's detector cannot establish it against a hostile root user.
 
 ## Appendix: SOC 2 Control Mapping
 
@@ -369,30 +371,31 @@ report, and your auditor decides how a control is worded for your environment.
 
 | SOC 2 control area | Confidentiality tier | The typed fact | Caveat |
 |---|---|---|---|
-| Confidentiality of data in transit | Tier 0 (BYOK) | AnyInfer's adapters call the provider directly; no proxy hop exists in the call graph | Applies to customer data, not vendor prompt IP; that's what Tiers 1-4 answer |
+| Confidentiality of data in transit | Tier 0 (BYOK) | AnyInfer's adapters call the provider directly; no AnyInfer-operated proxy hop exists in the call graph | Does not constrain the application operator or configured provider |
 | Confidentiality of data at rest | Tier 1 (`SealedTemplate`) | `EncryptedTemplate.ciphertext` (AES-256-GCM); plaintext never touches the on-disk asset | Protects against static extraction only, not a live-memory or debugger control |
 | Access control / authentication | Tier 1 entitlement | `TemplateVault` refuses to decrypt without a signature-verified, unexpired `LicenseBlob` | Offline by default; online revocation is opt-in per deployment |
 | Data retention / minimization | Tier 2 (`AnyInfer Relay`) | `Relay.handle()` writes no request or response body to any durable store; zero retention is structural | You operate the Relay process, so its hosting environment's logging discipline is yours |
 | Logical access / tenant isolation | Tier 2 multi-tenant | `RelayRegistry.resolve(tenant_id, routing_key)` cannot resolve another tenant's routes | Relevant only for a shared Relay serving more than one downstream vendor |
-| Confidentiality of data in use | Tier 3 (attested local execution) | `ConfidentialExecutionStatus.end_to_end`: root on the host cannot read the prompt during local inference, when `True` | Requires TEE hardware (SEV-SNP/TDX today); `False` reported plainly otherwise |
-| Change management / fail-safe defaults | Tier 3 enforcement | `ConfidentialExecutionAdapter` raises and never calls the inner adapter when attestation is unavailable | Enforcement and pre-flight share one function, so they cannot drift apart |
-| Integrity of processing | Tier 4 (model provenance) | `ConfidentialExecutionStatus.model_verified`: weights hash-match a vendor-signed manifest, checked fresh on every call | Only a Tier 4 claim in combination with `end_to_end` |
+| Deployment readiness | Tier 3 local policy | `ConfidentialExecutionStatus.end_to_end`: local probes detect the required CPU and GPU-CC signals | Detection is advisory and local-only; no quote is checked |
+| Change management / fail-safe defaults | Tier 3 enforcement | `ConfidentialExecutionAdapter` raises and never calls the inner adapter when required signals are absent | Enforcement and pre-flight share one detector; a passing detector is not attestation |
+| Integrity of weights | Tier 4 (model provenance) | `ConfidentialExecutionStatus.model_verified`: weights hash-match a vendor-signed manifest at check time | Requires `anyinfer[attest]`; it is not a host-attested execution claim |
 
 Three scope notes an auditor will ask about: none of the tiers are availability
-controls, and none should be cited as one; the GPU-attestation claim is scoped to the
+controls, and none should be cited as one; the GPU readiness signal is scoped to the
 [deployment pairings above](#deployment-scope-today); and Tier 3 today is
 [detection, not cryptographic attestation](#detection-versus-cryptographic-attestation);
 read that section before the follow-up question arrives.
 
 !!! tip "Key Takeaways"
-    - Tiers 1–2 raise the cost of extracting prompt IP; only Tier 3 (TEE-attested local
-      execution) carries a cryptographic guarantee, and Tier 4 is meaningful only
-      inside it.
+    - Tiers 1–2 raise the cost of extracting prompt IP. Tier 3 currently detects local
+      TEE readiness and enforces that detection as a policy; hardware-quote verification
+      is not implemented.
     - Everything fails closed *in AnyInfer's own code paths*: no valid license, no
-      rendered prompt from the vault; no attestation, no generation; no matching hash,
+      rendered prompt from the vault; no required detected signals, no generation; no matching hash,
       `model_verified=False`. Tiers 1–2 gate code paths on a machine the adversary owns;
-      only Tier 3's hardware boundary is not bypassable by whoever holds the bundle.
-    - Tier 3 today detects TEE presence rather than verifying a signed hardware quote.
+      none of the current Tier 3 signals is evidence a remote party can trust.
+    - Tier 4 verifies a signed weight manifest at a point in time; it requires the
+      `anyinfer[attest]` extra and does not make the host-attestation claim.
     - The SOC 2 mapping restates the same typed facts in auditor vocabulary; it does not
       add guarantees.
 

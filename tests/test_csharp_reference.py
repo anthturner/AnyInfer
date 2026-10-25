@@ -260,6 +260,7 @@ def test_source_links_are_repository_relative(rendered: reference.Reference) -> 
         if text.startswith("public class Box<T>")
     )
     assert f"ReferenceFixture/Shapes.cs#L{line})" in box
+    assert "ReferenceFixture\\Shapes.cs" not in box
 
 
 def test_absolute_source_paths_inside_the_checkout_become_repository_relative(

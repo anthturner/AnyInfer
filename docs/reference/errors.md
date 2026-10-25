@@ -170,13 +170,15 @@ fall back to a larger model instead, or trim the prompt with
 
 <div class="anyinfer-error-card anyinfer-severity-medium" markdown>
 
-## `TransportError` :material-alert:{ title="Retryable; no usable response arrived" }
+## `TransportError` :material-alert:{ title="Retryable; a transport attempt failed" }
 
-**When:** a timeout, connection failure, or TLS error. No usable response arrived.
+**When:** a timeout, connection failure, or TLS error occurs while acquiring or reading a
+provider response.
 
-**Retryable:** yes. Since nothing was delivered, a retry cannot duplicate output the
-consumer already saw (the boundary that makes `StreamProtocolError` different). See
-[the event stream](../concepts/events.md).
+**Retryable:** yes, when the error is marked retryable. A retry can follow streamed deltas
+that already reached the consumer, so treat it as a new attempt and use attempt events to
+distinguish it. A mid-stream framing or protocol error is a `StreamProtocolError`; it surfaces
+after content rather than silently restarting. See [the event stream](../concepts/events.md).
 
 ```
 TransportError: request to ollama timed out

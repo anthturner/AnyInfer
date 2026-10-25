@@ -48,17 +48,17 @@ public static class CookbookRetrievalExample
         ArgumentNullException.ThrowIfNull(deployment);
         ArgumentNullException.ThrowIfNull(output);
         await using var client = new AsyncClient(deployment.Providers);
-        var index = await BuildIndexAsync(client, deployment.EmbeddingTarget, corpus, maxBatchInputs, cancellationToken).ConfigureAwait(false);
-        var result = await SearchAsync(client, index, deployment.EmbeddingTarget, deployment.RerankTarget, query, candidates: 3, topN: 2, cancellationToken).ConfigureAwait(false);
-        await output.WriteLineAsync($"indexed {index.Entries.Count} passages in {index.Requests} request(s), space {index.Space.ProviderId}/{index.Space.Model} ({index.Space.Dimensions} dims)").ConfigureAwait(false);
+        var index = await BuildIndexAsync(client, deployment.EmbeddingTarget, corpus, maxBatchInputs, cancellationToken);
+        var result = await SearchAsync(client, index, deployment.EmbeddingTarget, deployment.RerankTarget, query, candidates: 3, topN: 2, cancellationToken);
+        await output.WriteLineAsync($"indexed {index.Entries.Count} passages in {index.Requests} request(s), space {index.Space.ProviderId}/{index.Space.Model} ({index.Space.Dimensions} dims)");
         foreach (var warning in index.Warnings)
         {
-            await output.WriteLineAsync($"warning: {warning}").ConfigureAwait(false);
+            await output.WriteLineAsync($"warning: {warning}");
         }
 
         foreach (var hit in result.Hits)
         {
-            await output.WriteLineAsync($"{hit.PassageId}  rerank {hit.RerankScore:F2}  cosine {hit.Cosine:F2}").ConfigureAwait(false);
+            await output.WriteLineAsync($"{hit.PassageId}  rerank {hit.RerankScore:F2}  cosine {hit.Cosine:F2}");
         }
 
         return (index, result);
@@ -85,7 +85,7 @@ public static class CookbookRetrievalExample
             target: embeddingTarget,
             inputType: EmbeddingInputIntent.Document,
             batch: new BatchPolicy(maxConcurrency: 2, maxItemsOverride: maxBatchInputs),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
 
         // Vectors come back in input order across every internal batch, so IDs pair by position.
         var entries = corpus.Zip(embedded.Vectors, static (passage, vector) => new CookbookIndexEntry(passage, vector.Values)).ToArray();
@@ -120,7 +120,7 @@ public static class CookbookRetrievalExample
             target: embeddingTarget,
             inputType: EmbeddingInputIntent.Query,
             expectedSpace: index.Space,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
         var shortlist = index.Entries
             .Select(entry => (entry.Passage, Cosine: Cosine(probe.Vectors[0].Values, entry.Vector)))
             .OrderByDescending(static candidate => candidate.Cosine)
@@ -133,7 +133,7 @@ public static class CookbookRetrievalExample
                 .Select(static entry => new RerankDocument(entry.Passage.Id, entry.Passage.Text)),
             target: rerankTarget,
             topN: topN,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
         var hits = ranked.Items.Select(item => new CookbookSearchHit(item.DocumentId, item.Score, shortlist[item.DocumentId])).ToArray();
         return new CookbookSearchResult(hits, probe.Usage, ranked.Usage);
     }

@@ -48,12 +48,11 @@ public static class ConfigurationFileExample
         CancellationToken cancellationToken = default)
     {
         await using var client = AsyncClient.FromConfig(config);
-        var ranked = await client.RerankAsync(question, passages, topN: 1, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        var ranked = await client.RerankAsync(question, passages, topN: 1, cancellationToken: cancellationToken);
         var best = passages[ranked.Items[0].Index];
         var answer = await client.GenerateAsync(
             $"Answer from this passage only.\n\n{best.Text}\n\nQuestion: {question}",
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
         return new ConfiguredAnswer(best.Id, answer);
     }
     // --8<-- [end:use]

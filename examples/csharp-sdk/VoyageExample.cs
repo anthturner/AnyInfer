@@ -19,7 +19,7 @@ public static class VoyageExample
         CancellationToken cancellationToken = default)
     {
         await using var client = new AsyncClient([settings], manifests: true);
-        return await RunAsync(client, cancellationToken).ConfigureAwait(false);
+        return await RunAsync(client, cancellationToken);
     }
 
     /// <summary>Runs embedding and reranking through the default registry with the synchronous facade.</summary>
@@ -39,7 +39,7 @@ public static class VoyageExample
             inputType: EmbeddingInputIntent.Document,
             retainRaw: true,
             cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         var reranking = await client.RerankAsync(
             "Which text mentions water?",
             [
@@ -51,7 +51,7 @@ public static class VoyageExample
             returnDocuments: true,
             retainRaw: true,
             cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         return new VoyageObservation(embeddings, reranking);
     }
 

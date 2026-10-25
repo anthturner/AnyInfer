@@ -38,34 +38,41 @@ import anyinfer as ai
 
 text = "AnyInfer 0.1 adds embeddings, reranking, and an OpenAI-compatible sidecar."
 
-client = ai.Client(
+with ai.Client(
     [
         ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
         ai.ProviderSettings.of("ollama"),
     ]
-)
-result = client.generate(
-    "Summarize this release note:\n" + text, target="anthropic:claude-sonnet-4-5"
-)
+) as client:
+    result = client.generate(
+        "Summarize this release note:\n" + text, target="anthropic:claude-sonnet-4-5"
+    )
 
-print(result.text)
-print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
+    print(result.text)
+    print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
 ```
 
 Point the same call at a local model by changing one string:
 
 ```python
-result = client.generate(
-    "Summarize this release note:\n" + text, target="ollama:qwen3:8b"
-)  # "medium" is a catalog alias
+with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+    result = client.generate(
+        "Summarize this release note:\n" + text, target="ollama:qwen3:8b"
+    )
 ```
 
 Embeddings and reranking are the same client, the same routing, and the same batching —
 never a bolted-on provider option:
 
 ```python
-vectors = client.embed(["first passage", "second passage"], target="ollama:nomic-embed-text")
-ranked = client.rerank("which passage answers the question", passages, target="cohere:rerank-v3.5")
+passages = ["first passage", "second passage"]
+with ai.Client(
+    [ai.ProviderSettings.of("ollama"), ai.ProviderSettings.of("cohere", api_key="env://COHERE_API_KEY")]
+) as client:
+    vectors = client.embed(passages, target="ollama:nomic-embed-text")
+    ranked = client.rerank(
+        "which passage answers the question", passages, target="cohere:rerank-v3.5"
+    )
 ```
 
 ---

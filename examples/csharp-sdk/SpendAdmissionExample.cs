@@ -51,7 +51,7 @@ public static class SpendAdmissionExample
                 prompt,
                 target: target,
                 sampling: new Sampling(maxOutputTokens: 256),
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken);
             return new AdmissionOutcome(generation, Refusal: null);
         }
         catch (SpendLimitException refusal)

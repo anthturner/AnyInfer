@@ -35,7 +35,7 @@ public static class CredentialReferenceExample
         // Neither loading nor client construction resolves a reference; the first call that needs the
         // provider instance does, before its request is sent.
         await using var client = AsyncClient.FromConfig(config, resolver: resolver);
-        return await client.GenerateAsync(prompt, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return await client.GenerateAsync(prompt, cancellationToken: cancellationToken);
     }
     // --8<-- [end:load]
 

@@ -92,18 +92,18 @@ public static class CookbookPoliciesExample
                         route: route,
                         sampling: Summary,
                         metadata: new Dictionary<string, string> { ["tenant"] = job.Tenant },
-                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                        cancellationToken: cancellationToken);
 
                     // Time the gateway's client-side rate limit held this request before dispatch.
                     var queuedMs = generation.Timing?.Phases.GetValueOrDefault("queued_ms") ?? 0;
                     outcomes.Add(new CookbookJobOutcome(job.Id, plan.Fits, plan.EstimatedCost?.High, generation.Target?.ToString(), generation.Usage?.CostUsd, queuedMs, generation.CacheMechanism, null));
-                    await output.WriteLineAsync($"{job.Id} [{job.Tenant}] {generation.Target}: {Money(generation.Usage?.CostUsd)}").ConfigureAwait(false);
+                    await output.WriteLineAsync($"{job.Id} [{job.Tenant}] {generation.Target}: {Money(generation.Usage?.CostUsd)}");
                 }
                 catch (SpendLimitException refused)
                 {
                     // Refused before dispatch: no provider request was sent for this job.
                     outcomes.Add(new CookbookJobOutcome(job.Id, plan.Fits, plan.EstimatedCost?.High, null, null, 0, null, refused));
-                    await output.WriteLineAsync($"{job.Id} [{job.Tenant}] refused: {Money(refused.SpentUsd)} spent, next up to {Money(refused.EstimatedUsd)}, ceiling {Money(refused.LimitUsd)}").ConfigureAwait(false);
+                    await output.WriteLineAsync($"{job.Id} [{job.Tenant}] refused: {Money(refused.SpentUsd)} spent, next up to {Money(refused.EstimatedUsd)}, ceiling {Money(refused.LimitUsd)}");
                 }
             }
         }
@@ -111,7 +111,7 @@ public static class CookbookPoliciesExample
         var totals = ledger.Totals();
         var store = new SpendStore(storePath);
         store.Accumulate(ledger, bucket);
-        await output.WriteLineAsync($"run: {Money(totals.Cost)} over {totals.Requests} request(s); {totals.UnknownRequests} with unknown cost").ConfigureAwait(false);
+        await output.WriteLineAsync($"run: {Money(totals.Cost)} over {totals.Requests} request(s); {totals.UnknownRequests} with unknown cost");
         return new CookbookMeteredRun(outcomes, totals, ledger.ByTarget(), ledger.ByLabel("tenant"), store.Load());
     }
 

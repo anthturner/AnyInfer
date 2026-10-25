@@ -28,44 +28,48 @@ read.
 
 === "Sync"
 
-    ```python hl_lines="10"
+    ```python hl_lines="12"
     import anyinfer as ai
 
     text = "The 0.1 release adds embeddings, reranking, and an OpenAI-compatible sidecar."
 
-    client = ai.Client(
-        [
-            ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-        ]
-    )
-
-    result = client.generate(
-        "Summarize this in one sentence:\n" + text,
-        target="anthropic:claude-sonnet-4-5",
-    )
-
-    print(result.text)
-    client.close()
-    ```
-
-=== "Async"
-
-    ```python hl_lines="11"
-    import anyinfer as ai
-
-    text = "The 0.1 release adds embeddings, reranking, and an OpenAI-compatible sidecar."
-
-    async with ai.AsyncClient(
+    with ai.Client(
         [
             ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
         ]
     ) as client:
-        result = await client.generate(
+        result = client.generate(
             "Summarize this in one sentence:\n" + text,
             target="anthropic:claude-sonnet-4-5",
         )
 
         print(result.text)
+    ```
+
+=== "Async"
+
+    ```python hl_lines="15"
+    import asyncio
+
+    import anyinfer as ai
+
+    async def main() -> None:
+        text = "The 0.1 release adds embeddings, reranking, and an OpenAI-compatible sidecar."
+
+        async with ai.AsyncClient(
+            [
+                ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+            ]
+        ) as client:
+            result = await client.generate(
+                "Summarize this in one sentence:\n" + text,
+                target="anthropic:claude-sonnet-4-5",
+            )
+
+            print(result.text)
+
+
+    asyncio.run(main())
     ```
 
 === "C# async (prerelease)"
@@ -84,8 +88,8 @@ The C# tabs cover buffered generation in the native prerelease. Model discovery 
 explicit instance calls; the [C# SDK overview](csharp-sdk.md) shows their async and synchronous
 forms.
 
-The highlighted line is the only one that changes when you point the same call at a
-different provider or a local model.
+The highlighted `target=` line is the call-site change when you point the same request at a
+different configured provider or local model. Configure that provider and its credentials too.
 
 Note the credential: `"env://ANTHROPIC_API_KEY"` is a *reference*, safe to keep in a
 config file. It is resolved once and registered for redaction, so the key can never
@@ -96,6 +100,8 @@ appear in a log line or an error message. See
 `close()`:
 
 ```python
+import anyinfer as ai
+
 with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
     result = client.generate("Why is the sky blue?", target="ollama:qwen3:8b")
 ```
@@ -103,13 +109,17 @@ with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
 ## Streaming
 
 ```python
-with client.stream(messages, target="ollama:qwen3:8b") as stream:
-    for event in stream:
-        if isinstance(event, ai.TextDelta):
-            print(event.text, end="", flush=True)
+import anyinfer as ai
 
-    final = stream.result
-    print(f"\n\n{final.usage.output_tokens} tokens in {final.timing.total_ms:.0f} ms")
+messages = [ai.user("Explain TCP slow start in two sentences.")]
+with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+    with client.stream(messages, target="ollama:qwen3:8b") as stream:
+        for event in stream:
+            if isinstance(event, ai.TextDelta):
+                print(event.text, end="", flush=True)
+
+        final = stream.result
+        print(f"\n\n{final.usage.output_tokens} tokens in {final.timing.total_ms:.0f} ms")
 ```
 
 Using the stream as a context manager matters: leaving the block early cancels the
@@ -122,14 +132,16 @@ in-flight request instead of letting it run on. See
 have configured:
 
 ```python
-client = ai.Client(
+import anyinfer as ai
+
+prompt = "Give one practical use for a local language model."
+with ai.Client(
     [
         ai.ProviderSettings.of("ollama"),
         ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
     ]
-)
-
-result = client.generate(prompt, target="medium")  # -> ollama, since it is listed first
+) as client:
+    result = client.generate(prompt, target="medium")  # -> ollama, since it is listed first
 ```
 
 The order you configure providers is the preference order. See
@@ -140,6 +152,8 @@ The order you configure providers is the preference order. See
 Pass a JSON schema and get back a validated Python value:
 
 ```python
+import anyinfer as ai
+
 SUMMARY = {
     "type": "object",
     "properties": {
@@ -149,15 +163,19 @@ SUMMARY = {
     "required": ["headline", "topics"],
 }
 
-result = client.generate(
-    article,
-    target="medium",
-    schema=SUMMARY,
-    repair=ai.Repair(max_attempts=1),
-)
+article = "The release adds embeddings, reranking, and an OpenAI-compatible sidecar."
+with ai.Client(
+    [ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]
+) as client:
+    result = client.generate(
+        article,
+        target="anthropic:claude-sonnet-4-5",
+        schema=SUMMARY,
+        repair=ai.Repair(max_attempts=1),
+    )
 
-print(result.structured["headline"])
-print(result.structured_mechanism)  # "json_schema", "grammar", "json_mode", or "prompt"
+    print(result.structured["headline"])
+    print(result.structured_mechanism)  # "json_schema", "grammar", "json_mode", or "prompt"
 ```
 
 AnyInfer uses the strongest mechanism the provider supports, then validates the result
@@ -167,16 +185,26 @@ gets the shape wrong. See [structured output](../concepts/structured-output.md).
 ## Fallback Chains
 
 ```python
+import anyinfer as ai
+
+prompt = "Summarize this release note in one sentence."
 route = ai.Route(
     targets=("anthropic:claude-sonnet-4-5", "openai:gpt-5", "ollama:qwen3:8b"),
     retry=ai.Retry(max_attempts=3),
 )
 
-result = client.generate(prompt, route=route)
+with ai.Client(
+    [
+        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+        ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
+        ai.ProviderSettings.of("ollama"),
+    ]
+) as client:
+    result = client.generate(prompt, route=route)
 
-print(f"served by {result.target}")
-for attempt in result.attempts:
-    print(f"  {attempt.target} -> {attempt.outcome}")
+    print(f"served by {result.target}")
+    for attempt in result.attempts:
+        print(f"  {attempt.target} -> {attempt.outcome}")
 ```
 
 Every result carries its full routing trail, so "why was this slow?" is answerable

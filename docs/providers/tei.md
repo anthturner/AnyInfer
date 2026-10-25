@@ -90,9 +90,8 @@ ID and its original index. Usage stays unknown (`null`), never zero, so a `Spend
 these requests in `UnknownRequests`. The offline runner executes this recipe against scripted
 `/info`, `/embed`, and `/rerank` responses and checks the discovered targets, the unknown usage,
 the normalized `EmbeddingSpace`, the caller IDs, and that a reranker on the embedding port stops
-the recipe before any operation request. The same public APIs (`ModelsAsync` with an operation,
-then buffered `EmbedAsync` and `RerankAsync`) were exercised against the pinned TEI 1.9.4 CPU
-deployment on 2026-10-22.
+the recipe before any operation request. A native live public-API probe against the pinned TEI
+1.9.4 CPU deployment is defined but remains pending.
 
 ### Batch Against a Verified Server Limit
 
@@ -136,9 +135,8 @@ For the exact request/response fields this adapter depends on, see
 [contracts/tei.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/tei.md).
 Python traffic was recorded against the pinned TEI 1.9.4 image and model revisions on
 2026-10-22; the three sanitized cassettes replay in CI without a server. The older
-2026-08-24 TEI 1.8.3 evidence is retained in the contract as historical evidence. The C# public
-APIs for operation-filtered discovery and buffered embedding and reranking were exercised against
-the pinned TEI 1.9.4 CPU deployment on 2026-10-22.
+2026-08-24 TEI 1.8.3 evidence is retained in the contract as historical evidence. The C# examples
+and offline runner use scripted responses; the native live public-API probe remains pending.
 
 ## See Also
 

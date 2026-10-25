@@ -27,15 +27,14 @@ def list_files(pattern: str = "*") -> str:
     return "\n".join(str(p) for p in Path.cwd().glob(pattern))
 
 
-client = ai.Client([ai.ProviderSettings.of("ollama")])
+with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
+    result = client.run_tools(
+        sys.argv[1],
+        tools=[read_file, list_files],
+        target="ollama:qwen3:8b",
+    )
 
-result = client.run_tools(
-    sys.argv[1],
-    tools=[read_file, list_files],
-    target="ollama:qwen3:8b",
-)
-
-print(result.text)
+    print(result.text)
 ```
 
 The model decides when to call `read_file` or `list_files`; AnyInfer runs the function,

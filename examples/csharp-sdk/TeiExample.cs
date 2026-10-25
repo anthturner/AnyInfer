@@ -23,7 +23,7 @@ public static class TeiExample
         CancellationToken cancellationToken = default)
     {
         await using var client = new AsyncClient([embeddingSettings, rerankSettings], manifests: true);
-        return await RunAsync(client, cancellationToken).ConfigureAwait(false);
+        return await RunAsync(client, cancellationToken);
     }
 
     /// <summary>Runs embedding and reranking through the default registry with the synchronous facade.</summary>
@@ -43,7 +43,7 @@ public static class TeiExample
             target: "tei-embed:embed-model",
             retainRaw: true,
             cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         var reranking = await client.RerankAsync(
             "Which text mentions water?",
             [
@@ -54,7 +54,7 @@ public static class TeiExample
             returnDocuments: true,
             retainRaw: true,
             cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         return new TeiObservation(embeddings, reranking);
     }
 

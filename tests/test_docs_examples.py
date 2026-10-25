@@ -10,9 +10,18 @@ These are the *shapes* the docs promise, run end to end.
 from __future__ import annotations
 
 import json
+import re
+import textwrap
+from pathlib import Path
 
 import anyinfer as ai
-from anyinfer.testing.fakes import FakeOllamaServer, FakeOpenAIServer, FakeResponse
+from anyinfer.testing.fakes import (
+    FakeAnthropicServer,
+    FakeOllamaServer,
+    FakeOpenAIServer,
+    FakeResponse,
+    FakeResponsesServer,
+)
 from support import make_client, make_sync_client
 
 
@@ -31,23 +40,130 @@ def _ollama_client(server: FakeOllamaServer) -> ai.AsyncClient:
 # ---- quickstart ----------------------------------------------------------------------
 
 
-def test_quickstart_first_call() -> None:
-    """docs/guides/quickstart.md — the three-line sync example."""
-    server = FakeOpenAIServer(FakeResponse(text="A one-sentence summary."))
-    with make_sync_client(server) as client:
+def _quickstart_fences() -> list[str]:
+    """Return the authored Python fences from the introductory quickstart."""
+    page = (Path(__file__).resolve().parent.parent / "docs" / "guides" / "quickstart.md")
+    matches = re.finditer(
+        r"(?ms)^ {0,4}```python[^\n]*\n(.*?)^ {0,4}```[ \t]*$",
+        page.read_text(encoding="utf-8"),
+    )
+    return [textwrap.dedent(match.group(1)) for match in matches]
+
+
+def test_quickstart_target_highlights_match_authored_source() -> None:
+    """The first-call highlights name the `target=` lines in the rendered Python source."""
+    page = (Path(__file__).resolve().parent.parent / "docs" / "guides" / "quickstart.md")
+    matches = re.finditer(
+        r'(?ms)^ {0,4}```python hl_lines="(\d+)"\n(.*?)^ {0,4}```[ \t]*$',
+        page.read_text(encoding="utf-8"),
+    )
+    highlights = [
+        (int(match.group(1)), textwrap.dedent(match.group(2))) for match in matches
+    ]
+    assert highlights
+    for highlighted_line, source in highlights:
+        target_line = next(
+            number for number, line in enumerate(source.splitlines(), start=1) if "target=" in line
+        )
+        assert highlighted_line == target_line
+
+
+def test_authored_quickstart_python_fences_execute(monkeypatch) -> None:
+    """Every authored Quickstart program runs with real calls through fake transports."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    fences = _quickstart_fences()
+    assert fences
+
+    def offline_factory(actual_of, transports):
+        def offline_settings(provider_id: str, **kwargs):
+            if provider_id not in transports:
+                raise AssertionError(f"Quickstart fence selected an unconfigured provider: {provider_id}")
+            kwargs["transport"] = transports[provider_id]
+            return actual_of(provider_id, **kwargs)
+
+        return offline_settings
+
+    for number, fence in enumerate(fences, start=1):
+        anthropic_response = FakeResponse(text="A fake response.")
+        if "schema=SUMMARY" in fence:
+            anthropic_response = FakeResponse(
+                text=json.dumps({"headline": "A headline", "topics": ["topic"]})
+            )
+        anthropic = FakeAnthropicServer(anthropic_response)
+        ollama = FakeOllamaServer(FakeResponse(text="A local fake response."))
+        openai = FakeResponsesServer(FakeResponse(text="An OpenAI fake response."))
+        offline_settings = offline_factory(
+            ai.ProviderSettings.of,
+            {
+                "anthropic": anthropic.transport(),
+                "ollama": ollama.transport(),
+                "openai": openai.transport(),
+            },
+        )
+
+        compile(fence, f"quickstart-fence-{number}", "exec")
+        with monkeypatch.context() as patched:
+            patched.setattr(ai.ProviderSettings, "of", staticmethod(offline_settings))
+            exec(fence, {"__name__": "__main__"})
+
+
+def test_quickstart_first_call(monkeypatch) -> None:
+    """docs/guides/quickstart.md — the sync Anthropic call and its owned lifetime."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    server = FakeAnthropicServer(FakeResponse(text="A one-sentence summary."))
+    with ai.Client(
+        [
+            ai.ProviderSettings.of(
+                "anthropic",
+                api_key="env://ANTHROPIC_API_KEY",
+                transport=server.transport(),
+            )
+        ]
+    ) as client:
         result = client.generate(
             "Summarize this in one sentence:\nsome text",
-            target="openai-compat:fake-model-small",
+            target="anthropic:claude-sonnet-4-5",
         )
     assert result.text == "A one-sentence summary."
 
 
+async def test_quickstart_async_first_call(monkeypatch) -> None:
+    """docs/guides/quickstart.md — the async wrapper uses the same real call shape."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    server = FakeAnthropicServer(FakeResponse(text="An async one-sentence summary."))
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "anthropic",
+                api_key="env://ANTHROPIC_API_KEY",
+                transport=server.transport(),
+            )
+        ]
+    ) as client:
+        result = await client.generate(
+            "Summarize this in one sentence:\nsome text",
+            target="anthropic:claude-sonnet-4-5",
+        )
+    assert result.text == "An async one-sentence summary."
+
+
 def test_quickstart_streaming() -> None:
     """docs/guides/quickstart.md and guides/streaming.md — the streaming shape."""
-    server = FakeOpenAIServer(FakeResponse(text="Streaming output."))
+    server = FakeOllamaServer(FakeResponse(text="Streaming output."))
     with (
-        make_sync_client(server) as client,
-        client.stream("hi", target="openai-compat:m") as stream,
+        ai.Client(
+            [
+                ai.ProviderSettings.of(
+                    "ollama",
+                    base_url="http://127.0.0.1:11434",
+                    transport=server.transport(),
+                )
+            ]
+        ) as client,
+        client.stream(
+            [ai.user("Explain TCP slow start in two sentences.")], target="ollama:qwen3:8b"
+        ) as stream,
     ):
         chunks = [e.text for e in stream if isinstance(e, ai.TextDelta)]
         final = stream.result
@@ -55,6 +171,31 @@ def test_quickstart_streaming() -> None:
     assert "".join(chunks) == "Streaming output."
     assert final.usage.output_tokens is not None
     assert final.timing.total_ms >= 0
+
+
+def test_quickstart_alias_uses_the_first_configured_provider(monkeypatch) -> None:
+    """docs/guides/quickstart.md — alias resolution follows configured provider order."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    ollama = FakeOllamaServer(FakeResponse(text="local answer"))
+    anthropic = FakeAnthropicServer(FakeResponse(text="hosted answer"))
+    with ai.Client(
+        [
+            ai.ProviderSettings.of(
+                "ollama", base_url="http://127.0.0.1:11434", transport=ollama.transport()
+            ),
+            ai.ProviderSettings.of(
+                "anthropic",
+                api_key="env://ANTHROPIC_API_KEY",
+                transport=anthropic.transport(),
+            ),
+        ]
+    ) as client:
+        result = client.generate(
+            "Give one practical use for a local language model.", target="medium"
+        )
+
+    assert result.target.provider_id == "ollama"
+    assert result.text == "local answer"
 
 
 async def test_quickstart_embed_and_rerank() -> None:
@@ -93,8 +234,9 @@ async def test_quickstart_embed_and_rerank() -> None:
         await client.aclose()
 
 
-async def test_quickstart_structured_output() -> None:
-    """docs/guides/quickstart.md — schema with repair."""
+def test_quickstart_structured_output(monkeypatch) -> None:
+    """docs/guides/quickstart.md — the configured Anthropic schema call with repair."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     summary_schema = {
         "type": "object",
         "properties": {
@@ -104,12 +246,20 @@ async def test_quickstart_structured_output() -> None:
         "required": ["headline", "topics"],
     }
     payload = {"headline": "A headline", "topics": ["a", "b"]}
-    server = FakeOpenAIServer(FakeResponse(text=json.dumps(payload)))
+    server = FakeAnthropicServer(FakeResponse(text=json.dumps(payload)))
 
-    async with make_client(server) as client:
-        result = await client.generate(
-            "article text",
-            target="openai-compat:m",
+    with ai.Client(
+        [
+            ai.ProviderSettings.of(
+                "anthropic",
+                api_key="env://ANTHROPIC_API_KEY",
+                transport=server.transport(),
+            )
+        ]
+    ) as client:
+        result = client.generate(
+            "The release adds embeddings, reranking, and an OpenAI-compatible sidecar.",
+            target="anthropic:claude-sonnet-4-5",
             schema=summary_schema,
             repair=ai.Repair(max_attempts=1),
         )
@@ -118,20 +268,40 @@ async def test_quickstart_structured_output() -> None:
     assert result.structured_mechanism in {"json_schema", "grammar", "json_mode", "prompt"}
 
 
-async def test_quickstart_fallback_chain() -> None:
-    """docs/guides/quickstart.md and guides/fallback.md — the attempt trail."""
-    server = FakeOpenAIServer([FakeResponse(status=503), FakeResponse(text="recovered")])
-    async with make_client(server) as client:
-        result = await client.generate(
-            "hi",
+def test_quickstart_fallback_chain(monkeypatch) -> None:
+    """docs/guides/quickstart.md — configured providers and core-owned fallback."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    anthropic = FakeAnthropicServer([FakeResponse(status=503)] * 3)
+    openai = FakeResponsesServer(FakeResponse(text="recovered"))
+    ollama = FakeOllamaServer(FakeResponse(text="local fallback"))
+    with ai.Client(
+        [
+            ai.ProviderSettings.of(
+                "anthropic",
+                api_key="env://ANTHROPIC_API_KEY",
+                transport=anthropic.transport(),
+            ),
+            ai.ProviderSettings.of(
+                "openai",
+                api_key="env://OPENAI_API_KEY",
+                transport=openai.transport(),
+            ),
+            ai.ProviderSettings.of(
+                "ollama", base_url="http://127.0.0.1:11434", transport=ollama.transport()
+            ),
+        ]
+    ) as client:
+        result = client.generate(
+            "Summarize this release note in one sentence.",
             route=ai.Route(
-                targets=("openai-compat:m",),
-                retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+                targets=("anthropic:claude-sonnet-4-5", "openai:gpt-5", "ollama:qwen3:8b"),
+                retry=ai.Retry(max_attempts=3, backoff_base_s=0.0),
             ),
         )
 
     assert result.text == "recovered"
-    assert [a.outcome for a in result.attempts] == ["retried", "ok"]
+    assert [a.outcome for a in result.attempts] == ["retried", "retried", "failed", "ok"]
     for attempt in result.attempts:
         assert str(attempt.target)
 

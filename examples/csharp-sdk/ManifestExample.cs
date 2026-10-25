@@ -21,7 +21,7 @@ public static class ManifestExample
             cancellationToken: cancellationToken);
         var partial = stream.Manifest
             ?? throw new InvalidOperationException("Manifest capture was not initialized for the stream.");
-        var generation = await stream.CollectAsync(cancellationToken).ConfigureAwait(false);
+        var generation = await stream.CollectAsync(cancellationToken);
         var terminal = generation.Manifest
             ?? throw new InvalidOperationException("The completed generation has no manifest.");
         return new ManifestObservation(partial, terminal, generation);

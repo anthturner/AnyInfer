@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -710,7 +710,11 @@ def _source(
                 f"{item['uid']} has a source path outside the repository: {recorded}"
             ) from None
     else:
-        path = PurePosixPath(os.path.normpath(str(docfx_root / recorded))).as_posix()
+        # DocFX records repository-relative paths using the host separator. Source URLs,
+        # manifests, and the rendered Markdown are platform-independent, so normalize the
+        # recorded path before combining it with the POSIX DocFX root.
+        relative = PurePosixPath(recorded.replace("\\", "/"))
+        path = PurePosixPath(posixpath.normpath(str(docfx_root / relative))).as_posix()
     if path.startswith("../") or path.startswith("/"):
         raise ReferenceError(f"{item['uid']} has a source path outside the repository: {path}")
     line = source.get("startLine")

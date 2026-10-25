@@ -26,6 +26,11 @@ _LINK = re.compile(r"(?P<image>!?)\[([^\]]*)\]\(([^)\s]+)(\s+[^)]*)?\)")
 _ADMONITION = re.compile(r'^(?P<indent>\s*)!!!\s+(?P<kind>\w+)(?:\s+"(?P<title>[^"]+)")?\s*$')
 _TAB = re.compile(r'^(?P<indent>\s*)===\s+"(?P<title>[^"]+)"\s*$')
 _DETAILS = re.compile(r'^(?P<indent>\s*)\?\?\?\+?\s+\w+(?:\s+"(?P<title>[^"]+)")?\s*$')
+_FENCE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>`{3,})(?P<info>[^\r\n]*)$")
+_MATERIAL_HL_LINES = re.compile(
+    r'(?P<space>[ \t]+)hl_lines=(?P<quote>["\'])(?P<lines>\d+(?:-\d+)?(?:[ \t,]+\d+(?:-\d+)?)*)'
+    r'(?P=quote)'
+)
 _MATERIAL_ICON = re.compile(
     r':material-(?P<name>[a-z0-9-]+):(?:\{\s*title="(?P<title>[^"]*)"\s*\})?'
 )
@@ -347,6 +352,7 @@ def _prepare_markdown(
     content = content.replace("{{ extra.anyinfer_version }}", str(read_versions(root)["python"]))
     content = _expand_snippets(content, root)
     content = _expand_api_markers(content, renderer)
+    content = _convert_material_fence_options(content)
     content = _convert_admonitions(content)
     content = _convert_details(content)
     content, has_tabs = _convert_tabs(content)
@@ -445,6 +451,25 @@ def _expand_api_markers(content: str, renderer: Callable[..., str]) -> str:
             raise ValueError(f"API renderer left a directive for {match.group('symbol')!r}")
         indent = match.group("indent")
         lines.extend(f"{indent}{part}\n" for part in rendered.rstrip("\n").splitlines())
+    return "".join(lines)
+
+
+def _convert_material_fence_options(content: str) -> str:
+    """Translate Material line-highlight attributes into Docusaurus fence metadata."""
+    lines: list[str] = []
+    for line in content.splitlines(keepends=True):
+        header = _FENCE.match(line.rstrip("\r\n"))
+        if header is None:
+            lines.append(line)
+            continue
+
+        def replace(match: re.Match[str]) -> str:
+            ranges = re.sub(r"[ \t]+", ",", match.group("lines"))
+            return f"{match.group('space')}{{{ranges}}}"
+
+        info = _MATERIAL_HL_LINES.sub(replace, header.group("info"))
+        ending = line[len(line.rstrip("\r\n")) :]
+        lines.append(f"{header.group('indent')}{header.group('marker')}{info}{ending}")
     return "".join(lines)
 
 

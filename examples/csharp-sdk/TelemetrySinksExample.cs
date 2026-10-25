@@ -49,8 +49,7 @@ public static class TelemetrySinksExample
         {
             // Constructor observers are payload-free; this one subscription opts in to payloads.
             client.Subscribe(audit, payloads: true);
-            var generation = await client.GenerateAsync("Say hello.", target: target, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
+            var generation = await client.GenerateAsync("Say hello.", target: target, cancellationToken: cancellationToken);
             trace.Flush();
             return generation;
         }

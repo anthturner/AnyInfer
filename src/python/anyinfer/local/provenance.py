@@ -1,8 +1,8 @@
 """Tier 4: model-weight provenance verification.
 
-Tier 3 (`attestation.py`) proves *where* a prompt ran. It says nothing about *what* ran
-inside it — whether the model weights are the exact, certified artifact a vendor shipped,
-or something swapped or tampered with in place. This module extends the manifest
+The local readiness detector (`attestation.py`) does not verify a hardware quote or prove
+where a prompt ran. This module independently checks whether model weights match a
+vendor-signed manifest. It extends the manifest
 discipline `local/runtimes.py` already applies to *runtime* builds (`runtime.json` pins
 architecture, backend, and build id) to the *model weights* themselves: a content hash and
 signature check against a vendor-published manifest.
@@ -14,13 +14,12 @@ operates a shared signing service or takes custody of vendor key material, mirro
 AnyInfer. A vendor's own tooling (e.g. `cryptography`'s `Ed25519PrivateKey` directly, or
 any signing process they already trust) produces the signature; this module only checks it.
 
-**Only a Tier 4 claim when it runs inside Tier 3's attested boundary.** A hash-and-signature
-check on an unattested host is a real, valid check, but a *weaker and different* claim —
-verifying that the file on disk matches a signature, with no guarantee about who else
-could have read or swapped it before or during the check. Marketing that as "Tier 4" would
-misrepresent the guarantee DESIGN.md §30.5 defines; the field this
-module populates (`ConfidentialExecutionStatus.model_verified`) is documented accordingly
-— a caller must additionally check `end_to_end` before treating it as the full claim.
+**A successful check verifies files, not an attested execution boundary.** It establishes
+that the weights read at check time match the signed manifest. It does not prove what an
+untrusted host later loads or prevent that host from reading or replacing the files.
+`ConfidentialExecutionStatus.model_verified` reports this verification result;
+`end_to_end` reports detected local readiness. Even when both are true, no hardware quote
+has been verified and the pair is not an attested provenance guarantee.
 
 **Requires the `attest` extra** (``pip install anyinfer[attest]``) for the signature
 verification dependency (`cryptography`) — never imported at module scope, so importing

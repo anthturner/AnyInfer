@@ -51,7 +51,7 @@ public static class RequestPolicyExample
             cachePolicy: new CachePolicy());
         var deltas = new List<ToolCallDelta>();
         await using var stream = client.StreamAsync(request, cancellationToken);
-        await foreach (var item in stream.WithCancellation(cancellationToken).ConfigureAwait(false))
+        await foreach (var item in stream.WithCancellation(cancellationToken))
         {
             if (item is ToolCallDelta delta)
             {

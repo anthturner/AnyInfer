@@ -22,7 +22,7 @@ public static class TelemetryExample
             var generation = await client.GenerateAsync(
                 "Say hello.",
                 target: target,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken);
             return new TelemetryObservation(generation, observer.Snapshot());
         }
         finally

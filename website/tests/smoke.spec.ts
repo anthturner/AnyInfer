@@ -126,6 +126,7 @@ test.describe('the static documentation artifact', () => {
     const python = page.locator('.theme-doc-markdown pre').filter({hasText: 'import anyinfer'}).first();
     await expect(python).toBeVisible();
     await expect(python).toContainText('generate(');
+    await expect(python.locator('.theme-code-block-highlighted-line')).toContainText('target=');
     await page.goto('/csharp/quickstart/');
     const article = page.locator('.theme-doc-markdown');
     await expect(article.getByRole('heading', {level: 1})).toBeVisible();
@@ -226,7 +227,7 @@ test.describe('the static documentation artifact', () => {
     await expect(page.locator('.navbar-sidebar').getByRole('link', {name: 'Installation and Extras', exact: true})).toBeVisible();
   });
 
-  test('gives each download option enough room for commands and platform choices', async ({page}) => {
+  test('gives each download option enough room for commands and platform choices', async ({page}, testInfo) => {
     for (const width of [320, 390, 768, 1024, 1440]) {
       await page.setViewportSize({width, height: 1000});
       await page.goto('/downloads/');
@@ -253,6 +254,9 @@ test.describe('the static documentation artifact', () => {
         const logo = (await page.locator('.navbar__inner .navbar__logo').boundingBox())!;
         const search = (await page.getByRole('searchbox').boundingBox())!;
         expect(logo.x + logo.width).toBeLessThan(search.x);
+      }
+      if (width === 390 || width === 1440) {
+        await page.screenshot({path: testInfo.outputPath(`downloads-${width}.png`), fullPage: true});
       }
     }
   });

@@ -41,10 +41,8 @@ public static class TeiServersExample
         await using var client = new AsyncClient(servers);
 
         // GET /info reports the one model a TEI process serves and whether it embeds or reranks.
-        var embedder = (await client.ModelsAsync("tei-embed", InferenceOperation.Embedding, cancellationToken)
-            .ConfigureAwait(false)).FirstOrDefault()?.Id;
-        var reranker = (await client.ModelsAsync("tei-rerank", InferenceOperation.Rerank, cancellationToken)
-            .ConfigureAwait(false)).FirstOrDefault()?.Id;
+        var embedder = (await client.ModelsAsync("tei-embed", InferenceOperation.Embedding, cancellationToken)).FirstOrDefault()?.Id;
+        var reranker = (await client.ModelsAsync("tei-rerank", InferenceOperation.Rerank, cancellationToken)).FirstOrDefault()?.Id;
         if (embedder is null || reranker is null)
         {
             return new TeiServersObservation(embedder, reranker, Embeddings: null, Ranking: null);
@@ -53,13 +51,13 @@ public static class TeiServersExample
         var embeddings = await client.EmbedAsync(
             documents.Select(static document => document.Text),
             target: $"tei-embed:{embedder}",
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
         var ranking = await client.RerankAsync(
             query,
             documents,
             target: $"tei-rerank:{reranker}",
             topN: 2,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
         return new TeiServersObservation(embedder, reranker, embeddings, ranking);
     }
     // --8<-- [end:discover]

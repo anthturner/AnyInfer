@@ -26,7 +26,7 @@ public static class ServerToolExample
             serverTools: [new ServerToolSpec("web_search", maxUses: 2)]);
         try
         {
-            var answer = await client.GenerateAsync(request, cancellationToken).ConfigureAwait(false);
+            var answer = await client.GenerateAsync(request, cancellationToken);
             var searches = answer.ServerToolUses
                 .Where(static use => use.Kind == "web_search")
                 .Sum(static use => use.Uses);
@@ -36,8 +36,7 @@ public static class ServerToolExample
             when (failure.Attempts.All(static attempt => attempt.Error is UnsupportedInputException))
         {
             // Every target refused the server-side tool before its provider was called.
-            var answer = await client.GenerateAsync(question, target: target, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
+            var answer = await client.GenerateAsync(question, target: target, cancellationToken: cancellationToken);
             return new ServerToolObservation(answer, Searches: 0, SearchOffered: false);
         }
     }

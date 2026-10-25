@@ -51,7 +51,7 @@ public static class CookbookObservabilityExample
             cancellationToken: cancellationToken);
         var partial = stream.Manifest
             ?? throw new InvalidOperationException("Manifest capture is enabled, so a stream always has a manifest.");
-        var generation = await stream.CollectAsync(cancellationToken).ConfigureAwait(false);
+        var generation = await stream.CollectAsync(cancellationToken);
         var terminal = generation.Manifest
             ?? throw new InvalidOperationException("A completed generation carries its terminal manifest.");
 
@@ -59,7 +59,7 @@ public static class CookbookObservabilityExample
         var check = await SchemaValidator.ValidateAsync(
             terminal.ToDictionary(),
             new SchemaSpec(ManifestUtilities.JsonSchema()),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
         if (!check.IsValid)
         {
             throw new InvalidOperationException("The manifest does not match the embedded manifest schema: " + string.Join("; ", check.Messages));

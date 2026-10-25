@@ -46,7 +46,7 @@ public static class AccountingExample
             generation = await client.GenerateAsync(
                 "Count this request.",
                 target: target,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken);
         }
 
         var storeWasAbsent = !File.Exists(storePath);
@@ -55,11 +55,11 @@ public static class AccountingExample
         var persisted = store.Load();
 
         var limiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false));
-        await using (var firstLease = await limiter.AcquireAsync(cancellationToken).ConfigureAwait(false))
+        await using (var firstLease = await limiter.AcquireAsync(cancellationToken))
         {
         }
 
-        await using (var secondLease = await limiter.AcquireAsync(cancellationToken).ConfigureAwait(false))
+        await using (var secondLease = await limiter.AcquireAsync(cancellationToken))
         {
         }
 

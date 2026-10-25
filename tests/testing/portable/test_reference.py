@@ -126,7 +126,7 @@ def test_foreign_anyinfer_module_refuses_environment_capture(
     foreign = tmp_path / "foreign.py"
     foreign.write_text("foreign", encoding="utf-8")
     monkeypatch.setitem(sys.modules, "anyinfer", _module("anyinfer", foreign))
-    with pytest.raises(ReferencePreflightError, match="escapes its root"):
+    with pytest.raises(ReferencePreflightError, match="not under repository src/python"):
         reference.capture_reference_environment(preflight)
 
 

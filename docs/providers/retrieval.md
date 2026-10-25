@@ -50,7 +50,7 @@ the provider instance ID (`voyage`, `jina`, or the alias you configured).
 | Embedding batches | [Batching engages](../concepts/embeddings.md#batching) at 1,000 inputs | No documented ceiling: Jina batches internally, so no limit is invented; requests above the library's sanity ceilings refuse locally, and `BatchPolicy.max_items_override` applies an independently verified limit |
 | Rerank documents | 1,000 is a hard cap; the core refuses larger requests unless `rerank_cross_batch` opts into chunk-local rankings | `top_n` is taken natively by the reranker |
 | Truncation | Defaults on server-side: over-length inputs are cut, not rejected. Disable per call with `provider_options={"voyage": {"truncation": False}}` | — |
-| Dimensionality | — | Matryoshka truncation via `dimensions=`; `late_chunking` via `provider_options={"jina": {"late_chunking": True}}` |
+| Dimensionality | `output_dimension` via the shared `dimensions=` argument | Matryoshka truncation via `dimensions=`; `late_chunking` via `provider_options={"jina": {"late_chunking": True}}` |
 
 ## Notes
 

@@ -36,7 +36,7 @@ const features = [
   ],
   [
     'Confidentiality tiers',
-    'Encrypted-at-rest templates, zero-retention orchestration, and one function that tells you if a box can run a model under hardware attestation — honestly tiered, nowhere else.',
+    'Encrypted templates, a caller-operated relay, and attestation-readiness detection, with explicit guarantees and limits.',
     '/guides/confidentiality-tiers/',
   ],
 ] as const;
@@ -52,9 +52,9 @@ export default function Home(): ReactNode {
               <img className={styles.onLight} src="/assets/anyinfer-wordmark-on-light.svg" alt="AnyInfer" width="671" height="200" />
               <img className={styles.onDark} src="/assets/anyinfer-wordmark-on-dark.svg" alt="AnyInfer" width="671" height="200" />
             </h1>
-            <p className={styles.lead}>One typed inference layer for hosted APIs and a supervised local model — with a test
-              kit for your failure paths, provenance on every number, and a confidentiality story
-              no other BYOK library ships.</p>
+            <p className={styles.lead}>One typed inference layer for hosted APIs and supervised local models — with a test
+              kit for your failure paths, provenance-tagged capabilities, and explicit
+              confidentiality controls.</p>
             <div className={styles.actions}>
               <a className="anyinfer-button anyinfer-button-primary" href="/python/quickstart/">Python quickstart</a>
               <a className="anyinfer-button anyinfer-button-secondary" href="/csharp/">C# SDK (prerelease)</a>

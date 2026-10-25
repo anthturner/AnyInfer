@@ -296,7 +296,7 @@ async def test_release_report_rechecks_foreign_cached_anyinfer_before_publicatio
         )
         return _observation()
 
-    with pytest.raises(release_report.ReleaseReportError, match="outside the committed checkout"):
+    with pytest.raises(release_report.ReleaseReportError, match="not under repository src/python"):
         await release_report.write_release_report(
             selected,
             repository_root=_ROOT,

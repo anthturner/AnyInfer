@@ -16,8 +16,8 @@ public static class LifecycleExample
         ArgumentException.ThrowIfNullOrWhiteSpace(providerId);
 
         await using var client = new AsyncClient([settings]);
-        var models = await client.ModelsAsync(providerId, cancellationToken: cancellationToken).ConfigureAwait(false);
-        var health = await client.HealthAsync(providerId, cancellationToken).ConfigureAwait(false);
+        var models = await client.ModelsAsync(providerId, cancellationToken: cancellationToken);
+        var health = await client.HealthAsync(providerId, cancellationToken);
         return new LifecycleObservation(models, health);
     }
 

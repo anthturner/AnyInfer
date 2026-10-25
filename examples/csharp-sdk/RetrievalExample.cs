@@ -21,7 +21,7 @@ public static class RetrievalExample
             ["A quiet river bends through the valley.", "A lighthouse watches the harbor."],
             target: target,
             cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         var reranking = await client.RerankAsync(
             "Which text mentions water?",
             [
@@ -31,7 +31,7 @@ public static class RetrievalExample
             target: target,
             returnDocuments: true,
             cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         return new RetrievalObservation(embeddings, reranking);
     }
 

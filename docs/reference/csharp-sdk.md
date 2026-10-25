@@ -47,9 +47,9 @@ bindings:
 | [`voyage`](../providers/retrieval.md) | Embedding, rerank | `https://api.voyageai.com/v1` |
 | [`jina`](../providers/retrieval.md) | Embedding, rerank | `https://api.jina.ai/v1` |
 
-Buffered embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
-deployment on 2026-10-22. Cerebras, Hyperbolic, Nscale, Voyage, and Jina have offline
-scripted-handler evidence only; their hosted traffic has not been live-verified.
+TEI, Cerebras, Hyperbolic, Nscale, Voyage, and Jina have offline scripted-handler evidence
+only. The native TEI live public-API probe against the pinned 1.9.4 CPU deployment remains
+pending; hosted traffic for the other providers has not been live-verified.
 Cerebras, Hyperbolic, and Nscale are reviewed presets served through the
 shared chat adapter: use ordinary `ProviderSettings` with their conventional `env://`
 credential (`CEREBRAS_API_KEY`, `HYPERBOLIC_API_KEY`, `NSCALE_API_KEY`) and a

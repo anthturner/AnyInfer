@@ -15,7 +15,7 @@ public static class ProbeExample
         ArgumentException.ThrowIfNullOrWhiteSpace(target);
 
         await using var client = new AsyncClient([settings]);
-        return await client.ProbeAsync(target, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return await client.ProbeAsync(target, cancellationToken: cancellationToken);
     }
 
     /// <summary>Runs the ordered default probe selection through the synchronous facade.</summary>

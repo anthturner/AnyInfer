@@ -26,8 +26,7 @@ public static class ContextWindowRouteExample
     {
         await using var client = new AsyncClient(providers, capabilityOverrides: capabilities);
         var route = new Route([usualTarget], contextWindowTargets: [largeContextTarget]);
-        return await client.GenerateAsync(prompt, route: route, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        return await client.GenerateAsync(prompt, route: route, cancellationToken: cancellationToken);
     }
     // --8<-- [end:route]
 }

@@ -21,12 +21,12 @@ public static class JinaExample
             ["A quiet river bends through the valley.", "A lighthouse watches the harbor."],
             target: "jina-retrieval:jina-embeddings-v5-text-small",
             inputType: EmbeddingInputIntent.Document, retainRaw: true, cancellationToken: cancellationToken,
-            manifest: true).ConfigureAwait(false);
+            manifest: true);
         var reranking = await client.RerankAsync(
             "Which text mentions water?",
             [new RerankDocument("river", "A quiet river bends through the valley."), new RerankDocument("lighthouse", "A lighthouse watches the harbor.")],
             target: "jina-retrieval:jina-reranker-v3", topN: 1, returnDocuments: true,
-            retainRaw: true, cancellationToken: cancellationToken, manifest: true).ConfigureAwait(false);
+            retainRaw: true, cancellationToken: cancellationToken, manifest: true);
         return new JinaObservation(embeddings, reranking);
     }
 

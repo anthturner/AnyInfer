@@ -4,10 +4,15 @@
 `DESIGN.md` first.** Each phase ends in a test gate. Record departures beside the
 affected box as `> NOTE:` entries and reconcile this checklist after every work wave.
 
-Status: **in progress; resume at R6.A's final re-run, then R6.B when authorized**. A
+Status: **in progress; resume at R6.A's quality pass and final acceptance, then R6.B**. A
 2026-10-25 request authorized implementing this plan on `feature/language-neutral-foundation`
 (committing and pushing to that branch) and adapting the site to the user-supplied brand kit v2.
 R0–R5 are implemented on that branch. Publication (R6.B) remains separately unauthorized.
+
+> NOTE: The follow-up request asks for a thorough example/content quality pass and completion
+> of the remaining documentation work. The R6.A subtasks below track that pass; preserve
+> existing native SDK work in the shared checkout. Final publication uses the existing
+> protected-branch process after the completed artifact and recovery path are reviewable.
 
 ## Starting point and settled decisions
 
@@ -25,9 +30,9 @@ Current implementation:
   `website/.generated/{shared,python,csharp}/`; it prepares `docs/index.md` separately
   as `home.mdx`. Keep one authored source per page and preserve existing source paths.
 - `scripts/generate_python_reference.py::render_symbol()` expands the existing Python
-  `:::` markers with Griffe. C# currently has an authored semantic reference at
-  `docs/reference/csharp-sdk.md`; it has no generated API reference or complete native
-  documentation-coverage gate yet.
+  `:::` markers with Griffe. C# has an authored semantic reference at
+  `docs/reference/csharp-sdk.md`, generated type/member pages under `/csharp/api/`, and
+  a source-comment and rendered-symbol coverage gate.
 - `scripts/build_docs.py` owns build/prepare/preview. Production output is root `site/`.
   `scripts/export_docs.py` adds redirects, SDK/version metadata, and agent exports;
   Pagefind indexes the final HTML; `scripts/check_docs_site.py` validates it.
@@ -295,8 +300,10 @@ plan cannot implement them by describing them.
   **Test gate:** exact snippets run offline with substantive assertions; configuration
   and connection examples retain their documented no-network/inert boundaries.
   > NOTE: Recipes live in `docs/guides/csharp-sdk.md` (grouped by task), observability,
-  > retrieval and TEI pages. TEI's buffered C# calls have the 2026-10-22 TEI 1.9.4 live probe;
-  > Voyage, Jina, Cerebras, Hyperbolic and Nscale are offline scripted evidence only.
+  > retrieval and TEI pages. Native recipes have offline scripted evidence. The retained
+  > 2026-10-22 TEI 1.9.4 cassettes establish Python traffic; the maintenance record marks the
+  > native live public-API probe pending. The R6 quality pass removed stronger native claims
+  > that had no retained run receipt.
 
 - [x] **R3.D — Add a coherent native cookbook.** Add source-linked, complete programs
   and authored pages at `docs/examples/csharp-{generation,streaming,tools,retrieval,
@@ -411,6 +418,74 @@ plan cannot implement them by describing them.
   > live probe pending while the docs cite the 2026-10-22 C# run, so confirm the run and
   > reconcile one of them.
 
+- [x] **R6.A1 — Review C# application examples and their authored pages.** Audit
+  `examples/csharp-sdk/`, the native cookbook, installation/quickstart, SDK guide and
+  migration guide for usable call shapes, disposal/cancellation, visible failures,
+  unknown-cost handling and executable evidence. Prefer plain `await` in these application
+  samples; retain library-internal scheduling policy. Keep source includes canonical.
+  **Test gate:** static recipe controls pass and the coordinator runs all native example
+  cases after the wave, with independent review of changed examples.
+  > NOTE: Reviewed 2026-10-25. Every authored C# include still maps to a runner-executed
+  > offline example; application and cookbook samples now use plain `await`, including async
+  > enumeration, while harness scheduling keeps its `ConfigureAwait(false)` calls. Corrected
+  > unsupported claims of a native live TEI run to scripted-offline evidence with live native
+  > verification explicitly pending. `tests/test_csharp_docs_examples.py -q` passes (7 tests;
+  > repository-local `--basetemp` was required because the sandbox temp directory was exhausted).
+  > The coordinator must still run the Release C# example runner and obtain independent review
+  > before treating the R6.A gate as complete.
+  > NOTE: Documentation coverage also found 30 missing parameter/return tags in the preserved,
+  > untracked native context-primitives workstream. Added XML comments only in
+  > `ContextDocument.cs`, `ContextPacking.cs`, and `ContextStructure.cs`; these WIP comments
+  > are not part of the docs-only commit and make no parity claim. The coordinator must rerun
+  > the native documentation checker with the context workstream present.
+
+- [x] **R6.A2 — Recheck concepts, reference, provider and contributor claims.** Correct
+  the three outstanding TransportError/Voyage-dimensions/TEI evidence findings against
+  source and recorded evidence, then audit these public areas for contradictory scope,
+  counts, missing steps, misleading guarantees and awkward explanations. Never turn an
+  offline observation into a live verification claim. **Test gate:** changed claims cite
+  source/evidence, documentation coverage/link checks pass, and independent review clears
+  the content changes.
+  > NOTE: Reviewed 2026-10-25. `generation.py` retries retryable `TransportError` values after
+  > emitted stream content, so the error card no longer promises no duplicated output;
+  > Python/C# Voyage adapter tests prove shared `dimensions` becomes `output_dimension`; and the
+  > TEI change declaration records the native live probe as pending, with no recorded native live
+  > run receipt. The TEI C# documentation, including the native reference, now states the
+  > offline evidence boundary. Ran the reviewed documentation coverage check; the coordinator
+  > still owns link checks and independent review.
+
+- [x] **R6.A3 — Review Python examples and the remaining user journeys.** Audit the
+  Python cookbook, mixed task guides and public entrypoints for complete, idiomatic calls,
+  source-backed assertions, setup/cleanup, credential handling and honest SDK scope.
+  Preserve existing routes and include sources; fix substantive issues rather than
+  mechanically rewriting prose. **Test gate:** focused source/example controls and the
+  coordinator's executable documentation gate pass, with no unresolved review findings.
+  > NOTE: Reviewed 2026-10-25. Public Python entrypoints, guides, cookbook samples, and
+  > sidecar journeys were checked against `anyinfer agents-md` from the installed 0.1.3
+  > distribution and the client/local-attestation source. Corrected client cleanup in
+  > standalone snippets, defined the README retrieval corpus, and made async distillation
+  > lifetime explicit. The confidentiality guide now limits BYOK to the direct-call
+  > topology, and describes Tier 3 as local TEE-readiness detection and Tier 4 as
+  > point-in-time signed-manifest verification, not cryptographic attestation. The focused
+  > `tests/test_docs_examples.py -q` run produced no output and did not complete in the
+  > available window, so the coordinator must run the executable documentation gate and
+  > focused docs/example controls before closing R6.A.
+  > NOTE: Independent review found remaining disconnected Python fences. Quickstart now has
+  > complete sync/async programs, explicit inputs, configured provider credentials, and
+  > source-exact fake-transport execution controls. The vector-store rerank and lifecycle
+  > snippets now own their store and async-client lifetimes; distillation and fallback recipes
+  > likewise own their inputs and clients. The coordinator must run the focused docs-example
+  > control after this content wave settles, then the executable documentation gate.
+
+- [ ] **R6.A4 — Rehearse independent archives and inspect the finished site.** In an
+  isolated scratch checkout, snapshot the actual outgoing native prerelease, build it,
+  inspect archived/current routes, native signatures, version selection, local search
+  and exports, and remove the scratch archive. Produce no invented production history.
+  Complete artifact/browser acceptance, including small screens and both themes, then
+  run the full gate once and record exact outcomes. **Test gate:** archive/browser checks,
+  production build, TypeScript and documentation-specific checks pass; unrelated failures
+  are recorded accurately before closing R6.A.
+
 - [ ] **R6.B — Publish through the existing branch process and prove recovery.** This
   carries forward the migration's unexecuted publication/recovery work. When separately
   authorized, use `feature/* -> develop -> main` and the existing Pages workflow;
@@ -450,8 +525,9 @@ Extend tests at actual failure boundaries (coverage, snippet execution, xrefs, m
 layout), not assertions that merely mirror implementation strings.
 
 When stopping partway, record the first unfinished box, exact commit/tree and remaining
-failure here. Initial resume point is **R0.A**. No unchecked phase has been implemented
-by the request that created this plan.
+failure here. Current resume point is **R6.A**, including its acceptance/rehearsal subtask
+**R6.A4**. Content quality subtasks R6.A1–3 are implemented; their coordinator gates remain
+part of R6.A until the final artifact and independent review are recorded below.
 
 ## Primary tool references
 
