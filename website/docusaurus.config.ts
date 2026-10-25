@@ -60,10 +60,12 @@ function docsInstance(
   ];
 }
 
+const socialCardAlt = 'AnyInfer: Any model. Any provider. Expertise built in.';
+
 const config: Config = {
   title: 'AnyInfer',
   tagline: 'Application-owned hybrid inference',
-  favicon: 'assets/anyinfer-icon-512.png',
+  favicon: 'assets/favicon.ico',
   url: 'https://anyinfer.dev',
   baseUrl: '/',
   trailingSlash: true,
@@ -76,6 +78,16 @@ const config: Config = {
   onBrokenAnchors: 'ignore',
   markdown: {format: 'detect', mermaid: true, hooks: {onBrokenMarkdownLinks: 'throw'}},
   staticDirectories: ['static', '.generated/static'],
+  // Brand typefaces are bundled from exact-pinned @fontsource packages: no font CDN.
+  clientModules: ['./src/fonts.ts'],
+  // The brand kit's favicon set: the 16 and 24 px images use the simple mark, which
+  // drops the provider ports that would blur at that size.
+  headTags: [
+    {tagName: 'link', attributes: {rel: 'icon', type: 'image/png', sizes: '16x16', href: '/assets/favicon-16.png'}},
+    {tagName: 'link', attributes: {rel: 'icon', type: 'image/png', sizes: '32x32', href: '/assets/favicon-32.png'}},
+    {tagName: 'link', attributes: {rel: 'icon', type: 'image/png', sizes: '48x48', href: '/assets/favicon-48.png'}},
+    {tagName: 'link', attributes: {rel: 'apple-touch-icon', sizes: '180x180', href: '/assets/anyinfer-app-icon-light-180.png'}},
+  ],
   presets: [
     [
       'classic',
@@ -98,15 +110,22 @@ const config: Config = {
     metadata: [
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:image', content: 'https://anyinfer.dev/assets/anyinfer-social-card.png'},
+      {name: 'twitter:image:alt', content: socialCardAlt},
       {property: 'og:image', content: 'https://anyinfer.dev/assets/anyinfer-social-card.png'},
+      {property: 'og:image:width', content: '1200'},
+      {property: 'og:image:height', content: '630'},
+      {property: 'og:image:alt', content: socialCardAlt},
+      {name: 'theme-color', content: '#FFFFFF', media: '(prefers-color-scheme: light)'},
+      {name: 'theme-color', content: '#0A1A1B', media: '(prefers-color-scheme: dark)'},
     ],
     navbar: {
       logo: {
         alt: 'AnyInfer home',
         src: 'assets/anyinfer-horizontal-light.svg',
         srcDark: 'assets/anyinfer-horizontal-dark.svg',
-        width: 148,
-        height: 29,
+        // The lockup's minimum is 24 px tall; 32 px keeps the name legible in the bar.
+        width: 140,
+        height: 32,
       },
       items: [
         {to: '/python/', label: 'Python SDK', position: 'left'},
@@ -118,6 +137,16 @@ const config: Config = {
     },
     footer: {
       style: 'dark',
+      // The footer is the brand's ink ground in both themes, so it always takes the
+      // on-dark lockup.
+      logo: {
+        alt: 'AnyInfer',
+        src: 'assets/anyinfer-horizontal-dark.svg',
+        srcDark: 'assets/anyinfer-horizontal-dark.svg',
+        href: '/',
+        width: 122,
+        height: 28,
+      },
       links: [
         {title: 'Documentation', items: [
           {label: 'Quickstart', to: '/python/quickstart/'},
@@ -141,16 +170,23 @@ const config: Config = {
   },
 };
 
+/**
+ * Brand code colors: keywords in the amber text tone, literals in the link teal, comments
+ * muted, everything else in the body ink. Every token meets WCAG AA on the code surface.
+ */
 function codeTheme(dark: boolean): PrismTheme {
+  const ink = dark
+    ? {text: '#E8F0EE', surface: '#102627', muted: '#8FA6A4', signal: '#F5B266', literal: '#6FD0BA', danger: '#F07A6A', success: '#4CC38A'}
+    : {text: '#0A1A1B', surface: '#F4F7F6', muted: '#4A6261', signal: '#9A5410', literal: '#24695F', danger: '#C0392B', success: '#1D7A4C'};
   return {
-    plain: {color: dark ? '#f0f6fc' : '#0b3b3c', backgroundColor: dark ? '#151b23' : '#f6f8fa'},
+    plain: {color: ink.text, backgroundColor: ink.surface},
     styles: [
-      {types: ['comment', 'prolog', 'doctype', 'cdata'], style: {color: dark ? '#9198a1' : '#59636e'}},
-      {types: ['keyword', 'selector', 'tag', 'builtin'], style: {color: dark ? '#4fbfa8' : '#1f6f63'}},
-      {types: ['string', 'char', 'attr-value', 'regex'], style: {color: dark ? '#f0c86a' : '#805015'}},
-      {types: ['function', 'class-name', 'attr-name'], style: {color: dark ? '#7fd8c4' : '#2c7a6f'}},
-      {types: ['number', 'boolean', 'constant', 'symbol'], style: {color: dark ? '#e8963c' : '#805015'}},
-      {types: ['operator', 'punctuation'], style: {color: dark ? '#bdcbd0' : '#59636e'}},
+      {types: ['comment', 'prolog', 'doctype', 'cdata'], style: {color: ink.muted}},
+      {types: ['keyword', 'builtin', 'selector', 'tag', 'atrule', 'important', 'decorator', 'annotation'], style: {color: ink.signal}},
+      {types: ['string', 'char', 'attr-value', 'regex', 'url', 'number', 'boolean', 'constant', 'symbol'], style: {color: ink.literal}},
+      {types: ['function', 'class-name', 'attr-name', 'property', 'namespace', 'variable', 'operator', 'punctuation'], style: {color: ink.text}},
+      {types: ['deleted'], style: {color: ink.danger}},
+      {types: ['inserted'], style: {color: ink.success}},
     ],
   };
 }

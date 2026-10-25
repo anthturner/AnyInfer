@@ -266,10 +266,10 @@ def _hides_table_of_contents(source: str) -> bool:
 
 
 def _copy_static(root: Path, output_dir: Path) -> set[Path]:
-    """Copy public documentation artwork, styles, and source examples once per build."""
+    """Copy public documentation artwork and source examples once per build."""
     static = output_dir / "static"
     expected: set[Path] = set()
-    for source in (root / "docs" / "assets", root / "docs" / "stylesheets"):
+    for source in (root / "docs" / "assets",):
         if source.exists():
             expected.update(_copy_tree_if_changed(source, static / source.name))
     # Only public source examples named from docs are assets. Copying the repository's

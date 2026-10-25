@@ -1,7 +1,9 @@
 .notFound { max-width: 1120px; }
+.notFound h1 { font-size: clamp(2rem, 1.55rem + 1.8vw, 2.75rem); letter-spacing: -0.035em; }
 .cards { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 2rem 0; }
-.card { border: 1px solid var(--ifm-color-emphasis-200); border-radius: .7rem; color: inherit; padding: 1.25rem; text-decoration: none; }
-.card:hover { border-color: var(--ifm-color-primary); text-decoration: none; }
-.card h2 { font-size: 1.1rem; margin: 0 0 .5rem; }
-.card p { margin: 0; }
+.card { background: var(--ai-surface); border: 1px solid var(--ai-border); border-radius: var(--ai-radius-lg); color: var(--ai-text); padding: 1.25rem 1.4rem; text-decoration: none; transition: border-color 160ms ease; }
+.card:hover { border-color: var(--ai-accent); color: var(--ai-text); text-decoration: none; }
+.card h2 { font-size: 1.25rem; letter-spacing: -0.02em; margin: 0 0 .5rem; }
+.card p { color: var(--ai-text-muted); margin: 0; }
 @media screen and (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }

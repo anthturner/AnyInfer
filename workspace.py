@@ -1745,8 +1745,23 @@ def _bundle_windows_icon(work_dir: Path) -> Path | None:
         return None
 
     icon = work_dir / "anyinfer.ico"
-    with Image.open(ROOT / "docs" / "assets" / "anyinfer-icon-512.png") as image:
-        image.save(icon, sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    assets = ROOT / "docs" / "assets"
+    # The brand kit's own favicon art fills the small sizes (16 and 24 px use the simple
+    # mark, without ports); the larger sizes are scaled from the full 512 px mark. Every
+    # size gets an exact frame, so Pillow never rescales one of the small images.
+    frames = [Image.open(assets / f"favicon-{size}.png") for size in (16, 24, 32, 48, 64)]
+    try:
+        with Image.open(assets / "anyinfer-icon-512.png") as image:
+            large = [image.resize((size, size), Image.Resampling.LANCZOS) for size in (128, 256)]
+            frames.extend(large)
+            image.save(
+                icon,
+                sizes=[(frame.width, frame.height) for frame in frames],
+                append_images=frames,
+            )
+    finally:
+        for frame in frames:
+            frame.close()
     return icon
 
 

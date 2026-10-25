@@ -186,7 +186,7 @@ class SchemaPanel(QWidget):
 
     def _set_mechanism_pill(self, mechanism: str) -> None:
         self._mechanism_pill.setText(
-            f"<span style='background:{theme.color('accent_bg')}; color:{theme.color('accent')}; "
+            f"<span style='background:{theme.color('accent_bg')}; color:{theme.color('link')}; "
             f"border-radius:8px; padding:2px 8px;'><b>{_escape(mechanism)}</b></span>"
         )
         self._mechanism_pill.setTextFormat(Qt.TextFormat.RichText)

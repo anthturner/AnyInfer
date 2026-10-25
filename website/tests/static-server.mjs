@@ -3,7 +3,7 @@ import {createServer} from 'node:http';
 import {extname, join, normalize} from 'node:path';
 
 const site = normalize(join(import.meta.dirname, '../../site'));
-const contentTypes = {'.css': 'text/css', '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm'};
+const contentTypes = {'.css': 'text/css', '.html': 'text/html', '.ico': 'image/x-icon', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.woff': 'font/woff', '.woff2': 'font/woff2'};
 
 createServer((request, response) => {
   const relative = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname).replace(/^\/+/, '');

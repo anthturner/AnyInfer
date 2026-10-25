@@ -1,65 +1,101 @@
-/* AnyInfer palette — deep teal + amber
-   Tuned for GitHub's light, light-high-contrast, dark, dark-dimmed and dark-high-contrast canvases.
-   Icon art is background-independent; only text/link colors swap. */
+/* AnyInfer palette (brand kit v2)
+   Mark colour logic: amber = AnyInfer, teal = adapters, slate = providers.
+   Every text token passes WCAG AA (4.5:1) on --ai-bg and --ai-surface.
+   Amber (--ai-signal) is for fills only; use --ai-signal-text for amber text. */
 
 :root {
-  /* Brand constants — identical in every theme */
-  --anyinfer-teal:        #2C7A6F;  /* chip body, primary accent shape AND text on light (4.8:1 on #fff) */
-  --anyinfer-teal-deep:   #0B3B3C;  /* primary ink / dark surface */
-  --anyinfer-teal-bright: #4FBFA8;  /* teal for TEXT on dark backgrounds */
-  --anyinfer-amber:       #E8963C;  /* output / signal */
-  --anyinfer-gold:        #F0C86A;  /* secondary warm accent */
-  --anyinfer-slate:       #7E9A9B;  /* source ports, meta marks */
-  --anyinfer-knockout:    #FFFFFF;  /* glyph knocked out of the teal chip */
+  /* Brand constants, identical in every theme */
+  --ai-brand-amber: #E8902F;
+  --ai-brand-amber-bright: #F0A04B;
+  --ai-brand-teal: #2C7A6F;
+  --ai-brand-teal-bright: #4FBFA8;
+  --ai-brand-slate: #6F8A89;
+  --ai-brand-slate-light: #9DB2B0;
+  --ai-brand-ink: #0A1A1B;
+  --ai-brand-mist: #E8F0EE;
 
-  /* Light theme (github-light, github-light-high-contrast) */
-  --anyinfer-bg:          #ffffff;
-  --anyinfer-surface:     #f6f8fa;
-  --anyinfer-border:      #d1d9e0;
-  --anyinfer-text:        var(--anyinfer-teal-deep);
-  --anyinfer-text-muted:  #59636e;
-  --anyinfer-accent-text: var(--anyinfer-teal);
-  --anyinfer-link:        #1f6f63;
-  --anyinfer-link-hover:  var(--anyinfer-teal);
-  --anyinfer-accent-bg:   #eaf4f1;
-  --anyinfer-accent-border: #a8cfc6;
-  --anyinfer-focus:       var(--anyinfer-teal);
+  /* Type */
+  --ai-font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --ai-font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --ai-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Shape */
+  --ai-radius-sm: 6px;
+  --ai-radius: 8px;
+  --ai-radius-lg: 16px;
+
+  /* Light theme (default) */
+  --ai-bg: #FFFFFF;
+  --ai-surface: #F4F7F6;
+  --ai-surface-2: #E8F0EE;
+  --ai-border: #D3DEDC;
+  --ai-text: #0A1A1B;
+  --ai-text-muted: #4A6261;
+  --ai-accent: #2C7A6F;
+  --ai-on-accent: #FFFFFF;
+  --ai-link: #24695F;
+  --ai-link-hover: #2C7A6F;
+  --ai-accent-bg: #E6F2EF;
+  --ai-signal: #E8902F;
+  --ai-signal-text: #9A5410;
+  --ai-signal-bg: #FCF0E3;
+  --ai-port: #6F8A89;
+  --ai-success: #1D7A4C;
+  --ai-danger: #C0392B;
+  --ai-focus: #2C7A6F;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark theme (github-dark #0d1117, github-dark-dimmed #212830) */
-    --anyinfer-bg:          #0d1117;
-    --anyinfer-surface:     #151b23;
-    --anyinfer-border:      #3d444d;
-    --anyinfer-text:        #f0f6fc;
-    --anyinfer-text-muted:  #9198a1;
-    --anyinfer-accent-text: var(--anyinfer-teal-bright);
-    --anyinfer-link:        var(--anyinfer-teal-bright);
-    --anyinfer-link-hover:  #7fd8c4;
-    --anyinfer-accent-bg:   #0f2b28;
-    --anyinfer-accent-border: #275d54;
-    --anyinfer-focus:       var(--anyinfer-teal-bright);
+  :root:not([data-theme="light"]):not([data-color-mode="light"]) {
+    --ai-bg: #0A1A1B;
+    --ai-surface: #102627;
+    --ai-surface-2: #163234;
+    --ai-border: #1F3B3C;
+    --ai-text: #E8F0EE;
+    --ai-text-muted: #8FA6A4;
+    --ai-accent: #4FBFA8;
+    --ai-on-accent: #0A1A1B;
+    --ai-link: #6FD0BA;
+    --ai-link-hover: #9BE0CF;
+    --ai-accent-bg: #0F2E2B;
+    --ai-signal: #F0A04B;
+    --ai-signal-text: #F5B266;
+    --ai-signal-bg: #2A2114;
+    --ai-port: #9DB2B0;
+    --ai-success: #4CC38A;
+    --ai-danger: #F07A6A;
+    --ai-focus: #4FBFA8;
   }
 }
 
-/* GitHub Primer sets data-color-mode / data-dark-theme on <html>. */
+/* Explicit dark: GitHub Primer, Docusaurus, MkDocs Material slate, or a .dark class */
 [data-color-mode="dark"],
 [data-theme="dark"],
+[data-md-color-scheme="slate"],
 .dark {
-  --anyinfer-bg:          #0d1117;
-  --anyinfer-surface:     #151b23;
-  --anyinfer-border:      #3d444d;
-  --anyinfer-text:        #f0f6fc;
-  --anyinfer-text-muted:  #9198a1;
-  --anyinfer-accent-text: var(--anyinfer-teal-bright);
-  --anyinfer-link:        var(--anyinfer-teal-bright);
-  --anyinfer-link-hover:  #7fd8c4;
-  --anyinfer-accent-bg:   #0f2b28;
-  --anyinfer-accent-border: #275d54;
-  --anyinfer-focus:       var(--anyinfer-teal-bright);
+  --ai-bg: #0A1A1B;
+  --ai-surface: #102627;
+  --ai-surface-2: #163234;
+  --ai-border: #1F3B3C;
+  --ai-text: #E8F0EE;
+  --ai-text-muted: #8FA6A4;
+  --ai-accent: #4FBFA8;
+  --ai-on-accent: #0A1A1B;
+  --ai-link: #6FD0BA;
+  --ai-link-hover: #9BE0CF;
+  --ai-accent-bg: #0F2E2B;
+  --ai-signal: #F0A04B;
+  --ai-signal-text: #F5B266;
+  --ai-signal-bg: #2A2114;
+  --ai-port: #9DB2B0;
+  --ai-success: #4CC38A;
+  --ai-danger: #F07A6A;
+  --ai-focus: #4FBFA8;
 }
 
-body { background: var(--anyinfer-bg); color: var(--anyinfer-text); }
-a { color: var(--anyinfer-link); }
-a:hover { color: var(--anyinfer-link-hover); }
+body { background: var(--ai-bg); color: var(--ai-text); font-family: var(--ai-font-body); }
+h1, h2, h3, h4 { font-family: var(--ai-font-display); letter-spacing: -0.02em; }
+code, pre, kbd { font-family: var(--ai-font-mono); }
+a { color: var(--ai-link); }
+a:hover { color: var(--ai-link-hover); }
+:focus-visible { outline: 2px solid var(--ai-focus); outline-offset: 2px; }

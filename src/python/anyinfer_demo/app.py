@@ -61,7 +61,12 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication(sys.argv[:1])
     app.setApplicationName("AnyInfer Demo")
     app.setApplicationVersion(_library_version())
-    app.setWindowIcon(QIcon(str(asset_path("anyinfer-icon-512.png"))))
+    # Below 32 px the brand uses its simple mark (no provider ports), so the small
+    # sizes come from the kit's favicon art rather than a downscaled full mark.
+    icon = QIcon()
+    for name in ("favicon-16.png", "favicon-24.png", "anyinfer-icon-512.png"):
+        icon.addFile(str(asset_path(name)))
+    app.setWindowIcon(icon)
     apply_theme(app, config.theme)
 
     # The window saves back to the same file the session was started from.

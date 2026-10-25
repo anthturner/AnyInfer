@@ -14,7 +14,7 @@ export default function ActiveSdkVersion({mobile = false}: {mobile?: boolean}): 
   return <DocsVersionDropdownNavbarItem
     docsPluginId={python ? 'python' : 'csharp'}
     mobile={mobile}
-    className="anyinfer-sdk-version"
+    className={`anyinfer-sdk-version anyinfer-sdk-badge anyinfer-sdk-badge--${python ? 'python' : 'csharp'}`}
     title={active.label}
     versions={Object.fromEntries(versions.map((version) => [version.name, {
       label: version.label.replace(/^(Python|C#) /, 'v').replace(' (prerelease)', ''),

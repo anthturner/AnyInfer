@@ -444,7 +444,7 @@
       "review": "pending",
       "evidence": [
         "tests/test_branding.py",
-        "scripts/render_social_card.py"
+        "docs/assets/anyinfer-palette.css"
       ],
       "unsupported_native": [],
       "notes": "Repository brand assets; the demo-package mirror rule is Python-demo-specific."

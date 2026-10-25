@@ -599,7 +599,7 @@ class WelcomeView(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
 
         self._logo = QSvgWidget()
-        self._logo.setFixedSize(300, 65)
+        self._logo.setFixedSize(284, 65)  # the lockup's own 1135:260 proportions
         self._logo.setAccessibleName("AnyInfer")
         layout.addWidget(self._logo, 0, Qt.AlignmentFlag.AlignCenter)
         self._reapply_logo()

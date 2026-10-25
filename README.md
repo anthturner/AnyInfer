@@ -8,9 +8,9 @@
 <p align="center">
   <a href="https://github.com/anthturner/AnyInfer/actions/workflows/ci.yml"><img src="https://github.com/anthturner/AnyInfer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
   <a href="https://anyinfer.dev/"><img src="https://img.shields.io/badge/docs-anyinfer.dev-2C7A6F" alt="Documentation" /></a>
-  <a href="https://github.com/anthturner/AnyInfer/releases/latest"><img src="https://img.shields.io/github/v/release/anthturner/AnyInfer?include_prereleases&label=release&color=E8963C" alt="Latest release" /></a>
+  <a href="https://github.com/anthturner/AnyInfer/releases/latest"><img src="https://img.shields.io/github/v/release/anthturner/AnyInfer?include_prereleases&label=release&color=E8902F" alt="Latest release" /></a>
   <a href="https://github.com/anthturner/AnyInfer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-2C7A6F" alt="MIT license" /></a>
-  <img src="https://img.shields.io/badge/python-3.11%2B-0B3B3C" alt="Python 3.11+" />
+  <img src="https://img.shields.io/badge/python-3.11%2B-0A1A1B" alt="Python 3.11+" />
 </p>
 
 **AnyInfer is an application-owned hybrid inference runtime, with a shared foundation and

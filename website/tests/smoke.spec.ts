@@ -86,6 +86,21 @@ test.describe('the static documentation artifact', () => {
     await expect(page.locator('.anyinfer-search__results')).toBeHidden();
   });
 
+  test('serves the brand typefaces itself and requests nothing off-site', async ({page}) => {
+    const offsite: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.protocol !== 'data:' && url.hostname !== '127.0.0.1') offsite.push(request.url());
+    });
+    await page.goto('/python/quickstart/');
+    await page.evaluate(() => document.fonts.ready);
+    const loaded = await page.evaluate(() => [...document.fonts]
+      .filter((font) => font.status === 'loaded')
+      .map((font) => `${font.family.replace(/["']/g, '')} ${font.weight}`));
+    expect(loaded).toEqual(expect.arrayContaining(['Inter 400', 'Space Grotesk 600', 'JetBrains Mono 400']));
+    expect(offsite).toEqual([]);
+  });
+
   test('keeps a legacy API fragment when the static redirect moves the route', async ({page}) => {
     await page.goto('/reference/api/client/#client');
     await expect(page).toHaveURL(/\/python\/api\/client\/#client$/);

@@ -1806,7 +1806,8 @@ class TestTheme:
         dark = theme.stylesheet(theme.palette_colors(dark=True))
         assert "#2C7A6F" in light  # teal reads as the accent on light canvases
         assert "#4FBFA8" in dark  # bright teal takes over on dark canvases
-        assert "#E8963C" in light and "#E8963C" in dark  # amber is a brand constant
+        assert "#E8902F" in light  # amber fills the default action
+        assert "#F0A04B" in dark  # the brighter amber fills it on dark canvases
 
     def test_an_explicit_preference_overrides_the_system(self, qapp: object):
         from anyinfer_demo import theme

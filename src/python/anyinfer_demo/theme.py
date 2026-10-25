@@ -1,8 +1,9 @@
 """Theming: the AnyInfer brand palette, plus a handful of named custom palettes.
 
 The tokens for ``"light"``/``"dark"`` are a Qt translation of
-``docs/assets/anyinfer-palette.css`` — the same deep-teal-and-amber palette the project uses
-on the web. The user preference is one of ``"system"``, ``"light"``, ``"dark"``, or one of the
+``docs/assets/anyinfer-palette.css`` — the brand kit's teal-and-amber palette the project
+uses on the web, where amber is a fill and amber text takes the darker signal-text tone. The
+user preference is one of ``"system"``, ``"light"``, ``"dark"``, or one of the
 `CUSTOM_THEMES` keys; ``"system"`` resolves through Qt's color scheme hint and follows
 the OS live via ``QStyleHints.colorSchemeChanged``. A custom theme is a single, self-contained
 palette (not a light/dark pair) — picking one is a deliberate departure from OS-following.
@@ -43,51 +44,55 @@ DEFAULT_THEME_CHOICES: tuple[tuple[str, str], ...] = (
 )
 """``(preference value, display label)`` pairs for the OS-following defaults."""
 
-# docs/assets/anyinfer-palette.css — brand constants shared by the light and dark themes.
+# docs/assets/anyinfer-palette.css — the --ai-brand-* constants, identical in every theme.
+_AMBER = "#E8902F"
+_AMBER_BRIGHT = "#F0A04B"
 _TEAL = "#2C7A6F"
-_TEAL_DEEP = "#0B3B3C"
 _TEAL_BRIGHT = "#4FBFA8"
-_AMBER = "#E8963C"
-_GOLD = "#F0C86A"
+_INK = "#0A1A1B"
+_MIST = "#E8F0EE"
 
+# Each token is the palette's --ai-* value named in its comment. Two have no web
+# counterpart and are derived: ``accent_border`` (the accent mixed into the background,
+# for hover outlines and pressed states) and ``amber_hover`` (the lighter amber fill).
 _LIGHT: dict[str, str] = {
-    "bg": "#ffffff",
-    "surface": "#f6f8fa",
-    "border": "#d1d9e0",
-    "text": _TEAL_DEEP,
-    "muted": "#59636e",
-    "accent": _TEAL,
-    "accent_hover": "#1f6f63",
-    "accent_bg": "#eaf4f1",
-    "accent_border": "#a8cfc6",
-    "on_accent": "#ffffff",
-    "link": "#1f6f63",
-    "amber": _AMBER,
-    "gold": _GOLD,
-    "on_amber": _TEAL_DEEP,
-    "ok": "#157347",
-    "warn": "#9a6700",
-    "danger": "#b42318",
+    "bg": "#FFFFFF",  # --ai-bg
+    "surface": "#F4F7F6",  # --ai-surface
+    "border": "#D3DEDC",  # --ai-border
+    "text": _INK,  # --ai-text
+    "muted": "#4A6261",  # --ai-text-muted
+    "accent": _TEAL,  # --ai-accent
+    "accent_hover": "#24695F",  # --ai-link
+    "accent_bg": "#E6F2EF",  # --ai-accent-bg
+    "accent_border": "#B5D0CD",
+    "on_accent": "#FFFFFF",  # --ai-on-accent
+    "link": "#24695F",  # --ai-link
+    "amber": _AMBER,  # --ai-signal
+    "amber_hover": _AMBER_BRIGHT,
+    "on_amber": _INK,
+    "ok": "#1D7A4C",  # --ai-success
+    "warn": "#9A5410",  # --ai-signal-text
+    "danger": "#C0392B",  # --ai-danger
 }
 
 _DARK: dict[str, str] = {
-    "bg": "#0d1117",
-    "surface": "#151b23",
-    "border": "#3d444d",
-    "text": "#f0f6fc",
-    "muted": "#9198a1",
-    "accent": _TEAL_BRIGHT,
-    "accent_hover": "#7fd8c4",
-    "accent_bg": "#0f2b28",
-    "accent_border": "#275d54",
-    "on_accent": _TEAL_DEEP,
-    "link": _TEAL_BRIGHT,
-    "amber": _AMBER,
-    "gold": _GOLD,
-    "on_amber": _TEAL_DEEP,
-    "ok": "#4cc38a",
-    "warn": "#d9a23d",
-    "danger": "#ef7f78",
+    "bg": _INK,  # --ai-bg
+    "surface": "#102627",  # --ai-surface
+    "border": "#1F3B3C",  # --ai-border
+    "text": _MIST,  # --ai-text
+    "muted": "#8FA6A4",  # --ai-text-muted
+    "accent": _TEAL_BRIGHT,  # --ai-accent
+    "accent_hover": "#6FD0BA",  # --ai-link
+    "accent_bg": "#0F2E2B",  # --ai-accent-bg
+    "accent_border": "#22544C",
+    "on_accent": _INK,  # --ai-on-accent
+    "link": "#6FD0BA",  # --ai-link
+    "amber": _AMBER_BRIGHT,  # --ai-signal
+    "amber_hover": "#F5B266",
+    "on_amber": _INK,
+    "ok": "#4CC38A",  # --ai-success
+    "warn": "#F5B266",  # --ai-signal-text
+    "danger": "#F07A6A",  # --ai-danger
 }
 
 # Named custom palettes: each is a complete, self-contained token set (not a light/dark
@@ -108,7 +113,7 @@ CUSTOM_THEMES: dict[str, dict[str, str]] = {
         "on_accent": "#0f1117",
         "link": "#7c93f0",
         "amber": "#e8963c",
-        "gold": "#f0c86a",
+        "amber_hover": "#f0c86a",
         "on_amber": "#1a1d24",
         "ok": "#5fd08a",
         "warn": "#e0b04a",
@@ -127,7 +132,7 @@ CUSTOM_THEMES: dict[str, dict[str, str]] = {
         "on_accent": "#ffffff",
         "link": "#a12c49",
         "amber": "#d9762f",
-        "gold": "#e8a94f",
+        "amber_hover": "#e8a94f",
         "on_amber": "#3a1208",
         "ok": "#2f8f5b",
         "warn": "#a16a1f",
@@ -146,7 +151,7 @@ CUSTOM_THEMES: dict[str, dict[str, str]] = {
         "on_accent": "#0a140c",
         "link": "#5fbf7a",
         "amber": "#e0a23c",
-        "gold": "#f0ca6e",
+        "amber_hover": "#f0ca6e",
         "on_amber": "#0f1a12",
         "ok": "#6bd68a",
         "warn": "#e0b04a",
@@ -165,7 +170,7 @@ CUSTOM_THEMES: dict[str, dict[str, str]] = {
         "on_accent": "#ffffff",
         "link": "#136181",
         "amber": "#d9822f",
-        "gold": "#eab35a",
+        "amber_hover": "#eab35a",
         "on_amber": "#0b3b52",
         "ok": "#1f8f6b",
         "warn": "#9a6d1a",
@@ -184,7 +189,7 @@ CUSTOM_THEMES: dict[str, dict[str, str]] = {
         "on_accent": "#1c1410",
         "link": "#f0a15c",
         "amber": "#e8963c",
-        "gold": "#f0c86a",
+        "amber_hover": "#f0c86a",
         "on_amber": "#1c1410",
         "ok": "#7ac97a",
         "warn": "#e8b054",
@@ -225,7 +230,7 @@ QMenuBar, QMenu { background: $surface; }
 QMenuBar { border-bottom: 1px solid $border; }
 QMenu { border: 1px solid $border; border-radius: 8px; padding: 4px; }
 QMenu::item { padding: 6px 20px; border-radius: 6px; }
-QMenu::item:selected, QMenuBar::item:selected { background: $accent_bg; color: $accent; }
+QMenu::item:selected, QMenuBar::item:selected { background: $accent_bg; color: $link; }
 QMenu::separator { height: 1px; background: $border; margin: 6px 12px; }
 
 QLabel { background: transparent; }
@@ -277,7 +282,7 @@ QPushButton:default {
     color: $on_amber;
     font-weight: 600;
 }
-QPushButton:default:hover { background: $gold; border-color: $gold; }
+QPushButton:default:hover { background: $amber_hover; border-color: $amber_hover; }
 QPushButton:default:disabled { background: $surface; border-color: $border; color: $muted; }
 /* Compact icon controls set their own hit-target size. Reset the generic button minima
    here: otherwise Qt adds the 30px content minimum to this rule's padding, silently turns
@@ -568,7 +573,7 @@ QPushButton#HelpChip {
     background: transparent;
     border: 1px solid $accent_border;
     border-radius: 10px;
-    color: $accent;
+    color: $link;
     padding: 0 8px;
     min-height: 0;
     font-size: 8pt;
@@ -614,7 +619,7 @@ QFrame#WelcomeCard {
     border-radius: 12px;
 }
 QFrame#WelcomeCard:hover { border-color: $accent; background: $accent_bg; }
-QLabel#WelcomeCardTitle { font-weight: 600; color: $accent; }
+QLabel#WelcomeCardTitle { font-weight: 600; color: $link; }
 QLabel#BubbleHeader { color: $muted; font-size: 8.5pt; }
 """)
 

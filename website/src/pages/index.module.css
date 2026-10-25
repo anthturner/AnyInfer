@@ -3,7 +3,7 @@
   margin: 0 auto;
   max-width: 76rem;
   min-width: 0;
-  padding: clamp(2rem, 5vw, 4.5rem) clamp(1rem, 4vw, 2rem) 5rem;
+  padding: clamp(1.75rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem) 5rem;
   width: 100%;
 }
 
@@ -18,132 +18,140 @@
 .home > article :global(.tabs-container),
 .home > article :global(.table-responsive) { max-width: 100%; min-width: 0; }
 
+/* Light/dark art swaps with the explicit Docusaurus theme, not the OS preference. */
+.onDark { display: none !important; }
+:global([data-theme='dark']) .onLight { display: none !important; }
+:global([data-theme='dark']) .onDark { display: block !important; }
+
+/* Hero: the social card's composition — name, display statement, mono tokens, and the
+   full mark at a size where its provider ports read clearly. */
 .hero {
-  isolation: isolate;
-  margin: 0 auto clamp(2.25rem, 5vw, 3.75rem);
-  max-width: 58rem;
-  padding: clamp(2.25rem, 5vw, 3.75rem) clamp(1rem, 5vw, 4rem);
-  position: relative;
-  text-align: center;
+  align-items: center;
+  border-bottom: 1px solid var(--ai-border);
+  display: grid;
+  gap: clamp(2rem, 5vw, 4rem);
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 0.75fr);
+  margin: 0 auto clamp(2.5rem, 6vw, 4rem);
+  max-width: 72rem;
+  padding: clamp(0.5rem, 3vw, 2rem) 0 clamp(2.5rem, 6vw, 4rem);
 }
 
-.hero::before,
-.hero::after {
-  border-radius: 999px;
-  content: '';
-  pointer-events: none;
-  position: absolute;
-  z-index: -1;
-}
+.heroCopy { min-width: 0; }
 
-.hero::before {
-  background: linear-gradient(90deg, transparent, var(--anyinfer-accent-border), transparent);
-  height: 1px;
-  left: 8%;
-  right: 8%;
-  top: .5rem;
-}
-
-.hero::after {
-  border: 1px solid color-mix(in srgb, var(--anyinfer-amber) 60%, transparent);
-  height: .5rem;
-  right: 14%;
-  top: .25rem;
-  width: .5rem;
-}
-
-.heroMark { display: grid; justify-items: center; }
 .eyebrow {
-  color: var(--anyinfer-link);
-  font-size: .75rem;
-  font-weight: 750;
-  letter-spacing: .12em;
+  color: var(--ai-text-muted);
+  display: block;
+  font-family: var(--ai-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.wordmark { display: inline-block; margin: 1rem 0 0; max-width: min(27.5rem, 100%); }
-.wordmark img { display: block; height: auto; max-width: 100%; }
-.wordmarkDark { display: none !important; }
-:global([data-theme='dark']) .wordmarkLight { display: none; }
-:global([data-theme='dark']) .wordmarkDark { display: block !important; }
-.hero p {
-  color: var(--anyinfer-muted);
-  font-size: clamp(1.1rem, 2vw, 1.3rem);
-  line-height: 1.65;
-  margin: 1.25rem auto 1.5rem;
-  max-width: 46rem;
+.eyebrow::before {
+  background: var(--ai-signal);
+  border-radius: 1px;
+  content: '';
+  display: inline-block;
+  height: 0.55em;
+  margin-right: 0.6em;
+  vertical-align: 0.08em;
+  width: 0.55em;
 }
-.actions { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; }
-.actions :global(.button) { border-radius: .4rem; font-weight: 700; padding: .7rem 1.1rem; }
+
+.wordmark { margin: 1.1rem 0 0; max-width: 100%; }
+.wordmark img { display: block; height: clamp(3.75rem, 2.5rem + 4.5vw, 5.75rem); max-width: 100%; width: auto; }
+
+.lead {
+  color: var(--ai-text);
+  font-family: var(--ai-font-display);
+  font-size: clamp(1.2rem, 1.05rem + 0.9vw, 1.75rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+  margin: 1.5rem 0 2rem;
+  max-width: 40rem;
+  text-wrap: pretty;
+}
+
+.actions { align-items: center; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.actions :global(.anyinfer-button) { padding-block: 0.7rem; }
+.actions :global(.anyinfer-button-text) { padding-inline: 0.5rem; }
+
 .diagram {
   align-items: center;
-  color: var(--anyinfer-muted);
+  color: var(--ai-text-muted);
   display: flex;
   flex-wrap: wrap;
-  font-size: .82rem;
-  font-weight: 650;
-  gap: .5rem;
-  justify-content: center;
-  margin-top: 1.5rem;
+  font-family: var(--ai-font-mono);
+  font-size: 0.8125rem;
+  gap: 0.45rem;
+  margin-top: 2rem;
 }
 .diagram span {
-  background: var(--anyinfer-surface);
-  border: 1px solid var(--anyinfer-accent-border);
-  border-radius: 1rem;
-  padding: .45rem .75rem;
+  background: var(--ai-surface);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--ai-radius-sm);
+  color: var(--ai-text);
+  padding: 0.3rem 0.65rem;
 }
-.diagram b { color: var(--anyinfer-amber); font-size: 1.1rem; }
+.diagram b { color: var(--ai-signal-text); font-weight: 500; }
 
+.heroMark { display: grid; justify-items: center; min-width: 0; }
+.heroMark img { aspect-ratio: 1; height: auto; max-width: 100%; width: clamp(12rem, 22vw, 18rem); }
+
+/* Capability cards */
+.capabilities { margin: 0 auto clamp(3.5rem, 7vw, 5rem); max-width: 72rem; }
 .featureHeading {
   align-items: baseline;
   display: flex;
   flex-wrap: wrap;
-  gap: .5rem 1.5rem;
+  gap: 0.5rem 1.5rem;
   justify-content: space-between;
-  margin: 0 auto 1rem;
-  max-width: 72rem;
+  margin: 0 0 1.25rem;
 }
-.featureHeading h2 { font-size: 1.15rem; margin: 0; }
-.featureHeading a { font-size: .9rem; }
+.featureHeading h2 { font-size: clamp(1.45rem, 1.25rem + 0.8vw, 1.75rem); letter-spacing: -0.025em; margin: 0; }
 
 .features {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 auto clamp(3.5rem, 7vw, 5.5rem);
-  max-width: 72rem;
 }
 .card {
-  background: var(--anyinfer-surface);
-  border: 1px solid var(--anyinfer-border);
-  border-radius: .75rem;
-  color: var(--anyinfer-text);
+  background: var(--ai-surface);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--ai-radius-lg);
+  color: var(--ai-text);
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 1.35rem;
+  padding: 1.4rem 1.5rem 1.5rem;
   position: relative;
   text-decoration: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 .card:hover {
-  border-color: var(--anyinfer-teal);
-  box-shadow: 0 .75rem 1.75rem color-mix(in srgb, var(--anyinfer-teal-deep) 12%, transparent);
-  color: var(--anyinfer-text);
+  border-color: var(--ai-accent);
+  box-shadow: var(--anyinfer-card-hover-shadow);
+  color: var(--ai-text);
   text-decoration: none;
   transform: translateY(-2px);
 }
-.card:focus-visible { outline: 3px solid var(--anyinfer-teal-bright); outline-offset: 3px; }
-.cardNumber { color: var(--anyinfer-muted); display: block; font-size: .74rem; font-weight: 800; letter-spacing: .1em; margin-bottom: .75rem; }
-.card h3 { font-size: 1.08rem; line-height: 1.3; margin: 0 0 .55rem; }
-.card p { color: var(--anyinfer-muted); line-height: 1.55; margin: 0; }
+.card:focus-visible { outline: 2px solid var(--ai-focus); outline-offset: 3px; }
+.cardNumber { color: var(--ai-signal-text); display: block; font-family: var(--ai-font-mono); font-size: 0.8125rem; font-weight: 500; margin-bottom: 0.9rem; }
+.card h3 { font-family: var(--ai-font-display); font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.3; margin: 0 0 0.5rem; }
+.card p { color: var(--ai-text-muted); font-size: 0.9375rem; line-height: 1.6; margin: 0; }
 
-.footer { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; margin: 3rem auto 0; max-width: 48rem; }
-.badge { background: var(--anyinfer-accent-bg); border: 1px solid var(--anyinfer-accent-border); border-radius: 1rem; color: var(--anyinfer-muted); font-size: .8rem; font-weight: 650; padding: .3rem .7rem; }
+.footer { align-items: center; display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 3rem auto 0; max-width: 48rem; }
 
-@media screen and (max-width: 900px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media screen and (max-width: 996px) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .heroMark { display: none; }
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media screen and (max-width: 600px) {
   .home { padding-bottom: 3.5rem; }
-  .hero { margin-bottom: 2.5rem; padding-inline: 0; }
   .features { grid-template-columns: minmax(0, 1fr); }
-  .actions :global(.button) { width: 100%; }
+  .actions :global(.anyinfer-button:not(.anyinfer-button-text)) { justify-content: center; width: 100%; }
   .diagram b { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }

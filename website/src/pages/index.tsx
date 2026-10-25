@@ -46,29 +46,33 @@ export default function Home(): ReactNode {
     <Layout>
       <main className={styles.home}>
         <section className={styles.hero}>
-          <div className={styles.heroMark}>
+          <div className={styles.heroCopy}>
             <span className={styles.eyebrow}>Application-owned hybrid inference</span>
             <h1 className={styles.wordmark}>
-              <img className={styles.wordmarkLight} src="/assets/anyinfer-horizontal-light.svg" alt="AnyInfer" width="440" />
-              <img className={styles.wordmarkDark} src="/assets/anyinfer-horizontal-dark.svg" alt="AnyInfer" width="440" />
+              <img className={styles.onLight} src="/assets/anyinfer-wordmark-on-light.svg" alt="AnyInfer" width="671" height="200" />
+              <img className={styles.onDark} src="/assets/anyinfer-wordmark-on-dark.svg" alt="AnyInfer" width="671" height="200" />
             </h1>
+            <p className={styles.lead}>One typed inference layer for hosted APIs and a supervised local model — with a test
+              kit for your failure paths, provenance on every number, and a confidentiality story
+              no other BYOK library ships.</p>
+            <div className={styles.actions}>
+              <a className="anyinfer-button anyinfer-button-primary" href="/python/quickstart/">Python quickstart</a>
+              <a className="anyinfer-button anyinfer-button-secondary" href="/csharp/">C# SDK (prerelease)</a>
+              <a className="anyinfer-button anyinfer-button-text" href="/downloads/">Downloads</a>
+            </div>
+            <div className={styles.diagram} aria-hidden="true">
+              <span>approved context</span><b>→</b><span>budget + route</span><b>→</b><span>cloud or local</span>
+            </div>
           </div>
-          <p>One typed inference layer for hosted APIs and a supervised local model — with a test
-            kit for your failure paths, provenance on every number, and a confidentiality story
-            no other BYOK library ships.</p>
-          <div className={styles.actions}>
-            <a className="button button--primary" href="/python/quickstart/">Python quickstart</a>
-            <a className="button button--secondary" href="/csharp/">C# SDK (prerelease)</a>
-            <a className="button button--secondary" href="/downloads/">Downloads</a>
-          </div>
-          <div className={styles.diagram} aria-hidden="true">
-            <span>approved context</span><b>→</b><span>budget + route</span><b>→</b><span>cloud or local</span>
+          <div className={styles.heroMark} aria-hidden="true">
+            <img className={styles.onLight} src="/assets/anyinfer-icon-512.svg" alt="" width="512" height="512" />
+            <img className={styles.onDark} src="/assets/anyinfer-mark-on-dark.svg" alt="" width="512" height="512" />
           </div>
         </section>
-        <section aria-labelledby="runtime-capabilities">
+        <section className={styles.capabilities} aria-labelledby="runtime-capabilities">
           <div className={styles.featureHeading}>
             <h2 id="runtime-capabilities">Python runtime capabilities</h2>
-            <a href="/concepts/foundation/#c-capability-map">C# capability map →</a>
+            <a className="anyinfer-button anyinfer-button-text" href="/concepts/foundation/#c-capability-map">C# capability map</a>
           </div>
           <div className={styles.features}>
             {features.map(([title, text, href], index) => (
@@ -85,9 +89,9 @@ export default function Home(): ReactNode {
           </MDXContent>
         </article>
         <section className={styles.footer}>
-          <a className={styles.badge} href="/python/">Python 3.11+ · v{manifest.versions.python}</a>
-          <a className={styles.badge} href="/csharp/">C# .NET 8 · v{manifest.versions.csharp} · prerelease</a>
-          <a href="/reference/conformance-matrix/">Python conformance matrix →</a>
+          <a className="anyinfer-sdk-badge anyinfer-sdk-badge--python" href="/python/">Python 3.11+ · v{manifest.versions.python}</a>
+          <a className="anyinfer-sdk-badge anyinfer-sdk-badge--csharp" href="/csharp/">C# .NET 8 · v{manifest.versions.csharp} · prerelease</a>
+          <a className="anyinfer-button anyinfer-button-text" href="/reference/conformance-matrix/">Python conformance matrix</a>
         </section>
       </main>
     </Layout>

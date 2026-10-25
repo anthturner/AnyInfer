@@ -221,7 +221,7 @@ class AboutDialog(QDialog):
         logo = QSvgWidget()
         variant = "dark" if theme.is_dark_active() else "light"
         logo.load(str(asset_path(f"anyinfer-horizontal-{variant}.svg")))
-        logo.setFixedSize(260, 56)
+        logo.setFixedSize(244, 56)  # the lockup's own 1135:260 proportions
         logo.setAccessibleName("AnyInfer")
         layout.addWidget(logo, 0, Qt.AlignmentFlag.AlignCenter)
 
