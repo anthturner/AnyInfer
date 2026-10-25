@@ -9,12 +9,38 @@ using System.Text;
 namespace AnyInfer.Config;
 
 /// <summary>Inert, validated version 1 configuration shared by C# AnyInfer integrations.</summary>
+/// <remarks>
+/// <para>
+/// This reader and writer implement a bounded subset of the shared JSON configuration format. A
+/// document must be a JSON object of at most <see cref="MaximumBytes"/> UTF-8 bytes whose optional
+/// <c>format_version</c> is 1. The root may contain <c>providers</c>, <c>default_route</c>,
+/// <c>operation_routes</c> (only <c>embedding</c> and <c>rerank</c>), <c>cache</c>, and <c>repair</c>
+/// (only <c>max_attempts</c>), plus <c>_comment</c> and the demo application's UI keys, which are
+/// accepted and ignored. The <c>context</c>, <c>history</c>, <c>observers</c>, <c>arena</c>,
+/// <c>arenas</c>, and <c>mcp</c> blocks are rejected as unimplemented, and any other key is rejected.
+/// </para>
+/// <para>
+/// Each provider entry needs an <c>id</c>. An entry whose boolean <c>enabled</c> is
+/// <see langword="false"/> is skipped without validating its other keys. An enabled entry may also set
+/// <c>adapter</c> (or its legacy spelling <c>provider_id</c>), an <c>alias</c> that restates the id,
+/// <c>base_url</c>, <c>api_key</c>, <c>api_version</c>, <c>headers</c>, <c>options</c>,
+/// <c>timeout_s</c> (a positive number, 120 when omitted), <c>limits</c>, <c>proxy</c>, <c>verify</c>,
+/// and <c>client_cert</c>, and the provider's declared setup fields directly or under <c>values</c>.
+/// Instance identifiers must be unique.
+/// </para>
+/// <para>
+/// Loading resolves no credential, constructs no adapter, and opens no CA-bundle or certificate file;
+/// an <c>api_key</c> is only checked with <see cref="ResolverChain.Handles"/>, so a reference whose
+/// scheme no resolver handles fails at load. Invalid content fails with a
+/// <see cref="ConfigException"/> whose message names the source.
+/// </para>
+/// </remarks>
 public sealed class AnyInferConfig
 {
-    /// <summary>The only configuration format version accepted by this SDK phase.</summary>
+    /// <summary>The only configuration format version this reader and writer accept.</summary>
     public const int FormatVersion1 = 1;
 
-    /// <summary>The largest UTF-8 configuration document accepted by this SDK phase.</summary>
+    /// <summary>The largest configuration document, in UTF-8 bytes (1 MiB), that <see cref="Load"/> and <see cref="Loads"/> accept.</summary>
     public const int MaximumBytes = 1024 * 1024;
 
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -40,6 +66,14 @@ public sealed class AnyInferConfig
     private static readonly HashSet<string> DirectKeys = new(StringComparer.Ordinal) { "base_url", "api_key", "api_version" };
 
     /// <summary>Creates an immutable configuration without resolving credentials or constructing adapters.</summary>
+    /// <param name="providers">Provider settings in preference order, copied; <see langword="null"/> for none. Instance identifiers are not checked for uniqueness here; the loader and client construction check them.</param>
+    /// <param name="route">Default generation route, or <see langword="null"/> for none.</param>
+    /// <param name="repair">Default schema-repair budget, or <see langword="null"/> for no repair.</param>
+    /// <param name="formatVersion">Configuration format version; only <see cref="FormatVersion1"/> is accepted.</param>
+    /// <param name="cache">Prompt-cache placement policy, or <see langword="null"/> for none.</param>
+    /// <param name="operationRoutes">Default routes for <see cref="InferenceOperation.Embedding"/> and <see cref="InferenceOperation.Rerank"/> only, copied; <see langword="null"/> for none.</param>
+    /// <exception cref="ConfigException"><paramref name="formatVersion"/> is unsupported, or <paramref name="operationRoutes"/> names another operation or holds a <see langword="null"/> route.</exception>
+    /// <exception cref="ArgumentException"><paramref name="providers"/> contains a <see langword="null"/> element.</exception>
     public AnyInferConfig(
         IEnumerable<ProviderSettings>? providers = null,
         Route? route = null,
@@ -80,6 +114,13 @@ public sealed class AnyInferConfig
     public IReadOnlyDictionary<InferenceOperation, Route> OperationRoutes { get; }
 
     /// <summary>Loads and validates a UTF-8 configuration document from an explicit path.</summary>
+    /// <param name="path">Path of the configuration file; no default location is searched. The path appears in error messages.</param>
+    /// <param name="registry">Provider registry that validates adapter names, setup fields, required fields, and connection-setting support; <see langword="null"/> uses <see cref="ProviderRegistry.CreateDefault"/>.</param>
+    /// <param name="resolver">Credential resolver chain that must accept each <c>api_key</c> through <see cref="ResolverChain.Handles"/>; nothing is resolved. <see langword="null"/> uses <see cref="ResolverChain.CreateDefault"/>.</param>
+    /// <returns>The validated configuration.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="path"/> is empty or whitespace.</exception>
+    /// <exception cref="ConfigException">The file cannot be read, exceeds <see cref="MaximumBytes"/>, is not valid UTF-8 JSON, or does not describe a valid version 1 configuration.</exception>
     public static AnyInferConfig Load(string path, ProviderRegistry? registry = null, ResolverChain? resolver = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -119,6 +160,13 @@ public sealed class AnyInferConfig
     }
 
     /// <summary>Loads and validates a configuration JSON string without resolving credentials or constructing adapters.</summary>
+    /// <param name="text">Configuration JSON text, at most <see cref="MaximumBytes"/> when encoded as UTF-8.</param>
+    /// <param name="registry">Provider registry that validates adapter names, setup fields, required fields, and connection-setting support; <see langword="null"/> uses <see cref="ProviderRegistry.CreateDefault"/>.</param>
+    /// <param name="resolver">Credential resolver chain that must accept each <c>api_key</c> through <see cref="ResolverChain.Handles"/>; nothing is resolved. <see langword="null"/> uses <see cref="ResolverChain.CreateDefault"/>.</param>
+    /// <param name="source">Label that names the document in error messages; <c>&lt;string&gt;</c> by default.</param>
+    /// <returns>The validated configuration.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> or <paramref name="source"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException"><paramref name="text"/> exceeds <see cref="MaximumBytes"/>, is not valid UTF-8 JSON, or does not describe a valid version 1 configuration.</exception>
     public static AnyInferConfig Loads(string text, ProviderRegistry? registry = null, ResolverChain? resolver = null, string source = "<string>")
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -148,6 +196,17 @@ public sealed class AnyInferConfig
     }
 
     /// <summary>Renders this configuration as canonical two-space JSON without resolving credentials.</summary>
+    /// <remarks>
+    /// Values are written exactly as configured. A credential reference such as <c>env://NAME</c> stays
+    /// a reference, but a literal <c>api_key</c>, header values, options, the proxy URI with any user
+    /// name and password, the <c>verify</c> CA-bundle path, and the <c>client_cert</c> paths and password
+    /// are all written as literal text, so protect the output. A 120-second timeout, default values
+    /// inside the <c>limits</c> and <c>cache</c> blocks, transport handlers, and ignored demo keys are
+    /// not written; a block whose values are all defaults is written as an empty object.
+    /// </remarks>
+    /// <param name="comments">Whether to add a root <c>_comment</c> string that recommends credential references; the loader accepts and ignores it.</param>
+    /// <returns>JSON with sorted keys, two-space indentation, non-ASCII characters escaped, and a trailing newline.</returns>
+    /// <exception cref="ConfigException">The default route or an operation route uses retry, health, or context-window settings that format version 1 cannot express, or a value cannot be serialized as JSON.</exception>
     public string Dumps(bool comments = false)
     {
         try
@@ -211,7 +270,17 @@ public sealed class AnyInferConfig
         }
     }
 
-    /// <summary>Writes this configuration atomically only when the destination is new, unless overwrite is explicit.</summary>
+    /// <summary>Writes this configuration to a new file, or over an existing one only when overwrite is explicit.</summary>
+    /// <remarks>
+    /// The text is <see cref="Dumps"/> with <c>comments</c> set to <see langword="true"/>, written as
+    /// UTF-8 without a byte-order mark. It contains literal configured values, so protect the file. The
+    /// write is not staged through a temporary file, so an interrupted write can leave a partial file.
+    /// </remarks>
+    /// <param name="path">Destination file path; its parent directory must already exist.</param>
+    /// <param name="force"><see langword="false"/> (the default) to create the file exclusively and fail if it exists; <see langword="true"/> to replace an existing file.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="path"/> is empty or whitespace.</exception>
+    /// <exception cref="ConfigException">The parent directory does not exist, the file exists and <paramref name="force"/> is <see langword="false"/>, the file cannot be written, the path is invalid, or <see cref="Dumps"/> fails.</exception>
     public void Dump(string path, bool force = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -244,6 +313,7 @@ public sealed class AnyInferConfig
     }
 
     /// <summary>Returns a credential-safe configuration summary.</summary>
+    /// <returns>The provider count and whether a default route is configured, such as <c>AnyInferConfig(Providers=2, Route=configured)</c>.</returns>
     public override string ToString() => $"AnyInferConfig(Providers={Providers.Count}, Route={(Route is null ? "none" : "configured")})";
 
     private static byte[] ReadBoundedFile(string path)

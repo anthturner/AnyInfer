@@ -2,6 +2,7 @@ import type {Config} from '@docusaurus/types';
 import type {Options as DocsOptions} from '@docusaurus/plugin-content-docs';
 import {existsSync, readFileSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
 import type {PrismTheme} from 'prism-react-renderer';
 
 import {sidebarFromManifest} from './plugins/sidebars';
@@ -11,11 +12,18 @@ const sourceManifest = existsSync(manifestPath)
   ? JSON.parse(readFileSync(manifestPath, 'utf8')) as {versions?: Record<string, string>}
   : {};
 
+/** Versions archived by `scripts/build_docs.py snapshot`, newest first; each SDK has its own. */
+function archivedVersions(id: 'python' | 'csharp'): string[] {
+  const file = new URL(`./${id}_versions.json`, import.meta.url);
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as string[] : [];
+}
+
 function docsInstance(
   id: 'shared' | 'python' | 'csharp',
   routeBasePath: string,
   versionLabel?: string,
 ): [string, DocsOptions] {
+  const language = id === 'python' ? 'Python' : 'C#';
   return [
     '@docusaurus/plugin-content-docs',
     {
@@ -27,17 +35,27 @@ function docsInstance(
         ? {}
         : {
             lastVersion: 'current',
-            versions: {current: {path: '', label: versionLabel ?? 'Current', badge: true}},
+            versions: {
+              current: {path: '', label: versionLabel ?? 'Current', badge: true},
+              ...Object.fromEntries(archivedVersions(id).map((name) => [
+                name, {label: `${language} ${name}`, banner: 'unmaintained' as const, badge: true},
+              ])),
+            },
           }),
-      async sidebarItemsGenerator({docs}) {
-        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+      async sidebarItemsGenerator({docs, version}) {
+        // An archived version keeps the navigation and pages it was published with.
+        const source = version.versionName === 'current'
+          ? manifestPath
+          : join(version.contentPath, 'manifest.json');
+        const manifest = JSON.parse(await readFile(source, 'utf8'));
         return sidebarFromManifest(manifest, id).filter((item) => {
           if (item.type !== 'doc') return true;
           return docs.some((doc) => doc.id === item.id);
         });
       },
-      editUrl: ({docPath}) =>
-        `https://github.com/anthturner/AnyInfer/edit/main/docs/${docPath.replace(/\.mdx$/, '.md')}`,
+      editUrl: ({docPath, version}) => version === 'current'
+        ? `https://github.com/anthturner/AnyInfer/edit/main/docs/${docPath.replace(/\.mdx$/, '.md')}`
+        : undefined,
     },
   ];
 }

@@ -97,6 +97,24 @@ def validate_site(
         articles[url] = article
         documents[url] = html
 
+    for sdk, entries in (manifest.get("archives") or {}).items():
+        for entry in entries:
+            for page in entry["pages"]:
+                url = page["url"]
+                path = page_file(site, url)
+                if not path.is_file():
+                    raise ValueError(f"archived page is missing: {url}")
+                html = path.read_text(encoding="utf-8")
+                marker = f'data-pagefind-filter="version:{entry["version"]}"'
+                if marker not in html or "data-pagefind-body" not in html:
+                    raise ValueError(
+                        f"archived page is not searchable as {sdk} {entry['version']}: {url}"
+                    )
+                article = Article()
+                article.feed(html)
+                articles[url] = article
+                documents[url] = html
+
     for url, html in documents.items():
         _validate_links(site, url, html, articles)
 

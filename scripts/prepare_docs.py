@@ -116,6 +116,7 @@ def prepare(
         "redirects": redirects_for(pages),
         "navigation": navigation,
         "generated": generated,
+        "archives": _archives(root),
     }
     manifest_text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     if output_dir.exists() and not incremental:
@@ -132,6 +133,37 @@ def prepare(
     if incremental:
         _remove_stale_files(output_dir, expected)
     return manifest
+
+
+def _archives(root: Path) -> dict[str, list[dict[str, object]]]:
+    """List each SDK's archived versions and their archived routes for search and exports."""
+    try:
+        from . import docs_versions
+    except ImportError:
+        import docs_versions  # type: ignore[no-redef]
+
+    website = root / "website"
+    archives: dict[str, list[dict[str, object]]] = {}
+    for sdk in docs_versions.SDKS:
+        entries = []
+        for version in docs_versions.archived_versions(website, sdk):
+            manifest = docs_versions.archived_manifest(website, sdk, version)
+            entries.append(
+                {
+                    "version": version,
+                    "pages": [
+                        {
+                            "url": docs_versions.archived_url(sdk, version, page["url"]),
+                            "title": page["title"],
+                        }
+                        for page in manifest["pages"]
+                        if page["sdk"] == sdk
+                    ],
+                }
+            )
+        if entries:
+            archives[sdk] = entries
+    return archives
 
 
 def _csharp_reference(root: Path, build: Callable[[Path], Any] | None) -> Any:

@@ -243,11 +243,15 @@ def validate_package(
         names = _names(archive)
         allowed = _container_records(names, nuspec=nuspec_name) | {
             "lib/net8.0/AnyInfer.dll",
+            "lib/net8.0/AnyInfer.xml",
             "README.md",
             "LICENSE",
         }
+        if "lib/net8.0/AnyInfer.xml" not in names:
+            raise RuntimeError("package has no XML documentation for the library")
         if names != allowed:
             raise RuntimeError("package payload contains an unexpected member")
+        _validate_documentation(archive.read("lib/net8.0/AnyInfer.xml"))
         root, namespace = _read_nuspec(archive, nuspec_name)
         metadata = root.find(namespace + "metadata")
         if metadata is None:
@@ -286,6 +290,22 @@ def validate_package(
         allowed = _container_records(names, nuspec=nuspec_name) | {"lib/net8.0/AnyInfer.pdb"}
         if names != allowed:
             raise RuntimeError("symbols package contains an unexpected member")
+
+
+def _validate_documentation(content: bytes) -> None:
+    """Require the packaged XML documentation to describe this library's public entry point.
+
+    The documentation ships so IDEs show it to package consumers. DocFX, its configuration,
+    cache and the rendered reference are build-only; the exact payload set above keeps them out.
+    """
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError as error:
+        raise RuntimeError("packaged XML documentation is not well-formed") from error
+    assembly = root.findtext("assembly/name")
+    members = {member.get("name") for member in root.iter("member")}
+    if assembly != PACKAGE_ID or "T:AnyInfer.AsyncClient" not in members:
+        raise RuntimeError("packaged XML documentation does not describe the AnyInfer library")
 
 
 def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -38,13 +39,7 @@ def _docusaurus_command(root: Path) -> list[str]:
     """Use Docusaurus's local Node entry point when it is available."""
     node = shutil.which("node.exe" if sys.platform == "win32" else "node")
     entry_point = (
-        root
-        / "website"
-        / "node_modules"
-        / "@docusaurus"
-        / "core"
-        / "bin"
-        / "docusaurus.mjs"
+        root / "website" / "node_modules" / "@docusaurus" / "core" / "bin" / "docusaurus.mjs"
     )
     if node and entry_point.is_file():
         return [node, str(entry_point)]
@@ -147,11 +142,58 @@ def _preview(
         raise
 
 
+def _snapshot(command: str, rest: list[str]) -> int:
+    """Archive, or remove the archive of, one SDK's documentation version."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import docs_versions
+
+    parser = argparse.ArgumentParser(prog=f"build_docs.py {command}")
+    parser.add_argument("--sdk", choices=docs_versions.SDKS, required=True)
+    parser.add_argument("--version", required=True, help="the outgoing SDK version")
+    options = parser.parse_args(rest)
+    try:
+        if command == "remove-snapshot":
+            docs_versions.remove_snapshot(ROOT, options.sdk, options.version)
+            print(f"removed the {options.sdk} {options.version} documentation archive")
+            return 0
+
+        def prepare(root: Path) -> dict:
+            subprocess.run(
+                [sys.executable, str(root / "scripts/prepare_docs.py")], cwd=root, check=True
+            )
+            return json.loads(
+                (root / "website/.generated/manifest.json").read_text(encoding="utf-8")
+            )
+
+        def symbols(root: Path) -> dict[str, str]:
+            import generate_csharp_reference
+
+            return dict(generate_csharp_reference.build(root).symbols)
+
+        archive = docs_versions.snapshot(
+            ROOT,
+            options.sdk,
+            options.version,
+            prepare=prepare,
+            docusaurus=docs_versions.run_docusaurus,
+            symbols=symbols if options.sdk == "csharp" else None,
+        )
+    except (docs_versions.SnapshotError, subprocess.CalledProcessError) as error:
+        print(f"documentation snapshot failed: {error}", file=sys.stderr)
+        return 1
+    print(f"archived {options.sdk} {options.version} at {archive.relative_to(ROOT)}")
+    return 0
+
+
 def main() -> int:
     """Prepare source content and run the requested documentation pipeline."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("build", "prepare", "preview"))
+    parser.add_argument(
+        "command", choices=("build", "prepare", "preview", "snapshot", "remove-snapshot")
+    )
     args, rest = parser.parse_known_args()
+    if args.command in {"snapshot", "remove-snapshot"}:
+        return _snapshot(args.command, rest)
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if args.command != "prepare" and not npm:
         parser.error(

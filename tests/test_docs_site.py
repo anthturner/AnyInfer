@@ -172,3 +172,38 @@ def test_validate_site_rejects_an_incomplete_generated_reference(
         validate_site(
             site, baseline=None, require_pagefind=False, require_generated_reference=True
         )
+
+
+def _add_archive(site: Path, *, indexed: bool) -> None:
+    manifest = json.loads((site / "docs-manifest.json").read_text(encoding="utf-8"))
+    manifest["archives"] = {
+        "csharp": [
+            {"version": "0.0.9-proof", "pages": [{"url": "/csharp/0.0.9-proof/", "title": "C#"}]}
+        ]
+    }
+    (site / "docs-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    directory = site / "csharp" / "0.0.9-proof"
+    directory.mkdir(parents=True)
+    metadata = '<meta data-pagefind-filter="version:0.0.9-proof">' if indexed else ""
+    body = " data-pagefind-body" if indexed else ""
+    (directory / "index.html").write_text(
+        f"<html><head>{metadata}</head><body><article{body}><h1>C#</h1>"
+        '<a href="/python/api/client/#client">Client</a></article></body></html>',
+        encoding="utf-8",
+    )
+
+
+def test_validate_site_accepts_searchable_archived_versions(tmp_path: Path) -> None:
+    site = _make_site(tmp_path)
+    _add_archive(site, indexed=True)
+    validate_site(site, baseline=None, require_pagefind=False)
+
+
+def test_validate_site_rejects_unsearchable_or_missing_archived_pages(tmp_path: Path) -> None:
+    site = _make_site(tmp_path)
+    _add_archive(site, indexed=False)
+    with pytest.raises(ValueError, match=r"not searchable as csharp 0\.0\.9-proof"):
+        validate_site(site, baseline=None, require_pagefind=False)
+    (site / "csharp" / "0.0.9-proof" / "index.html").unlink()
+    with pytest.raises(ValueError, match="archived page is missing"):
+        validate_site(site, baseline=None, require_pagefind=False)

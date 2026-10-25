@@ -22,6 +22,13 @@ SPEC.loader.exec_module(CHECKER)
 REVISION = "a" * 40
 
 
+DOCUMENTATION = (
+    b'<?xml version="1.0"?><doc><assembly><name>AnyInfer</name></assembly><members>'
+    b'<member name="T:AnyInfer.AsyncClient"><summary>Client.</summary></member>'
+    b"</members></doc>"
+)
+
+
 def _container(archive: zipfile.ZipFile) -> None:
     archive.writestr("[Content_Types].xml", b"types")
     archive.writestr("_rels/.rels", b"rels")
@@ -36,6 +43,7 @@ def _package(
     license_type: str = "expression",
     dependency_group: str = "",
     namespace: str = "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd",
+    documentation: bytes | None = DOCUMENTATION,
 ) -> None:
     version = CHECKER.package_version()
     nuspec = f'''<?xml version="1.0"?>
@@ -51,6 +59,8 @@ def _package(
         _container(archive)
         archive.writestr("AnyInfer.nuspec", nuspec)
         archive.writestr("lib/net8.0/AnyInfer.dll", b"core")
+        if documentation is not None:
+            archive.writestr("lib/net8.0/AnyInfer.xml", documentation)
         archive.writestr("README.md", b"readme")
         archive.writestr("LICENSE", b"MIT")
         if unexpected is not None:
@@ -119,7 +129,14 @@ def test_validate_package_rejects_metadata_drift(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "unexpected", ["lib/net8.0/Other.dll", "runtimes/win-x64/native/other.dll"]
+    "unexpected",
+    [
+        "lib/net8.0/Other.dll",
+        "runtimes/win-x64/native/other.dll",
+        "docfx.json",
+        "content/api/anyinfer.asyncclient.md",
+        "lib/net8.0/AnyInfer.AsyncClient.yml",
+    ],
 )
 def test_validate_package_rejects_unexpected_payload(tmp_path: Path, unexpected: str) -> None:
     package, symbols = _paths(tmp_path)
@@ -620,3 +637,22 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'new AdapterTextDelta("""{"colour":"blue"}""")' in source
     assert 'new AdapterTextDelta("""{"anything":true}""")' in source
     assert 'request.SchemaName == "capability_probe"' in source
+
+
+@pytest.mark.parametrize(
+    ("documentation", "match"),
+    [
+        (None, "no XML documentation"),
+        (b"<doc><unclosed>", "not well-formed"),
+        (b"<doc><assembly><name>Other</name></assembly><members/></doc>", "does not describe"),
+    ],
+)
+def test_validate_package_requires_the_library_xml_documentation(
+    tmp_path: Path, documentation: bytes | None, match: str
+) -> None:
+    package, symbols = _paths(tmp_path)
+    _package(package, documentation=documentation)
+    _symbols(symbols)
+
+    with pytest.raises(RuntimeError, match=match):
+        CHECKER.validate_package(package, symbols, REVISION)

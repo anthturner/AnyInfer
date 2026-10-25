@@ -3,9 +3,22 @@ using System.Net;
 namespace AnyInfer;
 
 /// <summary>Immutable explicit HTTP(S) proxy settings for one provider instance.</summary>
+/// <remarks>
+/// The proxy applies only to the HTTP handler AnyInfer creates for the instance; a handler supplied
+/// through <see cref="ProviderSettings.Transport"/> bypasses it. Without explicit proxy settings the
+/// SDK-created handler keeps the .NET default proxy behavior. The user name and password are literal
+/// values, not credential references, and are registered for redaction when the handler is created.
+/// <see cref="ToString"/> omits every value, but <see cref="Config.AnyInferConfig.Dumps"/> writes the
+/// configured proxy URI, including any user name and password, so protect that output.
+/// </remarks>
 public sealed record ProviderProxy
 {
     /// <summary>Initializes proxy settings with an address that contains no userinfo.</summary>
+    /// <param name="address">Absolute <c>http</c> or <c>https</c> proxy URI with a host and no user information, query, fragment, or path other than <c>/</c>.</param>
+    /// <param name="userName">Literal proxy user name, or <see langword="null"/> for none.</param>
+    /// <param name="password">Literal proxy password, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="address"/> is not an acceptable proxy URI or contains user information.</exception>
     public ProviderProxy(Uri address, string? userName = null, string? password = null)
     {
         ValidateAddress(address, nameof(address));
@@ -38,6 +51,9 @@ public sealed record ProviderProxy
     public string? Password { get; }
 
     /// <summary>Parses one literal HTTP(S) proxy URI without exposing it in diagnostics.</summary>
+    /// <param name="value">Absolute <c>http</c> or <c>https</c> proxy URI, optionally with percent-encoded <c>user:password@</c> user information; surrounding whitespace is ignored. It must have a host and no query, fragment, or path other than <c>/</c>.</param>
+    /// <returns>Settings whose <see cref="Address"/> has the user information removed and whose <see cref="UserName"/> and <see cref="Password"/> hold the decoded credentials, or <see langword="null"/> when absent.</returns>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is <see langword="null"/>, blank, or not an acceptable proxy URI.</exception>
     public static ProviderProxy Parse(string value)
     {
         if (string.IsNullOrWhiteSpace(value)
@@ -61,6 +77,7 @@ public sealed record ProviderProxy
     }
 
     /// <summary>Returns an identity-only representation that omits the proxy address and credentials.</summary>
+    /// <returns>The constant text <c>ProviderProxy</c>.</returns>
     public override string ToString() => "ProviderProxy";
 
     internal string ConfigurationValue { get; }

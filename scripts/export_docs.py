@@ -144,6 +144,28 @@ def _write(site: Path, name: str, text: str, *, bounded: bool = False) -> None:
     destination.write_text(text, encoding="utf-8")
 
 
+def _search_metadata(sdk: str, version: str) -> str:
+    scope = "shared" if sdk == "shared" else f"{sdk}:{version}"
+    return (
+        f'<meta data-pagefind-filter="scope:{escape(scope, quote=True)}">'
+        f'<meta data-pagefind-filter="sdk:{escape(sdk, quote=True)}">'
+        f'<meta data-pagefind-filter="version:{escape(version, quote=True)}">'
+        f'<meta data-pagefind-meta="sdk[content]" content="{escape(sdk)}">'
+        f'<meta data-pagefind-meta="version[content]" content="{escape(version)}">'
+    )
+
+
+def _index_archived_page(site: Path, url: str, sdk: str, version: str) -> None:
+    """Make an archived SDK page searchable under its own version."""
+    path = page_file(site, url)
+    if not path.is_file():
+        raise ValueError(f"archived {sdk} {version} page is missing: {url}")
+    html = path.read_text(encoding="utf-8")
+    html = html.replace("</head>", _search_metadata(sdk, version) + "</head>", 1)
+    html = re.sub(r"<article(?=[\s>])", "<article data-pagefind-body", html, count=1)
+    path.write_text(html, encoding="utf-8")
+
+
 def export_site(site: Path, manifest: dict) -> None:
     """Export current article content and preserve old links using static files."""
     sections: dict[str, list[tuple[dict, str]]] = {}
@@ -161,18 +183,19 @@ def export_site(site: Path, manifest: dict) -> None:
         bodies[page["url"]] = body
         sdk = page["sdk"]
         version = str(versions.get(sdk, "current"))
-        scope = "shared" if sdk == "shared" else f"{sdk}:{version}"
-        metadata = (
-            f'<meta data-pagefind-filter="scope:{escape(scope, quote=True)}">'
-            f'<meta data-pagefind-filter="sdk:{escape(sdk, quote=True)}">'
-            f'<meta data-pagefind-filter="version:{escape(version, quote=True)}">'
-            f'<meta data-pagefind-meta="sdk[content]" content="{escape(sdk)}">'
-            f'<meta data-pagefind-meta="version[content]" content="{escape(version)}">'
-        )
-        html = html.replace("</head>", metadata + "</head>", 1)
+        html = html.replace("</head>", _search_metadata(sdk, version) + "</head>", 1)
         html = re.sub(r"<article(?=[\s>])", "<article data-pagefind-body", html, count=1)
         path.write_text(html, encoding="utf-8")
         sections.setdefault(page["section"], []).append((page, body))
+
+    archive_lines: list[str] = []
+    for sdk, entries in sorted((manifest.get("archives") or {}).items()):
+        for entry in entries:
+            version = str(entry["version"])
+            for page in entry["pages"]:
+                _index_archived_page(site, page["url"], sdk, version)
+            label = "C#" if sdk == "csharp" else sdk.capitalize()
+            archive_lines.append(f"- {label} {version}: {ORIGIN}/{sdk}/{version}/")
 
     index = [
         "# AnyInfer",
@@ -182,6 +205,8 @@ def export_site(site: Path, manifest: dict) -> None:
         f"Full current documentation: {ORIGIN}/llms-full.txt",
         "",
     ]
+    if archive_lines:
+        index.extend(["Archived SDK documentation (not in the text exports):", *archive_lines, ""])
     full = [f"# AnyInfer — full documentation\n\n{version_line}\n"]
     for section, entries in sections.items():
         slug = re.sub(r"[^a-z0-9]+", "-", section.lower().replace("c#", "csharp")).strip("-")

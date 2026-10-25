@@ -155,8 +155,12 @@ deliberate act; the environment just adds a pause before the copy leaves the bui
 2. Read `## Unreleased` in
    [`CHANGELOG.md`](https://github.com/anthturner/AnyInfer/blob/main/CHANGELOG.md): it is
    what the release will say. Fix anything wrong there first.
-3. On a feature branch: bump `project.version` and `anyinfer.__version__`. Push, and the
-   changelog workflow pins those entries to the new version.
+3. On a feature branch, first decide whether readers of the outgoing release still need its
+   documentation once the site moves on (see
+   [archiving SDK documentation](#archiving-sdk-documentation)); if so, archive it while the
+   package metadata still names the outgoing version. Then bump `project.version` and
+   `anyinfer.__version__`. Push, and the changelog workflow pins those entries to the new
+   version.
 4. PR into `develop`; merge when green. PR `develop` into `main`; merge when green.
 5. Watch the release workflow attach `v<version>` and publish the wheel to PyPI.
 6. Verify the [downloads page](../downloads.md), checksum file, and PyPI project page.
@@ -174,6 +178,36 @@ Native beta bundles are not code-signed. macOS Gatekeeper and Windows SmartScree
 therefore require an explicit local approval. Signing and notarization require external
 certificates and are a release-infrastructure follow-up; the wheel, source distribution,
 checksums, and reproducible workflow remain the authoritative 0.1 release path.
+
+## Archiving SDK Documentation
+
+The site always shows the current documentation of each SDK at `/python/` and `/csharp/`.
+Each SDK can also keep archived versions of its own documentation; shared pages (concepts,
+providers, contributing) are never versioned, and archiving one SDK never touches the other's
+history. Nothing is archived automatically: archive a version only when a release replaces
+documentation that readers of the earlier release still need.
+
+Archive **before** bumping the version, while `pyproject.toml` (Python) or
+`src/csharp/Directory.Build.props` (C#) still names the outgoing version:
+
+```bash
+python scripts/build_docs.py snapshot --sdk python --version 0.1.3
+python scripts/build_docs.py snapshot --sdk csharp --version 0.1.0-proof
+```
+
+The command refuses any version other than the one the package metadata names, and a version
+that is already archived. It prepares the complete documentation first — for C# that includes
+extracting and rendering the API reference and checking it against the documentation
+inventory — then archives the prepared pages under `website/<sdk>_versioned_docs/` with the
+manifest (and, for C#, the symbol map) they were prepared from, so archived pages, their
+sidebar and their API links are never regenerated from later sources. Links between pages of
+the archived SDK are pointed at the archive; links to shared pages stay current. Archived pages
+appear in the SDK's version menu with an older-version banner and are searchable under their
+own version, but are left out of the `llms` text exports, which describe the current release.
+
+Commit `website/<sdk>_versions.json`, `website/<sdk>_versioned_docs/` and
+`website/<sdk>_versioned_sidebars/` with the version bump. To undo an archive before it is
+merged, run `python scripts/build_docs.py remove-snapshot --sdk <sdk> --version <version>`.
 
 ## When a Release Goes Wrong
 

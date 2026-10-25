@@ -4,9 +4,9 @@
 `DESIGN.md` first.** Each phase ends in a test gate. Record departures beside the
 affected box as `> NOTE:` entries and reconcile this checklist after every work wave.
 
-Status: **plan only**. The 2026-10-25 request authorizes writing this remainder plan,
-retiring completed plans, and committing/pushing the existing documentation work.
-It does not ask this turn to implement the unchecked phases or publish the site.
+Status: **in progress**. A later 2026-10-25 request authorized implementing this plan on
+`feature/language-neutral-foundation` (committing and pushing to that branch) and adapting the
+site to the user-supplied brand kit v2. Publication (R6.B) remains separately unauthorized.
 
 ## Starting point and settled decisions
 
@@ -75,7 +75,7 @@ plan cannot implement them by describing them.
 
 ### R0 — Inventory the work against the current native SDK
 
-- [ ] **R0.A — Capture scope and classify every page.** Re-read the current C# source,
+- [x] **R0.A — Capture scope and classify every page.** Re-read the current C# source,
   `docs/concepts/foundation.md`, `docs/reference/csharp-sdk.md`, the C# parent plan,
   `plans/SDK_FOUNDATION_ALIGNMENT.md`, and `plans/SDK_CONTEXT_PRIMITIVES.md`.
   Enumerate the actual pages from `website/navigation.json` and
@@ -90,8 +90,15 @@ plan cannot implement them by describing them.
   Do not turn a keyword search or the 235-row Python parity ledger into proof of native
   documentation completeness. **Test gate:** the inventory matches the actual source
   set; coverage controls demonstrate missing/stale rows fail; existing docs tests pass.
+  > NOTE: Ledger checked by `scripts/check_documentation_coverage.py` (used by
+  > `tests/test_documentation_coverage.py`). "Stale" means a row for a source the site no
+  > longer publishes; evidence must exist and must cite every `--8<--` include of the page.
+  > Rows start `review: "pending"`; `require_reviewed` stays `false` until R6.A flips it (or
+  > run the script with `--require-reviewed`). Repository-only entrypoints and exclusions
+  > (AGENTS.md, CLAUDE.md, Copilot shim, DESIGN.md, plans/, tests/fixtures/) are listed with
+  > reasons. Classification found 84 python, 17 mixed, 4 shared, 4 csharp pages.
 
-- [ ] **R0.B — Prove and pin the extraction toolchain.** Inspect
+- [x] **R0.B — Prove and pin the extraction toolchain.** Inspect
   `src/csharp/global.json`, `Directory.Build.props`, and `AnyInfer/AnyInfer.csproj`.
   Carry forward DocFX **2.81.0 as the initial candidate**, not a claim of installed or
   verified compatibility. Verify that exact package/version and .NET 8 compatibility
@@ -113,10 +120,21 @@ plan cannot implement them by describing them.
   ../../website/docfx.json`. Restore is an explicit setup step; normal builds must not
   download an unpinned executable. **Test gate:** the pinned tool extracts only the
   intended assembly with all representative constructs and a repeatable UID inventory.
+  > NOTE: DocFX 2.81.0 verified: the package ships a net8.0 tool build; it restores and runs
+  > under SDK 8.0.425 and extracts only `AnyInfer.csproj` (255 managed-reference items),
+  > byte-identically across repeated runs. Markdown output does not retain canonical XML
+  > documentation IDs (anchors become lossy underscore forms), so the bounded fallback is
+  > used: `outputFormat: mref` YAML plus the deterministic Python renderer, still extracted by
+  > DocFX. That adds build-only `PyYAML==6.0.3` (hash-locked in `website/requirements.lock`
+  > and the `dev` extra). `disableGitFeatures: false` supplies repository-relative source
+  > paths and lines; the branch-specific `source.remote` block is ignored. The representative
+  > fixture is `tests/fixtures/csharp-reference/ReferenceFixture/` (generic and nested types,
+  > ref/out/in/params, async streams, overloads, records, operators and conversions, crefs,
+  > a long signature, obsolete members, `inheritdoc`, and two deliberate documentation gaps).
 
 ### R1 — Make native API documentation coverage measurable
 
-- [ ] **R1.A — Add a complete documentation symbol inventory.** Reuse the existing
+- [x] **R1.A — Add a complete documentation symbol inventory.** Reuse the existing
   assembly boundary in `src/csharp/AnyInfer.Maintenance/PublicApi.cs`: it scans
   `typeof(AnyInfer.AsyncClient).Assembly.GetExportedTypes()` with `DeclaredOnly`.
   Its existing `--public-api --output PATH` projection collapses overloads to names
@@ -134,6 +152,15 @@ plan cannot implement them by describing them.
   this checker independent of the Python-equivalence evidence ledger.
   **Test gate:** a missing constructor/overload/member and a broken UID mapping each
   fail a negative control; the real assembly has zero unexplained coverage omissions.
+  > NOTE: `DocumentationInventory.cs` reflects over the built assembly; its IDs match the
+  > compiler's XML documentation IDs on every fixture member, including nested constructed
+  > generics. Exclusions: accessors, enum `value__`, runtime delegate members, static
+  > constructors, members unreachable through sealed or non-public types, and compiler
+  > synthesized record members (value equality, `ToString`/`PrintMembers`, `Deconstruct`,
+  > copy constructor, `EqualityContract`, `<Clone>$`); a declared record member is kept.
+  > Implicit constructors are deliberately kept, so a type must declare and document them.
+  > The inventory found what CS1591 never reports: undocumented positional record parameters
+  > and implicit constructors. Native tests: `AnyInfer.Tests/DocumentationInventoryTests.cs`.
 
 - [ ] **R1.B — Complete XML comments and retain the package boundary.** Enable
   `GenerateDocumentationFile` for `src/csharp/AnyInfer/AnyInfer.csproj` only. Author
