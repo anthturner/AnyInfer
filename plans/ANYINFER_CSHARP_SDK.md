@@ -1129,6 +1129,13 @@ must report a real conflict rather than silently changing a dependent public sig
   > zero-finding comment-coverage gate, C# installation and quickstart pages, task recipes and
   > a six-page native cookbook executed offline. This box stays open: the site is not
   > published, and the parity inventory has not been reconciled with the published claims.
+  > NOTE: Documentation content and local acceptance completed 2026-10-25 at `de76dc8`:
+  > all 30 workspace steps, 103 native example cases, TypeScript, 12 static browser checks
+  > and the dual-SDK archive rehearsal passed. A clean-source, current-only site candidate
+  > and last-good recovery payload are retained with source/checksum receipts in
+  > `maintenance/documentation/site-acceptance.json`. Publication/public smoke remain in
+  > the documentation leaf's R6.B; this does not complete API parity or platform/release
+  > qualification and does not check SDK.12a–c.
 - [ ] **SDK.12b** Qualify target frameworks, OS/runtime matrix, dependency licenses, package
   and symbols payload, source metadata and external consumers. Extend native CI deliberately
   for SDK support, preserving Python packaging and release behavior. Gate: full workspace,

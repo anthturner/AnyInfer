@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "verified_date": "2026-10-25",
+  "content_source": {
+    "base_commit": "199e3ea49c53c3d10dcdfbf43b1af93b5cb0e82f",
+    "tree": "be6877d91ac6525f411f0e33830d53d4ada945c9",
+    "commit": "de76dc898d07be4b1e2a964fb2c9c3edd2ac795f",
+    "note": "The archive rehearsal uses only the documentation change plus committed SDK sources. The primary workspace gate also includes preserved, uncommitted native context-primitives work."
+  },
+  "scope": {
+    "authored_published_sources": 117,
+    "unreviewed_sources": 0,
+    "python_sdk": "0.1.3",
+    "csharp_sdk": "0.1.0-proof",
+    "native_nuget_published": false
+  },
+  "checks": {
+    "focused_examples_and_rendering": {
+      "command": "python -m pytest -p no:cacheprovider --basetemp=.tmp-tests/docs-quality-focused-final tests/test_docs_examples.py tests/test_csharp_reference.py tests/test_docs_pipeline.py tests/testing/portable/test_reference.py::test_foreign_anyinfer_module_refuses_environment_capture tests/testing/portable/test_release_report.py::test_release_report_rechecks_foreign_cached_anyinfer_before_publication -m \"not slow\" -q",
+      "passed": 95,
+      "note": "The final workspace gate reran the complete tests after the factory-binding and single-range fixes."
+    },
+    "typecheck": {
+      "command": "npm --prefix website run typecheck",
+      "status": "passed"
+    },
+    "static_browser": {
+      "command": "PLAYWRIGHT_CHANNEL=chrome npm --prefix website run test:browser -- tests/smoke.spec.ts",
+      "passed": 12,
+      "viewports": [
+        320,
+        390,
+        768,
+        1024,
+        1440
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "visual_review": [
+        "Downloads: 390 and 1440 widths",
+        "Homepage: dark theme",
+        "Shared routing: dark theme"
+      ],
+      "clean_source_candidate_passed": 12
+    },
+    "workspace": {
+      "command": "python workspace.py check",
+      "status": "passed",
+      "log": ".tmp-tests/docs-quality-acceptance.log",
+      "steps_passed": 30,
+      "native_example_asserted_cases": 103,
+      "native_documentation_declarations_with_existing_context_wip": 1683,
+      "native_documentation_findings": 0,
+      "log_sha256": "37211229ed6ad415525fe321753ada9bab561dcda8176d902035f9df5a32e8a7",
+      "retained_log": "dist/docs-acceptance/de76dc898d07be4b1e2a964fb2c9c3edd2ac795f/docs-quality-acceptance.log"
+    }
+  },
+  "independent_archive_rehearsal": {
+    "current_pages": 361,
+    "archived_pages": {
+      "csharp": {
+        "0.1.0-proof": 255
+      },
+      "python": {
+        "0.1.3": 21
+      }
+    },
+    "manifest_sha256": "5933013a30b8a4f41ee69f5e3184f6f763558d97d27fc1449452c5e8b2b09c92",
+    "native_inventory_declarations": 1654,
+    "native_type_pages": 243,
+    "build_static_search_export_validation": "passed",
+    "browser_tests": {
+      "passed": 1
+    },
+    "archive_removal_independent": {
+      "csharp": true,
+      "python": true
+    },
+    "production_archives_created": false,
+    "built_source_tree": "b889e2ce571c37e23bfb3b2abdf942375f5fd3c5",
+    "verified_source_commit": "de76dc898d07be4b1e2a964fb2c9c3edd2ac795f",
+    "verified_source_tree": "be6877d91ac6525f411f0e33830d53d4ada945c9",
+    "source_verification": {
+      "tracked_blobs_checked": 1377,
+      "text_blobs_with_only_CRLF_conversion": 1146,
+      "other_differences": 0,
+      "note": "The only post-build source edit tightened the archive browser assertion to require both SDKs; that control and TypeScript were rerun against the same built artifact."
+    }
+  },
+  "publication": {
+    "status": "awaiting_separate_authorization",
+    "branch_process": [
+      "feature/*",
+      "develop",
+      "main"
+    ],
+    "public_deployment_performed": false,
+    "last_good": {
+      "source_revision": "f38d0d1a0fb1e8f29cce32ed37e3eccc1c52cdbc",
+      "original_successful_workflow": "https://github.com/anthturner/AnyInfer/actions/runs/32942917002",
+      "original_artifact_available": false,
+      "retained_rebuilt_archive": "dist/docs-recovery/f38d0d1a0fb1e8f29cce32ed37e3eccc1c52cdbc/github-pages.zip",
+      "retained_toolchain_receipt": "dist/docs-recovery/f38d0d1a0fb1e8f29cce32ed37e3eccc1c52cdbc/receipt.json",
+      "retention_scope": "Local checkout, excluded from Git. Transfer the archive and receipt to retained deployment storage before cutover.",
+      "sha256": "2fd5d79c155ac6de5c5f8717406ce4f6d543fb07949d047706b2c28e28206fb1",
+      "files": 187,
+      "packaging_overlays": {
+        "CNAME": "anyinfer.dev",
+        ".nojekyll": ""
+      },
+      "recorded_build_tools": {
+        "Jinja2": "3.1.6",
+        "Markdown": "3.10.3",
+        "Pygments": "2.21.0",
+        "mkdocs": "1.6.1",
+        "mkdocs-material": "9.7.7",
+        "mkdocstrings": "1.0.6",
+        "mkdocstrings-python": "2.0.9",
+        "pymdown-extensions": "12.0.1"
+      },
+      "local_http_smoke": {
+        "/": {
+          "status": 200,
+          "bytes": 89355
+        },
+        "/downloads/": {
+          "status": 200,
+          "bytes": 84150
+        },
+        "/guides/quickstart/": {
+          "status": 200,
+          "bytes": 94695
+        },
+        "/reference/api/client/": {
+          "status": 200,
+          "bytes": 514071
+        },
+        "/llms.txt": {
+          "status": 200,
+          "bytes": 26374
+        },
+        "/CNAME": {
+          "status": 200,
+          "bytes": 14
+        }
+      },
+      "restore_procedure": "Verify the archive checksum, extract to an empty directory, serve on loopback, and smoke the recorded routes. Redeploy that static payload through the normal Pages mechanism or use a reviewed source revert and Pages rebuild. Preserve CNAME, .nojekyll, Pages environment, artifact naming and concurrency."
+    }
+  },
+  "known_limits": [
+    "C# remains an independent native prerelease; documentation coverage is not a full Python parity or platform qualification claim.",
+    "Native live TEI verification remains pending; Python cassette evidence does not verify the C# adapter.",
+    "Public cutover and post-deployment smoke remain open."
+  ],
+  "environment": {
+    "os": "Windows",
+    "python": "3.13.15",
+    "node": "v26.12.1",
+    "dotnet": "8.0.426",
+    "docfx": "2.81.0"
+  },
+  "deployment_candidate": {
+    "source_commit": "de76dc898d07be4b1e2a964fb2c9c3edd2ac795f",
+    "archive": "dist/docs-acceptance/de76dc898d07be4b1e2a964fb2c9c3edd2ac795f/github-pages.zip",
+    "sha256": "cf3094a5025748455925b3cc6deafa86c690fce63e35dac6e399d3180228647a",
+    "files": 1410,
+    "bytes": 11155352,
+    "indexed_pages": 361,
+    "archived_versions": {},
+    "format": "ZIP of static site root; extract before Pages upload",
+    "manifest_sha256": "0cea1e231b8dd4507766ac79415cf7c8ac910e69db222cbe4de5b8473528d972",
+    "status": "passed",
+    "browser_tests_passed": 12,
+    "preserved_sdk_wip_excluded": true,
+    "retention_scope": "Local checkout, excluded from Git. Retain or transfer this archive with its receipt before deployment."
+  }
+}

@@ -4,10 +4,10 @@
 `DESIGN.md` first.** Each phase ends in a test gate. Record departures beside the
 affected box as `> NOTE:` entries and reconcile this checklist after every work wave.
 
-Status: **in progress; resume at R6.A's quality pass and final acceptance, then R6.B**. A
+Status: **implementation and local acceptance complete; resume at R6.B**. A
 2026-10-25 request authorized implementing this plan on `feature/language-neutral-foundation`
 (committing and pushing to that branch) and adapting the site to the user-supplied brand kit v2.
-R0–R5 are implemented on that branch. Publication (R6.B) remains separately unauthorized.
+R0–R5 and R6.A are complete on that branch. Publication (R6.B) remains separately unauthorized.
 
 > NOTE: The follow-up request asks for a thorough example/content quality pass and completion
 > of the remaining documentation work. The R6.A subtasks below track that pass; preserve
@@ -99,10 +99,10 @@ plan cannot implement them by describing them.
   > NOTE: Ledger checked by `scripts/check_documentation_coverage.py` (used by
   > `tests/test_documentation_coverage.py`). "Stale" means a row for a source the site no
   > longer publishes; evidence must exist and must cite every `--8<--` include of the page.
-  > Rows start `review: "pending"`; `require_reviewed` stays `false` until R6.A flips it (or
-  > run the script with `--require-reviewed`). Repository-only entrypoints and exclusions
+  > Rows began with `review: "pending"`; review is now complete and `require_reviewed` is
+  > `true`. Repository-only entrypoints and exclusions
   > (AGENTS.md, CLAUDE.md, Copilot shim, DESIGN.md, plans/, tests/fixtures/) are listed with
-  > reasons. Classification found 84 python, 17 mixed, 4 shared, 4 csharp pages.
+  > reasons. The final ledger classifies 64 Python, 38 mixed, 4 shared and 11 C# pages.
 
 - [x] **R0.B — Prove and pin the extraction toolchain.** Inspect
   `src/csharp/global.json`, `Directory.Build.props`, and `AnyInfer/AnyInfer.csproj`.
@@ -375,13 +375,13 @@ plan cannot implement them by describing them.
   **Test gate:** independent snapshot/restore fixtures, archived links, version selector,
   generated-reference identity, local search and section exports pass for each SDK.
   > NOTE: `scripts/docs_versions.py` implements `snapshot`/`remove-snapshot` with fixture
-  > tests in `tests/test_docs_versions.py`; no production archive exists. A real C#
-  > `0.1.0-proof` snapshot rehearsal in a scratch worktree failed on absolute DocFX source
-  > paths (fixed in R2.A); the full rehearsal build has not been re-run since.
+  > tests in `tests/test_docs_versions.py`; no production archive exists. The first real
+  > C# snapshot rehearsal found absolute DocFX source paths (fixed in R2.A). R6.A4 reran
+  > both SDK snapshots, their combined build and independent removal successfully.
 
 ### R6 — Final acceptance, public cutover and recovery
 
-- [ ] **R6.A — Verify the exact completed artifact and reconcile scope.** Re-read this
+- [x] **R6.A — Verify the exact completed artifact and reconcile scope.** Re-read this
   plan and the coverage ledger; require zero unreviewed sources, zero unexplained
   native public-symbol omissions and zero unexecuted supported recipes. Run
   `.venv/Scripts/python.exe workspace.py check`, `npm --prefix website run typecheck`,
@@ -398,25 +398,19 @@ plan cannot implement them by describing them.
   any unrelated full-gate failure rather than declaring the entire suite green.
   **Test gate:** documentation-specific gates and artifact/browser acceptance all pass;
   full-gate outcomes and independent content/coverage review are explicitly recorded.
-  > NOTE: Full `workspace.py check` at `d2a3577`: 25 of 28 steps passed, including docs-check,
-  > docs-build and all 15 C# steps. Lint and two docs-control import failures were fixed after
-  > that run. Unrelated, and reproduced on the plan's starting commit `136b3f8`: nine serve
-  > streaming tests and the `serve invariants (ADR-009)` conformance step fail with the unpinned
-  > Starlette 1.10.0 in this environment, plus one portable-driver fixture test. Demo-app tests
-  > (229) pass once the container has `libEGL`. `npm run typecheck` passes; browser acceptance
-  > passed 12 of 12 against that build after one test fix. The C# accounting fixture clock was
-  > fixed so the parity step no longer spins on Linux. Remaining: re-run the full gate and
-  > browser acceptance at the final revision before checking this box.
-  > Left for the next session, in order: (1) re-run `workspace.py check` and browser
-  > acceptance at the final revision; (2) re-run the R5.A snapshot rehearsal in a scratch
-  > worktree (snapshot C# `0.1.0-proof`, production build, then inspect the version menu,
-  > archived routes and search; create no production archive); (3) fix three review findings
-  > left open: `docs/reference/errors.md`'s TransportError card says a retry cannot duplicate
-  > output already seen, but a mid-stream transport failure is retried after deltas went out;
-  > `docs/providers/retrieval.md`'s Dimensionality row shows "—" for Voyage although both SDKs
-  > send `output_dimension`; and `maintenance/changes/tei-1-9-4.json` still calls the native
-  > live probe pending while the docs cite the 2026-10-22 C# run, so confirm the run and
-  > reconcile one of them.
+  > NOTE: Accepted 2026-10-25 at documentation commit `de76dc898d07be4b1e2a964fb2c9c3edd2ac795f`
+  > (tree `be6877d91ac6525f411f0e33830d53d4ada945c9`). `workspace.py check` passed all 30 steps;
+  > TypeScript passed; the 95 focused example/rendering controls passed and were followed by
+  > the final full gate. The Release native runner passed all 103 asserted cases. Independent
+  > content review cleared the Python lifecycle/setup fixes, native await changes, public
+  > confidentiality guarantees and TransportError/Voyage/TEI corrections. Fixed Windows source
+  > URL separators and restored Material line highlights during Docusaurus preparation.
+  > NOTE: The primary checkout's full gate includes preserved native context-primitives WIP:
+  > its documentation checker reports 1,683 declarations and zero findings. The isolated
+  > committed-source build excludes that WIP: 1,654 declarations, 243 type pages, 361 current
+  > indexed pages and no production archives. Both the primary artifact and the clean-source
+  > candidate passed all 12 browser tests. Evidence, tool versions, hashes and source-qualified
+  > limits are in [the acceptance receipt](../maintenance/documentation/site-acceptance.json).
 
 - [x] **R6.A1 — Review C# application examples and their authored pages.** Audit
   `examples/csharp-sdk/`, the native cookbook, installation/quickstart, SDK guide and
@@ -431,13 +425,12 @@ plan cannot implement them by describing them.
   > unsupported claims of a native live TEI run to scripted-offline evidence with live native
   > verification explicitly pending. `tests/test_csharp_docs_examples.py -q` passes (7 tests;
   > repository-local `--basetemp` was required because the sandbox temp directory was exhausted).
-  > The coordinator must still run the Release C# example runner and obtain independent review
-  > before treating the R6.A gate as complete.
+  > The final Release example runner and independent review passed; R6.A records the result.
   > NOTE: Documentation coverage also found 30 missing parameter/return tags in the preserved,
   > untracked native context-primitives workstream. Added XML comments only in
   > `ContextDocument.cs`, `ContextPacking.cs`, and `ContextStructure.cs`; these WIP comments
-  > are not part of the docs-only commit and make no parity claim. The coordinator must rerun
-  > the native documentation checker with the context workstream present.
+  > are not part of the docs-only commit and make no parity claim. The final native
+  > documentation checker passed with the context workstream present.
 
 - [x] **R6.A2 — Recheck concepts, reference, provider and contributor claims.** Correct
   the three outstanding TransportError/Voyage-dimensions/TEI evidence findings against
@@ -451,8 +444,8 @@ plan cannot implement them by describing them.
   > Python/C# Voyage adapter tests prove shared `dimensions` becomes `output_dimension`; and the
   > TEI change declaration records the native live probe as pending, with no recorded native live
   > run receipt. The TEI C# documentation, including the native reference, now states the
-  > offline evidence boundary. Ran the reviewed documentation coverage check; the coordinator
-  > still owns link checks and independent review.
+  > offline evidence boundary. Reviewed documentation coverage, link checks and independent
+  > review passed with 117 authored published sources and no unreviewed rows.
 
 - [x] **R6.A3 — Review Python examples and the remaining user journeys.** Audit the
   Python cookbook, mixed task guides and public entrypoints for complete, idiomatic calls,
@@ -466,18 +459,17 @@ plan cannot implement them by describing them.
   > standalone snippets, defined the README retrieval corpus, and made async distillation
   > lifetime explicit. The confidentiality guide now limits BYOK to the direct-call
   > topology, and describes Tier 3 as local TEE-readiness detection and Tier 4 as
-  > point-in-time signed-manifest verification, not cryptographic attestation. The focused
-  > `tests/test_docs_examples.py -q` run produced no output and did not complete in the
-  > available window, so the coordinator must run the executable documentation gate and
-  > focused docs/example controls before closing R6.A.
+  > point-in-time signed-manifest verification, not cryptographic attestation. An earlier
+  > sandbox test attempt could not complete; the coordinator reran the focused controls with
+  > local fake-server access, then passed the full executable documentation gate.
   > NOTE: Independent review found remaining disconnected Python fences. Quickstart now has
   > complete sync/async programs, explicit inputs, configured provider credentials, and
   > source-exact fake-transport execution controls. The vector-store rerank and lifecycle
   > snippets now own their store and async-client lifetimes; distillation and fallback recipes
-  > likewise own their inputs and clients. The coordinator must run the focused docs-example
-  > control after this content wave settles, then the executable documentation gate.
+  > likewise own their inputs and clients. Both custom-provider programs import the SDK.
+  > Focused controls, full executable documentation checks and final independent review passed.
 
-- [ ] **R6.A4 — Rehearse independent archives and inspect the finished site.** In an
+- [x] **R6.A4 — Rehearse independent archives and inspect the finished site.** In an
   isolated scratch checkout, snapshot the actual outgoing native prerelease, build it,
   inspect archived/current routes, native signatures, version selection, local search
   and exports, and remove the scratch archive. Produce no invented production history.
@@ -485,6 +477,13 @@ plan cannot implement them by describing them.
   run the full gate once and record exact outcomes. **Test gate:** archive/browser checks,
   production build, TypeScript and documentation-specific checks pass; unrelated failures
   are recorded accurately before closing R6.A.
+  > NOTE: Rehearsed real outgoing C# `0.1.0-proof` (255 SDK pages) and Python `0.1.3`
+  > (21 SDK pages) in an isolated source copy. Combined build, static validation, archived
+  > version menus/API links/scoped search and export checks passed. The browser control
+  > requires both archives. Removing either snapshot preserved the other's exact history;
+  > both were removed and the final current-only candidate was rebuilt and passed all 12
+  > browser tests. No production archive or invented release was committed. Downloads at
+  > 390/1440 widths, the dark homepage and a dark shared concept were visually inspected.
 
 - [ ] **R6.B — Publish through the existing branch process and prove recovery.** This
   carries forward the migration's unexecuted publication/recovery work. When separately
@@ -500,6 +499,15 @@ plan cannot implement them by describing them.
   never by resetting unrelated SDK work or rewriting Git history. **Test gate:** public
   smoke succeeds and the recovery record names a concrete deployable artifact/revision
   with the tested restoration procedure.
+  > NOTE: Recovery preparation is complete locally. The last successful Pages workflow was
+  > run `32942917002`, source `f38d0d1a0fb1e8f29cce32ed37e3eccc1c52cdbc`; its artifact expired.
+  > Rebuilt that exact source with recorded tool versions, retained the 187-file static ZIP
+  > under `dist/docs-recovery/<source>/github-pages.zip`, and extracted/served six recovery
+  > routes successfully over loopback. The receipt records its SHA-256, tool versions,
+  > CNAME/.nojekyll packaging overlays and restoration procedure. Retain/transfer this local
+  > archive and receipt before cutover. The tested new candidate is also retained under
+  > `dist/docs-acceptance/de76dc898d07be4b1e2a964fb2c9c3edd2ac795f/github-pages.zip`.
+  > No public deployment, protected-branch merge or public smoke has been performed.
 
 - [ ] **R6.C — Reconcile parent plans and retire this leaf.** Record which documentation
   outcomes are complete in `plans/README.md` and the C# parent's SDK.12a notes. Close
@@ -510,6 +518,10 @@ plan cannot implement them by describing them.
   work is complete or its remaining boxes are explicitly handed to another active plan.
   **Test gate:** no unfinished box is lost, no durable plan link remains, and all plan
   links resolve after retirement.
+  > NOTE: Parent SDK.12a and the plan index now record the accepted documentation work;
+  > implementation/parity/platform/release milestones remain open. Durable versioning and
+  > Pages recovery guidance lives in `docs/contributing/releasing.md`. Keep this leaf active
+  > until R6.B is complete, then retire it without dropping the publication/recovery outcome.
 
 ## Coordination and validation rules
 
@@ -525,9 +537,12 @@ Extend tests at actual failure boundaries (coverage, snippet execution, xrefs, m
 layout), not assertions that merely mirror implementation strings.
 
 When stopping partway, record the first unfinished box, exact commit/tree and remaining
-failure here. Current resume point is **R6.A**, including its acceptance/rehearsal subtask
-**R6.A4**. Content quality subtasks R6.A1–3 are implemented; their coordinator gates remain
-part of R6.A until the final artifact and independent review are recorded below.
+failure here. Current resume point is **R6.B**: obtain separate authorization for the
+protected-branch publication process, retain/transfer the tested local artifacts, deploy and
+run the public smoke. Documentation content and local acceptance are complete at
+`de76dc898d07be4b1e2a964fb2c9c3edd2ac795f` (tree `be6877d91ac6525f411f0e33830d53d4ada945c9`).
+After publication, finish R6.C and retire this leaf. No current local acceptance failure
+remains; full Python parity and native platform/release qualification remain parent work.
 
 ## Primary tool references
 
