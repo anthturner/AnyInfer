@@ -7,14 +7,15 @@ development as a prerelease local package (`0.1.0-proof`) with a hand-written re
 is not published to NuGet and does not claim full parity. See the [foundation capability
 map](../concepts/foundation.md).
 
-- **[SDK reference](api/README.md)**: the generated API reference: every public class,
+- **[Python API reference](api/README.md)**: the generated API reference for the supported
+  published Python SDK: every public class,
   function, and event, from the docstrings.
-- **[C# SDK proof reference](csharp-sdk.md)**: the bounded prerelease .NET surface, including
+- **[C# API reference](csharp-sdk.md)**: the bounded prerelease .NET surface, including
   pure catalog metadata, explicit lifecycle calls and capability probes, declarative setup
   metadata, and modern JSON Schema validation, with executable source examples.
-- **[Error catalog](errors.md)**: every exception, when it is raised, whether it retries,
+- **[Python error catalog](errors.md)**: every Python exception, when it is raised, whether it retries,
   and the `hint` the user will see.
-- **[Conformance matrix](conformance-matrix.md)**: what each provider actually supports,
+- **[Python conformance matrix](conformance-matrix.md)**: what each Python provider actually supports,
   from test results rather than assertion.
 - **[Shared configuration](configuration.md)**: provider settings, environment variables,
   and the common JSON file.
@@ -24,7 +25,8 @@ map](../concepts/foundation.md).
 
 ## API Stability
 
-The public API is fully typed (the package ships a `py.typed` marker) and documented in
+The following stability commitments apply to the published Python API. It is fully typed (the
+package ships a `py.typed` marker) and documented in
 its docstrings. The stability commitments cover the top-level `anyinfer` namespace plus
 the subpackage surfaces the guides teach: `anyinfer.config`, `anyinfer.local`,
 `anyinfer.serve`, `anyinfer.testing`, and `anyinfer.otel`. Anything under
@@ -43,6 +45,9 @@ before upgrading. What earns an entry is in
 [the changelog rules](../contributing/changelog.md).
 
 ## Module Map
+
+This module map is for the Python SDK. The native C# prerelease has its own
+[C# API reference](csharp-sdk.md) and does not claim this module layout or Python API stability.
 
 | Module | Responsibility |
 |---|---|

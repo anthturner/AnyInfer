@@ -146,7 +146,7 @@ A new built-in provider trips several enumeration gates. All of them, in one cha
 - `contracts/<id>.md` — written in Step 1; confirm it now matches the code.
 - `docs/providers/<id>.md` — with the `provider:` and `icon:` frontmatter the other pages
   carry.
-- `mkdocs.yml` nav, in the providers section.
+- `website/navigation.json`, in the providers section.
 - `scripts/generate_provider_index.py` — an `ADAPTER_PAGES` entry **and** an
   `ADAPTER_SUMMARIES` entry; the script raises "provider guide mapping mismatch" when only
   one is present.
@@ -205,7 +205,7 @@ python -m pytest -q               # or `workspace check`, which runs every gate 
 python -m mypy src/
 python -m ruff check src/ tests/
 lint-imports
-python -m mkdocs build --strict
+python workspace.py build docs
 ```
 
 Regenerate when the relevant shape changed:

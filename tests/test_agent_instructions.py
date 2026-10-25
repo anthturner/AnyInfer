@@ -118,7 +118,7 @@ def test_the_new_provider_procedure_covers_every_registration_gate() -> None:
         "scripts/generate_provider_index.py",
         "ADAPTER_PAGES",
         "ADAPTER_SUMMARIES",
-        "mkdocs.yml",
+        "website/navigation.json",
         "lint-imports",
         "workspace.py",
         "python scripts/generate_provider_index.py",
@@ -219,7 +219,7 @@ def test_no_rendered_text_instructs_the_reader_on_how_to_quote_it() -> None:
     where someone weighing Tier 3 against their threat model found instructions for a
     citer instead of the fact they came for. The rule was stated nowhere and enforced by
     nobody; this covers every surface that renders, docstrings included, because
-    mkdocstrings publishes those onto the site as well.
+    the generated Python reference publishes those onto the site as well.
     """
     offenders: list[str] = []
     for path in sorted((ROOT / "docs").rglob("*.md")):
@@ -275,7 +275,7 @@ def test_no_user_facing_text_carries_an_adr_identifier() -> None:
 
 
 def test_public_docstrings_carry_no_adr_identifier() -> None:
-    """Rendered onto the published site by mkdocstrings, so these are user-facing too."""
+    """Rendered into the published Python reference, so these are user-facing too."""
     import ast
 
     offenders: list[str] = []

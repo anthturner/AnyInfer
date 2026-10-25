@@ -1,0 +1,7 @@
+.notFound { max-width: 1120px; }
+.cards { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 2rem 0; }
+.card { border: 1px solid var(--ifm-color-emphasis-200); border-radius: .7rem; color: inherit; padding: 1.25rem; text-decoration: none; }
+.card:hover { border-color: var(--ifm-color-primary); text-decoration: none; }
+.card h2 { font-size: 1.1rem; margin: 0 0 .5rem; }
+.card p { margin: 0; }
+@media screen and (max-width: 760px) { .cards { grid-template-columns: 1fr; } }

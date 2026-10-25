@@ -92,8 +92,8 @@ env:
   UV_SYSTEM_PYTHON: "1"
 
 jobs:
-  # Decide whether this change can skip the test matrix. A change confined to docs/,
-  # mkdocs.yml, and overrides/ cannot alter library behavior, and the `gates` job already
+  # Decide whether this change can skip the test matrix. A change confined to docs/
+  # cannot alter library behavior, and the `gates` job already
   # runs every docs gate (link check, doc examples, strict site build) — so the suite rows
   # would re-prove code that did not change. Everything else, including this workflow and
   # scripts/, counts as code. Pure API calls, no checkout; bills under a minute.
@@ -133,7 +133,7 @@ jobs:
           [ -z "$files" ] && docs_only=false
           while IFS= read -r f; do
             case "$f" in
-              docs/*|mkdocs.yml|overrides/*) ;;
+              docs/*) ;;
               *) docs_only=false; break ;;
             esac
           done <<< "$files"
@@ -197,7 +197,7 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
       - run: uv pip install -e ".[all,dev]"
 
-      # mkdocstrings imports every documented package to render its reference pages, so
+      # The public-boundary gate imports every documented package to render its reference pages, so
       # sharded add-ons (src/python/anyinfer-*, each its own pyproject.toml and never folded into
       # the root package) need their own editable install for the docs gates below.
       # All three shards, matching `workspace.SHARDS` — a test asserts this list
@@ -281,8 +281,24 @@ jobs:
       # The site must build cleanly too — a docs change that renders fine on GitHub but
       # breaks the published site should fail here, not after deploy. It goes through
       # `check` like every other gate, so `workspace check` alone reproduces this job.
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: website/.nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm --prefix website ci
+      - run: uv pip install --require-hashes -r website/requirements.lock
+
       - name: site build (strict)
         run: python workspace.py check --only=docs-build
+
+      - name: install docs smoke-test browser
+        working-directory: website
+        run: npm exec -- playwright install --with-deps chromium
+
+      - name: browser checks against the static artifact
+        working-directory: website
+        run: npm run test:browser
 
   # This is a bounded native proof lane, not a Python package job: the checked-in
   # global.json selects its SDK and the workspace phase owns version/restore/test/package checks.
@@ -382,7 +398,7 @@ jobs:
       - run: uv pip install -e ".[all,dev]"
 
       # `workspace build all` (exercised by test_workspace.py) builds the docs site as
-      # part of "all", and mkdocstrings imports every sharded add-on (src/python/anyinfer-*) to
+      # part of "all", and the public-boundary gate imports every sharded add-on (src/python/anyinfer-*) to
       # render its reference pages — same reason the gates job installs it above.
       # All three shards, matching `workspace.SHARDS` — a test asserts this list
       # stays in step with it. Listed on one line rather than looped because the

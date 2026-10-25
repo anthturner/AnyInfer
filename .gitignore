@@ -8,6 +8,13 @@ __pycache__/
 build/
 dist/
 site/
+website/node_modules/
+website/.generated/
+website/.cache/
+website/.docusaurus/
+website/playwright-report/
+website/test-results/
+website/.venv/
 htmlcov/
 
 # Virtual environments

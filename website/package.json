@@ -1,0 +1,36 @@
+{
+  "name": "anyinfer-docs",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "start": "docusaurus start --host 127.0.0.1",
+    "site:build": "docusaurus build --out-dir ../site",
+    "search:index": "pagefind --site ../site",
+    "typecheck": "tsc --noEmit",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/plugin-content-docs": "3.10.2",
+    "@docusaurus/preset-classic": "3.10.2",
+    "@docusaurus/theme-mermaid": "3.10.2",
+    "@mdx-js/react": "3.1.1",
+    "@mermaid-js/layout-elk": "0.1.9",
+    "clsx": "2.1.1",
+    "prism-react-renderer": "2.4.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.10.2",
+    "@docusaurus/tsconfig": "3.10.2",
+    "@playwright/test": "1.55.0",
+    "@types/react": "19.1.16",
+    "@types/react-dom": "19.1.9",
+    "pagefind": "1.5.2",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=24 <27"
+  }
+}

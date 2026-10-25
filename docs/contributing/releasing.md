@@ -27,9 +27,10 @@ succeeded or was skipped by one of two deliberate conditions; a job that runs an
 always fails the gate.
 
 The two deliberate skips exist to keep billed minutes proportional to risk. First, a
-change confined to `docs/`, `mkdocs.yml`, and `overrides/` skips the whole test matrix
+change confined to `docs/` skips the whole test matrix
 (the `changes` job classifies it); the docs gates, the executable doc examples, and the
-strict site build still run on every change. Second, the expensive lanes — the two
+strict site build still run on every change. Changes under `website/`, `scripts/`, or
+their lockfiles and configuration are code changes, so they keep the full matrix. Second, the expensive lanes — the two
 middle interpreters and the macOS row, which bills at 10x Linux — run only on the pull
 request into `main`, where a merge should prove the release is buildable, and not on
 feature PRs into `develop`.

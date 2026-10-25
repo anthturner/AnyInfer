@@ -5,6 +5,10 @@ real translation, plus declarative presets for OpenAI-compatible services and en
 Breadth is useful, but it is not AnyInfer's product boundary; start with
 [why and when to use AnyInfer](../why-anyinfer.md) when choosing an integration layer.
 
+This inventory describes the published Python SDK. The native C# prerelease registers a bounded
+subset of providers and operations; its canonical coverage and limits are in the
+[foundation capability map](../concepts/foundation.md) and [C# SDK guide](../guides/csharp-sdk.md).
+
 The generated [complete inventory](all.md) is the full accessible rendering: all 106
 providers (20 dedicated adapters, 86 presets), each with its target prefixes, key
 variable or default endpoint, and notes.
@@ -97,8 +101,8 @@ variable or default endpoint, and notes.
 
 </div>
 
-See the [conformance matrix](../reference/conformance-matrix.md) for exactly which
-behaviors each one supports, generated from test results rather than asserted.
+See the Python [conformance matrix](../reference/conformance-matrix.md) for exactly which
+behaviors each listed provider supports, generated from test results rather than asserted.
 
 ## What Is the Same Everywhere
 

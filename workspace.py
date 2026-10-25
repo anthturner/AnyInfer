@@ -136,6 +136,12 @@ LINT_PATHS = (
     "src/python",
     "tests",
     "workspace.py",
+    "scripts/build_docs.py",
+    "scripts/check_docs_site.py",
+    "scripts/docs_common.py",
+    "scripts/export_docs.py",
+    "scripts/generate_python_reference.py",
+    "scripts/prepare_docs.py",
     "scripts/check_csharp_accounting.py",
     "scripts/_csharp_observation.py",
     "scripts/check_csharp_context_tuning.py",
@@ -341,7 +347,7 @@ def _tool_path(name: str) -> Path | None:
     The interpreter's scripts directory is checked first; outside a virtualenv, the user
     scheme's scripts directory is checked too. The second matters on a system interpreter
     whose site-packages is not writable: pip silently falls back to a user install there,
-    which puts ``mkdocs.exe`` and friends in a directory that is routinely absent from
+    which puts Python console scripts in a directory that is routinely absent from
     PATH — ``setup`` then succeeds while every tool looks "not installed".
 
     Returns:
@@ -481,7 +487,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     python("-m", "pip", "install", "-e", f".[{args.extras}]")
     # Sharded add-ons (src/python/anyinfer-*, each its own pyproject.toml per the monorepo
     # sharding convention) aren't in the root package's dependency graph. They are
-    # installed editable for two reasons: their mkdocstrings reference pages need them
+    # installed editable for two reasons: their generated reference pages need them
     # importable for `workspace build docs` / `workspace check --only=docs-build`, and
     # their own test suites must exercise the working tree. A non-editable install here
     # means a shard's tests silently run against a stale copy in site-packages, which is
@@ -516,7 +522,7 @@ def cmd_info(args: argparse.Namespace) -> int:
 
     print()
     print(bold("Tools"))
-    for name in ("ruff", "mypy", "pytest", "lint-imports", "mkdocs"):
+    for name in ("ruff", "mypy", "pytest", "lint-imports", "node", "npm"):
         found = _tool_path(name) is not None or shutil.which(name) is not None
         status = green("found") if found else yellow("missing")
         print(f"  {status}{'    ' if found else '  '}{name}")
@@ -687,7 +693,7 @@ def _scan_public_boundaries() -> tuple[list[str], dict[str, bool]]:
 
 
 def _reference_directives() -> set[str]:
-    """Return every mkdocstrings directive in the documentation."""
+    """Return every source API placeholder in the documentation."""
     directives: set[str] = set()
     for page in (ROOT / "docs").rglob("*.md"):
         text = page.read_text(encoding="utf-8")
@@ -793,6 +799,9 @@ _MD_SKIP_DIRS = {
     ".venv",
     "venv",
     "node_modules",
+    ".generated",
+    ".docusaurus",
+    ".cache",
     "__pycache__",
     "site",
     "build",
@@ -804,11 +813,11 @@ illustrative links are not meant to resolve; not ours to gate."""
 
 def _markdown_files() -> list[Path]:
     """Every Markdown file worth checking."""
-    return sorted(
-        markdown
-        for markdown in ROOT.rglob("*.md")
-        if not any(part in _MD_SKIP_DIRS for part in markdown.relative_to(ROOT).parts)
-    )
+    markdown: list[Path] = []
+    for parent, directories, filenames in os.walk(ROOT):
+        directories[:] = [name for name in directories if name not in _MD_SKIP_DIRS]
+        markdown.extend(Path(parent) / name for name in filenames if name.endswith(".md"))
+    return sorted(markdown)
 
 
 def _check_doc_links() -> int:
@@ -854,7 +863,7 @@ def _build_docs_site() -> int:
     ``workspace build docs``, because a gate that runs a *different* build from the one
     that publishes is a gate that can pass while the deploy breaks.
     """
-    return tool("mkdocs", "build", "--strict")
+    return python(str(ROOT / "scripts" / "build_docs.py"), "build")
 
 
 def _run_csharp(*args: str) -> int:
@@ -996,7 +1005,7 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
         Phase(
             "docs-build",
             "the strict site build the Pages deploy publishes",
-            (("mkdocs build --strict", _build_docs_site),),
+            (("Docusaurus static site and local search", _build_docs_site),),
         ),
         Phase(
             "csharp",
@@ -1173,7 +1182,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 _CONTRACTS_URL = "https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md"
-"""Absolute because the matrix page cannot link outside the mkdocs docs/ tree."""
+"""Absolute because the matrix page cannot link outside the published docs/ tree."""
 
 _NON_HTTP_ROWS = frozenset({"copilot", "llama-cpp"})
 """Matrix rows whose conformance boundary is not an in-process HTTP transport.
@@ -1606,8 +1615,8 @@ def cmd_providers(args: argparse.Namespace) -> int:
     passthrough=True,
 )
 def cmd_docs(args: argparse.Namespace) -> int:
-    """Serve the docs with mkdocs."""
-    return tool("mkdocs", "serve", *args.rest)
+    """Prepare the documentation and serve Docusaurus with live reload."""
+    return python(str(ROOT / "scripts" / "build_docs.py"), "preview", *args.rest)
 
 
 # ---------------------------------------------------------------------------------------
@@ -2107,7 +2116,7 @@ def cmd_build(args: argparse.Namespace) -> int:
             Phase(
                 "docs",
                 "the documentation site, strict (the Pages artifact)",
-                (("mkdocs build --strict", _build_docs_site),),
+                (("Docusaurus static site and local search", _build_docs_site),),
             )
         )
     if not phases:

@@ -1,18 +1,8 @@
----
-# No `title:` here on purpose. The theme renders a front-matter title as
-# "<title> - AnyInfer", which on the site's own homepage reads "AnyInfer - AnyInfer" --
-# in the browser tab and in every link unfurl (overrides/main.html).
-template: home.html
-hide:
-  - navigation
-  - toc
----
-
 # AnyInfer { .anyinfer-visually-hidden }
 
 <div class="anyinfer-code-teaser" markdown>
 
-=== "Sync"
+=== "Python sync"
 
     ```python
     import anyinfer as ai
@@ -24,7 +14,7 @@ hide:
     print(result.text)
     ```
 
-=== "Async"
+=== "Python async"
 
     ```python
     import anyinfer as ai
@@ -38,28 +28,40 @@ hide:
         print(result.text)
     ```
 
+=== "C# (prerelease)"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/GenerationExample.cs"
+    ```
+
 </div>
 
 AnyInfer provides a shared inference foundation with independent Python and C# SDK
-implementations. Python remains the supported published SDK; the native .NET 8 C# SDK is in
-development as a prerelease package. The Python SDK, CLI, and OpenAI-compatible sidecar use
-the same engine; C# executes a bounded native subset. See [the foundation](concepts/foundation.md).
+implementations. Python is the supported published SDK; its CLI and OpenAI-compatible
+sidecar use the Python engine. The native .NET 8 C# SDK is an independent prerelease,
+locally packaged as `0.1.0-proof`, with no runtime Python dependency. It is not published to
+NuGet and does not claim full parity. See [the foundation](concepts/foundation.md) for the capability map.
 
-The C# SDK is a native .NET 8 development surface distributed locally as package
-`0.1.0-proof`. It is not published to NuGet and does not claim full Python parity. See the
-[C# SDK guide](guides/csharp-sdk.md) and [foundation](concepts/foundation.md).
+Choose the [Python quickstart](guides/quickstart.md), [Python SDK guide](guides/python-sdk.md),
+or [Python reference](reference/api/README.md) for the supported SDK. For the native prerelease,
+start with the [C# SDK guide](guides/csharp-sdk.md), [C# reference](reference/csharp-sdk.md),
+or [Python-to-C# migration map](guides/python-to-csharp.md). The C# SDK is distinct from
+calling the Python sidecar over HTTP.
 
-## Install
+## Install the Python SDK {#install}
 
 ```bash
 pip install anyinfer
 ```
 
-The core depends on only `httpx2` and `jsonschema`. Provider SDKs, the sidecar, and the
-demo app are optional extras. Local inference is part of the core. See
+The Python core depends on only `httpx2` and `jsonschema`. Python provider SDKs, the Python
+sidecar, and the demo app are optional extras. Local inference is part of the Python core. See
 [installation and extras](guides/installation.md).
 
 ## What Makes This Different
+
+The capabilities below describe the supported Python runtime. The
+[C# capability map](concepts/foundation.md#c-capability-map) covers the native prerelease.
 
 Most libraries in this space solve *provider switching*: one function, many APIs, one
 response shape. AnyInfer solves the problem that starts right after: being correct about
@@ -100,7 +102,7 @@ what you sent, what you got back, what it cost, and what quietly didn't happen.
 | Existing local service | Ollama, LM Studio, vLLM | Native or compatible client behavior; the service keeps process ownership |
 | Managed local runtime | `llama.cpp` | Runtime and model acquisition, hardware fit, tuning, supervision, and loopback lifecycle |
 
-**→ [See the compatibility inventory](providers/all.md)**: dedicated protocol adapters
+**→ [See the Python compatibility inventory](providers/all.md)**: dedicated protocol adapters
 and declarative presets, from frontier APIs to local engines, with
 [per-provider guides](providers/README.md). Embeddings and reranking are typed, routed
 operations on the same client; see

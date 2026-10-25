@@ -4,7 +4,7 @@ A stream yields typed [events](../concepts/events.md) while the request runs: te
 reasoning, timing marks, and attempt failures. This page shows the patterns a terminal
 frontend needs; the full event vocabulary is in the [API reference](../reference/api/README.md).
 
-=== "Sync"
+=== "Python sync"
 
     ```python
     import anyinfer as ai
@@ -23,7 +23,7 @@ frontend needs; the full event vocabulary is in the [API reference](../reference
         )
     ```
 
-=== "Async"
+=== "Python async"
 
     ```python
     import anyinfer as ai
@@ -41,20 +41,22 @@ frontend needs; the full event vocabulary is in the [API reference](../reference
             )
     ```
 
-=== "C# async (prerelease)"
+=== "C# SDK (prerelease)"
 
     ```csharp
     --8<-- "examples/csharp-sdk/StreamingExample.cs"
     ```
 
-=== "C# sync facade (prerelease)"
+=== "C# SDK sync facade (prerelease)"
 
     ```csharp
     --8<-- "examples/csharp-sdk/SyncStreamingExample.cs"
     ```
 
-The C# proof keeps streaming separate from explicit model discovery and health operations; see
-the [C# SDK guide](csharp-sdk.md) for those source-linked calls.
+The C# SDK stream is disposed with `await using` (or `using` for `SyncStream`) and accepts a
+caller cancellation token. Read `Result` after consuming the stream to successful completion. It keeps
+streaming separate from explicit model discovery and health operations; see the
+[C# SDK guide](csharp-sdk.md) for those source-linked calls. The recipes below use Python APIs.
 
 ## Use the Context Manager
 

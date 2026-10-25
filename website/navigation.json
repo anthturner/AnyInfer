@@ -1,0 +1,368 @@
+[
+  {
+    "Home": "index.md"
+  },
+  {
+    "Integrate": [
+      "guides/README.md",
+      {
+        "Quickstart": "guides/quickstart.md"
+      },
+      {
+        "Installation and Extras": "guides/installation.md"
+      },
+      {
+        "Why and When to Use AnyInfer": "why-anyinfer.md"
+      },
+      {
+        "Shared Configuration": "reference/configuration.md"
+      },
+      {
+        "Surfaces": [
+          {
+            "Integrate the Python SDK": "guides/python-sdk.md"
+          },
+          {
+            "C# SDK (prerelease)": "guides/csharp-sdk.md"
+          },
+          {
+            "Move from Python to C# SDK (prerelease)": "guides/python-to-csharp.md"
+          },
+          {
+            "Run a Prompt from the Shell": "guides/cli.md"
+          },
+          {
+            "OpenAI-Compatible Sidecar": "serve/README.md"
+          },
+          {
+            "Running the Sidecar as a Service": "serve/running-as-a-service.md"
+          }
+        ]
+      },
+      {
+        "Python Tasks": [
+          {
+            "Stream Typed Events": "guides/streaming.md"
+          },
+          {
+            "Enforce a JSON Schema": "guides/structured-output.md"
+          },
+          {
+            "Add a Fallback Chain": "guides/fallback.md"
+          },
+          {
+            "Run the Tool Loop": "guides/tool-loop.md"
+          },
+          {
+            "Fit a Corpus to a Budget": "guides/fitting-context.md"
+          },
+          {
+            "Test Your Application Offline": "guides/testing-your-app.md"
+          },
+          {
+            "Compare Targets Without Spending": "guides/comparing-targets.md"
+          },
+          {
+            "Add Your Own Provider": "guides/custom-providers.md"
+          },
+          {
+            "Embed, Store, and Query Without a Database": "guides/vector-store.md"
+          }
+        ]
+      },
+      {
+        "Operations": [
+          {
+            "Run a Model Locally": "guides/local-inference.md"
+          },
+          {
+            "Observability": "guides/observability.md"
+          }
+        ]
+      },
+      {
+        "Confidentiality Tiers": "guides/confidentiality-tiers.md"
+      },
+      {
+        "Coding Agents": "guides/coding-agents.md"
+      },
+      {
+        "Integration Procedure": "agents/INTEGRATION.md"
+      },
+      {
+        "The Pack-In Demo Application": "guides/demo-app.md"
+      }
+    ]
+  },
+  {
+    "Concepts": [
+      "concepts/README.md",
+      {
+        "Shared Foundation": "concepts/foundation.md"
+      },
+      {
+        "The Request Path": [
+          {
+            "Targets and Aliases": "concepts/targets.md"
+          },
+          {
+            "The Event Stream": "concepts/events.md"
+          },
+          {
+            "Routing and Rate Limits": "concepts/routing.md"
+          },
+          {
+            "Structured Output": "concepts/structured-output.md"
+          },
+          {
+            "Sessions": "concepts/sessions.md"
+          },
+          {
+            "Embeddings and Reranking": "concepts/embeddings.md"
+          },
+          {
+            "Multimodal Inputs": "concepts/multimodal-inputs.md"
+          }
+        ]
+      },
+      {
+        "Cost and Context": [
+          {
+            "Capabilities and Provenance": "concepts/capabilities.md"
+          },
+          {
+            "Token Estimation and Context Budgets": "concepts/budgeting.md"
+          },
+          {
+            "Cost and Spending": "concepts/cost.md"
+          },
+          {
+            "Prompt Caching": "concepts/caching.md"
+          },
+          {
+            "Context Reduction": "concepts/context-reduction.md"
+          }
+        ]
+      },
+      {
+        "Local Execution": [
+          {
+            "The Local Subsystem": "concepts/local.md"
+          },
+          {
+            "The Model Catalog": "concepts/catalog.md"
+          }
+        ]
+      },
+      {
+        "Operations": [
+          {
+            "Credentials and Redaction": "concepts/credentials.md"
+          },
+          {
+            "Telemetry": "concepts/telemetry.md"
+          },
+          {
+            "Run Manifests": "concepts/run-manifests.md"
+          },
+          {
+            "Arena Runs": "concepts/arena.md"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "Examples": [
+      "examples/README.md",
+      {
+        "Structured Summaries with Fallback": "examples/summarize-with-fallback.md"
+      },
+      {
+        "A Local Tool-Calling Assistant": "examples/local-tool-agent.md"
+      },
+      {
+        "Distill a Corpus": "examples/distill-a-corpus.md"
+      },
+      {
+        "Regression-Test Fallback and Repair": "examples/golden-manifest.md"
+      },
+      {
+        "Semantic Search over a Small Corpus": "examples/semantic-search.md"
+      }
+    ]
+  },
+  {
+    "Providers": [
+      "providers/README.md",
+      {
+        "Every Provider": "providers/all.md"
+      },
+      {
+        "Hosted & Local Presets": "providers/presets.md"
+      },
+      {
+        "OpenAI": "providers/openai.md"
+      },
+      {
+        "Anthropic": "providers/anthropic.md"
+      },
+      {
+        "Google Gemini": "providers/gemini.md"
+      },
+      {
+        "DeepSeek": "providers/deepseek.md"
+      },
+      {
+        "xAI (Grok)": "providers/xai.md"
+      },
+      {
+        "Google Vertex AI": "providers/vertex.md"
+      },
+      {
+        "AWS Bedrock": "providers/bedrock.md"
+      },
+      {
+        "Cohere": "providers/cohere.md"
+      },
+      {
+        "Azure AI Foundry": "providers/azure-foundry.md"
+      },
+      {
+        "GitHub Copilot": "providers/copilot.md"
+      },
+      {
+        "Microsoft 365 Copilot": "providers/m365-copilot.md"
+      },
+      {
+        "OpenRouter": "providers/openrouter.md"
+      },
+      {
+        "Nebius Token Factory": "providers/nebius.md"
+      },
+      {
+        "Ollama": "providers/ollama.md"
+      },
+      {
+        "LM Studio": "providers/lm-studio.md"
+      },
+      {
+        "llama.cpp": "providers/llama-cpp.md"
+      },
+      {
+        "Text Embeddings Inference": "providers/tei.md"
+      },
+      {
+        "Voyage AI and Jina AI": "providers/retrieval.md"
+      },
+      {
+        "OpenAI-Compatible": "providers/openai-compat.md"
+      }
+    ]
+  },
+  {
+    "Reference": [
+      "reference/README.md",
+      {
+        "C# SDK (prerelease) Reference": "reference/csharp-sdk.md"
+      },
+      {
+        "SDK Reference": [
+          "reference/api/README.md",
+          {
+            "Clients and Streams": "reference/api/client.md"
+          },
+          {
+            "Requests and Messages": "reference/api/requests.md"
+          },
+          {
+            "Results and Stream Events": "reference/api/results.md"
+          },
+          {
+            "Embeddings and Reranking": "reference/api/embeddings.md"
+          },
+          {
+            "Portability Diff Tool": "reference/api/compare-diff.md"
+          },
+          {
+            "Vector Store Add-On": "reference/api/vector-store.md"
+          },
+          {
+            "Confidentiality Add-Ons": "reference/api/confidential.md"
+          },
+          {
+            "Routing": "reference/api/routing.md"
+          },
+          {
+            "Capabilities": "reference/api/capabilities.md"
+          },
+          {
+            "Context Reduction": "reference/api/context.md"
+          },
+          {
+            "Telemetry and Redaction": "reference/api/telemetry.md"
+          },
+          {
+            "Registry, Catalog, Credentials": "reference/api/registry.md"
+          },
+          {
+            "Configuration": "reference/api/configuration.md"
+          },
+          {
+            "Local Inference": "reference/api/local.md"
+          },
+          {
+            "Sidecar Frontend": "reference/api/serve.md"
+          },
+          {
+            "Testing Utilities": "reference/api/testing.md"
+          },
+          {
+            "Errors": "reference/api/errors.md"
+          }
+        ]
+      },
+      {
+        "Error Catalog": "reference/errors.md"
+      },
+      {
+        "Conformance Matrix": "reference/conformance-matrix.md"
+      },
+      {
+        "Glossary": "reference/glossary.md"
+      }
+    ]
+  },
+  {
+    "Contributing": [
+      "contributing/README.md",
+      {
+        "C# Core-Generation Proof": "contributing/csharp-proof.md"
+      },
+      {
+        "Architecture": "contributing/architecture.md"
+      },
+      {
+        "Coding Agents and Workstreams": "contributing/automation.md"
+      },
+      {
+        "Branding and Visual Assets": "contributing/branding.md"
+      },
+      {
+        "Writing an Adapter": "contributing/writing-an-adapter.md"
+      },
+      {
+        "The Conformance Suite": "contributing/conformance.md"
+      },
+      {
+        "Testing": "contributing/testing.md"
+      },
+      {
+        "Branching and Releases": "contributing/releasing.md"
+      },
+      {
+        "The Changelog": "contributing/changelog.md"
+      }
+    ]
+  }
+]

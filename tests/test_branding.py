@@ -75,16 +75,29 @@ def test_social_card_is_documentation_only() -> None:
     assert not (DEMO_ASSETS / "anyinfer-social-card.png").exists()
 
 
-def test_site_head_template_wires_up_the_brand_marks() -> None:
-    head = (ROOT / "overrides" / "main.html").read_text(encoding="utf-8")
+def test_docusaurus_configuration_wires_up_the_brand_marks() -> None:
+    config = (ROOT / "website" / "docusaurus.config.ts").read_text(encoding="utf-8")
     for expected in (
-        'property="og:image"',
-        'name="twitter:card" content="summary_large_image"',
+        "property: 'og:image'",
+        "name: 'twitter:card', content: 'summary_large_image'",
+        "name: 'twitter:image'",
         "anyinfer-social-card.png",
-        "anyinfer-icon-512.svg",
-        'rel="apple-touch-icon"',
+        "src: 'assets/anyinfer-horizontal-light.svg'",
+        "srcDark: 'assets/anyinfer-horizontal-dark.svg'",
+        "favicon: 'assets/anyinfer-icon-512.png'",
     ):
-        assert expected in head, expected
+        assert expected in config, expected
+
+
+def test_documentation_colors_match_the_canonical_brand_palette() -> None:
+    palette = (DOC_ASSETS / "anyinfer-palette.css").read_text(encoding="utf-8")
+    stylesheet = (ROOT / "website" / "src" / "css" / "custom.css").read_text(encoding="utf-8")
+    for token in ("teal", "teal-deep", "teal-bright", "amber", "gold", "slate"):
+        pattern = rf"--anyinfer-{token}:\s*(#[0-9a-f]{{6}});"
+        canonical = re.search(pattern, palette, re.IGNORECASE)
+        published = re.search(pattern, stylesheet, re.IGNORECASE)
+        assert canonical is not None and published is not None, token
+        assert canonical[1].lower() == published[1].lower(), token
 
 
 def test_deprecated_promotional_media_is_not_part_of_the_brand_kit() -> None:

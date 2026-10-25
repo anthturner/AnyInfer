@@ -1,9 +1,13 @@
 # Examples
 
-Small, complete programs, not fragments. Each one is a pattern the library was designed
-around. The shape of every example is exercised in CI against the in-process fake
+Small, complete Python programs, not fragments. Each one is a pattern the library was designed
+around. The shape of every Python example is exercised in CI against the in-process fake
 providers (`tests/test_docs_examples.py`); whether a program runs offline as written, and
 against what, is stated on each page.
+
+For native .NET, use the [C# SDK guide](../guides/csharp-sdk.md) and its source-linked,
+offline-compiled runner in `examples/csharp-sdk/AnyInfer.Examples.csproj`. Those C# examples are
+separate from this Python cookbook.
 
 | Example | What it shows |
 |---|---|

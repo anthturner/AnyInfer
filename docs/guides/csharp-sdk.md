@@ -2,15 +2,28 @@
 
 The repository includes an independent native .NET 8 SDK in development. Its runnable
 source examples live in `examples/csharp-sdk/`. Python remains the supported published SDK;
-C# is locally packaged as `0.1.0-proof` without full-parity or support-matrix claims. See the
+C# is locally packaged as `0.1.0-proof` and runs without a Python runtime. It is not published
+to NuGet and does not claim full parity or a support matrix. See the
 [foundation capability map](../concepts/foundation.md).
 
 The generation examples use `ProviderSettings` and the built-in OpenAI-compatible, Cerebras,
 Hyperbolic, and Nscale providers.
-The C# proof also includes built-in TEI, Voyage, and Jina adapters for buffered embeddings and
+The C# SDK also includes built-in TEI, Voyage, and Jina adapters for buffered embeddings and
 reranking; other provider-specific retrieval remains application-owned. The async calls accept
 a cancellation token and use `await using`; the matching synchronous facade uses `using` and
 the .NET default task scheduler.
+
+## Start here
+
+Read this page in the order that matches the application task:
+
+- [Use in a .NET application](#use-in-a-net-application) to reference the local prerelease.
+- [Create provider settings](#create-provider-settings) for the destination and credential
+  boundary, then [Generate text](#generate-text) for the first call.
+- [Stream, validate, and route](#stream-validate-and-route) for the compiled streaming,
+  structured-output, and fallback examples.
+- [Run the tool loop](tool-loop.md) for registered .NET tool handlers, or the
+  [C# reference](../reference/csharp-sdk.md) for the native API surface.
 
 ## Run the examples
 
@@ -26,6 +39,27 @@ dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --config
 
 The example verifier uses local scripted HTTP responses. It does not contact a provider, publish
 a package, or write a canonical conformance report.
+
+## Use in a .NET application
+
+The native SDK is a local prerelease package, not a public NuGet package. In an application that
+has a checkout of this repository, target .NET 8 and use the SDK selected by
+`src/csharp/global.json`, then
+add a project reference using placeholder paths for your application project and checkout:
+
+```bash
+dotnet add "<your-app.csproj>" reference "<checkout>/src/csharp/AnyInfer/AnyInfer.csproj"
+```
+
+Restore the application after adding the reference. The existing offline runner in
+`examples/csharp-sdk/AnyInfer.Examples.csproj` remains the executable starting point for the
+source-linked examples below. The core SDK namespace is `AnyInfer`. Start with
+[provider settings](#create-provider-settings) for the endpoint and credential reference, then
+[generate text](#generate-text) with the target selected by your application.
+
+`SettingsExample` and `GenerationExample` are helper classes in the examples project, rather
+than SDK exports. Use the `ProviderSettings`, `AsyncClient`, and `GenerateAsync` calls shown
+inside them in your own application.
 
 ## Create provider settings
 
@@ -48,9 +82,9 @@ provider with `cerebras:model`; no generic OpenAI-compatible provider setup is n
 ```
 
 The included executable example substitutes a scripted HTTP handler and checks its request and
-result offline. It does not make hosted Cerebras traffic live-verified. Hyperbolic is the other
-provider-specific generation preset selected in the C# default registry; remaining generated
-compatibility-preset rows are inert there.
+result offline. It does not make hosted Cerebras traffic live-verified. Hyperbolic and Nscale
+are the other provider-specific generation presets selected in the C# default registry; remaining
+generated compatibility-preset rows are inert there.
 Choose a model available to the configured account through discovery; this example's
 `gpt-oss-120b` target is not a static catalog guarantee.
 

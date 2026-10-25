@@ -12,14 +12,22 @@ Every merge to `main` with a version bump produces a
 below, built by the
 [release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/release.yml).
 
-<div class="anyinfer-card-grid" markdown>
+<div class="anyinfer-card-grid anyinfer-download-grid" markdown>
 
 <div class="anyinfer-card anyinfer-download-card" markdown>
+
+<div class="anyinfer-download-layout" markdown>
+
+<div class="anyinfer-download-intro" markdown>
 
 ### :material-language-python: Python Wheel
 
 For applications. Published to [PyPI](https://pypi.org/project/anyinfer/); installing
 from the repository is byte-identical.
+
+</div>
+
+<div class="anyinfer-download-install" markdown>
 
 ```bash
 pip install anyinfer
@@ -32,15 +40,31 @@ pip install "anyinfer @ git+https://github.com/anthturner/AnyInfer@main"
 
 </div>
 
+</div>
+
+</div>
+
 <div class="anyinfer-card anyinfer-download-card" markdown>
+
+<div class="anyinfer-download-layout" markdown>
+
+<div class="anyinfer-download-intro" markdown>
 
 ### :material-monitor-dashboard: Demo App Bundle
 
 Self-contained: unzip and run, no Python required. Fully offline, no credentials needed.
 
-:material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-windows-x64.zip)
-<br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-x64.zip)
-<br>:material-linux: [Linux (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-linux-x64.zip) · [Linux (arm64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-linux-arm64.zip)
+</div>
+
+<div class="anyinfer-download-install" markdown>
+
+<ul class="anyinfer-platforms">
+<li>:material-microsoft-windows: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-windows-x64.zip">Windows (x64)</a></li>
+<li>:material-apple: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-arm64.zip">macOS (Apple silicon)</a></li>
+<li>:material-apple: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-x64.zip">macOS (Intel)</a></li>
+<li>:material-linux: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-linux-x64.zip">Linux (x64)</a></li>
+<li>:material-linux: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-linux-arm64.zip">Linux (arm64)</a></li>
+</ul>
 
 Or with Python already installed:
 
@@ -50,15 +74,31 @@ pip install "anyinfer[demo]" && anyinfer-demo
 
 </div>
 
+</div>
+
+</div>
+
 <div class="anyinfer-card anyinfer-download-card" markdown>
+
+<div class="anyinfer-download-layout" markdown>
+
+<div class="anyinfer-download-intro" markdown>
 
 ### :material-server-network: Sidecar Bundle
 
 The OpenAI-compatible service, self-contained for integrations that do not use Python.
 
-:material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-windows-x64.zip)
-<br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-macos-x64.zip)
-<br>:material-linux: [Linux (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-linux-x64.zip) · [Linux (arm64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-linux-arm64.zip)
+</div>
+
+<div class="anyinfer-download-install" markdown>
+
+<ul class="anyinfer-platforms">
+<li>:material-microsoft-windows: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-windows-x64.zip">Windows (x64)</a></li>
+<li>:material-apple: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-macos-arm64.zip">macOS (Apple silicon)</a></li>
+<li>:material-apple: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-macos-x64.zip">macOS (Intel)</a></li>
+<li>:material-linux: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-linux-x64.zip">Linux (x64)</a></li>
+<li>:material-linux: <a href="https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-linux-arm64.zip">Linux (arm64)</a></li>
+</ul>
 
 Or with Python already installed:
 
@@ -74,10 +114,20 @@ anyinfer serve --config anyinfer.json
 
 </div>
 
+</div>
+
+</div>
+
 ## Notes
 
-- The core wheel depends on only `httpx2` and `jsonschema`; everything else is an extra.
+- The Python core wheel depends on only `httpx2` and `jsonschema`; everything else is an extra.
   [Installation and extras](guides/installation.md) lists which ones you need.
+- The native .NET 8 C# SDK is not a release artifact or public NuGet package. It is an
+  independent prerelease packaged locally as `0.1.0-proof`, with no runtime Python
+  dependency. Build it from the checkout using the
+  [C# application setup](guides/csharp-sdk.md#use-in-a-net-application); see the
+  [C# reference](reference/csharp-sdk.md) and
+  [migration map](guides/python-to-csharp.md) for its bounded capability surface.
 - Unzip the demo bundle and run the `anyinfer-demo` executable inside; `BUNDLE-INFO.txt`
   records the exact version. Bundles never embed `llama-server` binaries or model
   weights; install a runtime explicitly and let the local subsystem acquire verified

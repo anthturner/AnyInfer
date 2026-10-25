@@ -30,23 +30,27 @@ Pass a schema and `result.structured` comes back already validated against it, w
     print(analysis["sentiment"], analysis["score"])
     ```
 
-=== "C# SDK proof"
+=== "C# SDK (prerelease)"
 
     ```csharp
     --8<-- "examples/csharp-sdk/StructuredOutputExample.cs"
     ```
 
 The source uses `SchemaSpec` and deserializes the validated result into its `Answer` record. The
-C# proof evaluates Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12 schemas. Draft 3 and
+C# SDK evaluates Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12 schemas. Draft 3 and
 Draft 4 remain deferred. Numeric and regular-expression behavior follows the native .NET
 implementation; each regular-expression match has a bounded timeout. Registered resources are
 available through `SchemaValidationOptions`; external retrieval requires an explicit retriever.
 Capability facts can be queried before dispatch, but unknown or defaulted values are not evidence
 that another schema mechanism works.
 
-The C# proof retains arbitrary-size integers in modern schema input and generated values. Its
+The C# SDK retains arbitrary-size integers in modern schema input and generated values. Its
 native `const`, `enum`, and `uniqueItems` numeric comparisons use .NET `decimal`; a value outside
 that range, such as `1e70`, therefore raises a controlled schema-evaluation exception.
+
+The remaining recipes on this page use Python APIs, including Pydantic model input and
+`SchemaViolationError` handling. For the native request, result deserialization, and schema
+options, use the source-linked example above and the [C# reference](../reference/csharp-sdk.md).
 
 `repair=ai.Repair(max_attempts=1)` allows one corrective round trip against the same
 model before the call fails; see [repair](../concepts/structured-output.md#repair) for

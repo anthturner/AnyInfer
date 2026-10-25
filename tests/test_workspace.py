@@ -227,7 +227,10 @@ class TestVerbs:
             position("pytest"),
             recorded.index(["<docstrings>"]),
             recorded.index(["<doc-links>"]),
-            position("mkdocs", "build"),
+            next(
+                i for i, cmd in enumerate(recorded)
+                if len(cmd) > 1 and Path(cmd[1]).name == "build_docs.py"
+            ),
             position("dotnet", "--version"),
         ]
         assert positions == sorted(positions), "phases must run in the documented order"
@@ -515,15 +518,15 @@ class TestVerbs:
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0
-        assert recorded[0][1:] == ["build", "--strict"]
-        assert "mkdocs" in recorded[0][0]
+        assert Path(recorded[0][1]).name == "build_docs.py"
+        assert recorded[0][2:] == ["build"]
 
     def test_web_verb_builds_strictly_then_serves_loopback_only(self, recorded, capsys):
         """`workspace web` previews the exact Pages artifact: strict build, then serve."""
         assert workspace.main(["web", "--port", "9999"]) == 0
 
         build, serve = recorded
-        assert "mkdocs" in build[0] and build[1:] == ["build", "--strict"]
+        assert Path(build[1]).name == "build_docs.py" and build[2:] == ["build"]
         assert serve[-6:] == ["http.server", "9999", "--directory", "site", "--bind", "127.0.0.1"]
         assert "http://127.0.0.1:9999/" in capsys.readouterr().out
 
@@ -552,6 +555,7 @@ class TestBuild:
         monkeypatch.setattr(workspace, "_build_wheel", lambda: calls.append("wheel") or 0)
         monkeypatch.setattr(workspace, "_build_demo_bundle", lambda: calls.append("demo") or 0)
         monkeypatch.setattr(workspace, "_build_serve_bundle", lambda: calls.append("serve") or 0)
+        monkeypatch.setattr(workspace, "_build_docs_site", lambda: calls.append("docs") or 0)
         return calls
 
     def test_the_bundle_demo_verb_is_gone(self):
@@ -572,7 +576,7 @@ class TestBuild:
     @pytest.mark.slow
     def test_all_builds_wheel_then_both_native_bundles(self, built):
         assert workspace.main(["build", "all"]) == 0
-        assert built == ["wheel", "demo", "serve"]
+        assert built == ["wheel", "demo", "serve", "docs"]
 
     def test_the_wheel_is_platform_independent(self, built):
         """A pure-Python wheel serves every platform, so any platform argument works."""
@@ -610,6 +614,17 @@ class TestBuild:
 
 class TestAbsorbedGates:
     """The first-party maintenance code that lives in the runner itself."""
+
+    def test_doc_link_check_skips_staged_route_links(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(workspace, "ROOT", tmp_path)
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "index.md").write_text("# Authored page", encoding="utf-8")
+        staged = tmp_path / "website" / ".generated"
+        staged.mkdir(parents=True)
+        (staged / "index.md").write_text("[SDK](/python/)", encoding="utf-8")
+
+        assert workspace._check_doc_links() == 0
+        assert "1 markdown files" in capsys.readouterr().out
 
     def test_doc_link_check_reports_a_broken_link(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setattr(workspace, "ROOT", tmp_path)

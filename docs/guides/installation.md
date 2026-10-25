@@ -1,14 +1,19 @@
-# Installation and Extras
+# Python Installation and Extras {#installation-and-extras}
+
+This page covers the supported published Python SDK, its CLI, and the Python sidecar. For the
+independent native .NET 8 prerelease, use the
+[C# application setup](csharp-sdk.md#use-in-a-net-application). It is packaged locally as
+`0.1.0-proof`, has no runtime Python dependency, and is not published to NuGet.
 
 ```bash
 pip install anyinfer
 ```
 
-The core depends on `httpx2` and `jsonschema` and nothing else. That constraint is a
+The Python core depends on `httpx2` and `jsonschema` and nothing else. That constraint is a
 security argument as much as an aesthetic one: a small mandatory dependency surface is a
 small supply-chain attack surface.
 
-## Extras
+## Python Extras {#extras}
 
 | Extra | Adds | Needed for |
 |---|---|---|
@@ -32,7 +37,7 @@ Optional packages are imported only when their feature is used. A missing packag
 an actionable `ConfigError` or `CredentialError` with the install command, never a raw
 `ImportError` traceback.
 
-## Optional Add-On Packages
+## Optional Python Add-On Packages {#optional-add-on-packages}
 
 Some features ship as separate, independently-versioned distributions rather than as
 `anyinfer` extras (never imported by core, never a dependency of it):
@@ -49,13 +54,13 @@ pip install -e src/python/anyinfer-shared         # PyPI release ships
 pip install -e src/python/anyinfer-store
 ```
 
-## Which Providers Need Nothing Extra
+## Which Python Providers Need Nothing Extra {#which-providers-need-nothing-extra}
 
 `openai`, `anthropic`, `openai-compat`, `openrouter`, `ollama`, and `llama-cpp` are pure
 `httpx2` and work with a bare install. The local subsystem, including hardware detection and
 the llama-server supervisor, is core.
 
-## Requirements
+## Python Requirements {#requirements}
 
 - **Python 3.11+**
 - **Windows, macOS, and Linux** are all first-class and all tested in CI.
@@ -64,11 +69,11 @@ the llama-server supervisor, is core.
 models are acquired on demand or with `anyinfer models add`. Neither is bundled in the
 wheel, and both paths verify the downloaded artifacts.
 
-For non-Python deployments, release builds of the demo and sidecar are listed on
+For deployments using the Python demo or sidecar without a Python install, release builds are listed on
 the [Downloads](../downloads.md) page. The 0.1 beta native bundles are checksummed but not
 code-signed; verify `SHA256SUMS` from the GitHub Release before running them.
 
-## Verify the Install
+## Verify the Python Install {#verify-the-install}
 
 ```bash
 anyinfer providers   # every registered provider and what it needs
@@ -76,7 +81,7 @@ anyinfer doctor      # detected hardware and the recommended local tier
 ```
 
 !!! tip "Key Takeaways"
-    - The core install is two runtime dependencies; everything else is an extra you ask for.
+    - The Python core install is two runtime dependencies; everything else is an extra you ask for.
     - An extra exists per capability, not per provider — `serve`, `otel`, `keyring` are
       about what AnyInfer does, not who it talks to.
     - The add-on packages ship separately and install from a checkout until their first
@@ -88,7 +93,8 @@ anyinfer doctor      # detected hardware and the recommended local tier
 <div class="anyinfer-see-also" markdown>
 
 - [Quickstart](quickstart.md): from this install to a working result.
-- [Configuration](../reference/configuration.md): the file the SDK, CLI, and sidecar share.
-- [Providers](../providers/README.md): what each backend needs from you.
+- [Configuration](../reference/configuration.md): the file the Python SDK, CLI, and sidecar share.
+- [Providers](../providers/README.md): Python provider setup and quirks.
+- [C# application setup](csharp-sdk.md#use-in-a-net-application): native .NET prerelease setup.
 
 </div>

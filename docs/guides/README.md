@@ -2,11 +2,15 @@
 
 The Python SDK, CLI, and sidecar share the Python engine and
 [configuration file](../reference/configuration.md); only the process boundary changes.
+The native .NET 8 C# SDK is a separate implementation, packaged locally as the
+`0.1.0-proof` prerelease. Python remains the supported published SDK. C# has no runtime
+Python dependency, is not published to NuGet, and does not claim full parity. See the
+[foundation](../concepts/foundation.md) for the capability map.
 Not every application needs this layer at all; if a provider-switching client, an
 organization gateway, or a dedicated local server already solves your whole problem,
 [why and when to use AnyInfer](../why-anyinfer.md) names the better-shaped tool.
 
-The [quickstart](quickstart.md) is the shortest path from installation to a result.
+The [Python quickstart](quickstart.md) is the shortest path from Python installation to a result.
 
 ## Choose a Path
 
@@ -14,8 +18,15 @@ The [quickstart](quickstart.md) is the shortest path from installation to a resu
 results, the event stream, and in-process telemetry. The cost: AnyInfer is in your
 dependency tree and your process.
 
-**Run the [OpenAI-compatible sidecar](../serve/README.md)** when your application is not
-Python, when one process should hold provider credentials for several clients, or when
+**Embed the native [C# SDK](csharp-sdk.md)** when you are writing .NET 8 and want its
+async core or synchronous facade over typed events. Its bounded prerelease supports
+configured generation and retrieval; it does not manage a local runtime. Follow the
+[application setup](csharp-sdk.md#use-in-a-net-application), [reference](../reference/csharp-sdk.md),
+or [migration map](python-to-csharp.md). This is native .NET code, not a client for the
+Python sidecar.
+
+**Run the [OpenAI-compatible sidecar](../serve/README.md)** when an application in any
+language needs the Python runtime over HTTP, when one process should hold provider credentials for several clients, or when
 existing OpenAI-speaking tools should use your configured hybrid route:
 
 ```bash
@@ -31,15 +42,16 @@ usage and finish reasons survive).
 no server left running. The cost: process startup per call and no state between calls;
 it declares tools but never executes them (that is the [tool loop](tool-loop.md)).
 
-| | Python SDK | Sidecar | CLI `run` |
-|---|---|---|---|
-| Language | Python | Any | Any (a shell) |
-| Typed results | Yes | OpenAI JSON | Text or JSON |
-| Event stream | Full | Text and tool-call deltas | Text to stdout |
-| TTFT / attempt trail | Yes | Not on the wire | `--stats` / `--json` (timing and usage; no attempt trail) |
-| Local models | Yes | Yes | Yes |
-| Credentials | In-process | Held by the server | Read per call |
-| Deployment | A library | A process | A command |
+| | Python SDK | Native C# SDK (prerelease) | Python sidecar | CLI `run` |
+|---|---|---|---|---|
+| Language | Python | .NET 8 | Any | Any (a shell) |
+| Typed results | Yes | Generation and retrieval results | OpenAI JSON | Text or JSON |
+| Event stream | Full | Native typed events | Text and tool-call deltas | Text to stdout |
+| TTFT / attempt trail | Yes | Timing and attempt records | Not on the wire | `--stats` / `--json` (timing and usage; no attempt trail) |
+| Configured generation / retrieval | Yes | Bounded subset | Via the Python engine | Generation only |
+| Local runtime management | Yes | No | Yes | Yes |
+| Credentials | In-process | In-process | Held by the server | Read per call |
+| Deployment | A library | A local prerelease package | A process | A command |
 
 The paths compose: `anyinfer.serve.create_app(async_client, auth_token=token)` returns
 a plain ASGI app, mountable inside an existing Starlette or FastAPI application, so one
@@ -60,15 +72,16 @@ runs against in-process fakes with no credentials.
 - [Add your own provider](custom-providers.md)
 - [Embed, store, and query a small corpus](vector-store.md)
 
-## C# SDK (Development)
+## Native C# SDK (Prerelease) {#c-sdk-development}
 
-The native .NET 8 SDK is in development as a prerelease surface, packaged locally as
-`0.1.0-proof`. Python remains the supported published SDK. C# executes independently and
-does not claim full parity. Current capabilities and exclusions are centralized in the
-[foundation](../concepts/foundation.md); see the source-linked [C# SDK guide](csharp-sdk.md),
-[reference](../reference/csharp-sdk.md), and migration guide for details.
+Start with [application setup](csharp-sdk.md#use-in-a-net-application) and the
+[C# reference](../reference/csharp-sdk.md). The [foundation](../concepts/foundation.md)
+keeps the capability map and current exclusions together.
 
-- [Explore the C# SDK](csharp-sdk.md)
+- [Generate text](csharp-sdk.md#generate-text) with the async core or [sync facade](csharp-sdk.md#use-the-synchronous-facade)
+- [Stream typed events](streaming.md), [validate structured output](structured-output.md), and [route fallback](fallback.md) using the C# tabs
+- [Run registered .NET tool handlers](tool-loop.md#c-sdk-proof)
+- [Embed and rerank text](csharp-sdk.md#embed-and-rerank-text)
 - [Move from Python to C#](python-to-csharp.md)
 
 ## Operations

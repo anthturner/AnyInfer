@@ -1510,8 +1510,12 @@ Documentation is a shipped deliverable with milestone-bound obligations, not a p
 task. Target reader: a developer integrating AnyInfer into their application who has never
 seen this repo.
 
-**Tooling.** mkdocs-material + mkdocstrings (API reference generated from typed docstrings);
-versioned docs (mike) so published SDK versions keep matching docs; docs build is a CI gate.
+**Tooling.** Docusaurus publishes prepared Markdown from `docs/`, with the Python reference
+generated from typed source docstrings by Griffe. The site has independent shared, Python,
+and C# documentation instances; current SDK versions come from project metadata and no
+historical version is fabricated. The existing authored C# reference remains the C# surface
+until native reference generation is separately authorized. Pagefind ships a local search
+bundle with the static Pages artifact, and the docs build is a CI gate.
 
 **Quality gates (enforced from M0):**
 - Every public symbol has a docstring; the reference build fails on missing/undocumented

@@ -19,9 +19,18 @@ hubs, existing local services, and supervised `llama.cpp`; it owns routing, stru
 context preparation, telemetry, and configuration. The Python SDK, CLI, and OpenAI-compatible
 sidecar use the same engine.
 
-Python remains the supported published SDK. The native .NET 8 C# SDK is in development as a
-prerelease local package (`0.1.0-proof`), implementing a bounded subset without a full-parity
-or support-matrix claim. See the [shared foundation](https://anyinfer.dev/concepts/foundation/).
+Python remains the supported published SDK. The native .NET 8 C# SDK is an independent
+prerelease, locally packaged as `0.1.0-proof`, with no runtime Python dependency.
+It is not published to NuGet and does not claim full parity. See the
+[shared foundation](https://anyinfer.dev/concepts/foundation/) for the capability map.
+
+Choose the [Python SDK guide](https://anyinfer.dev/python/) and
+[Python reference](https://anyinfer.dev/python/api/) for the supported published SDK.
+For the native prerelease, use the [C# SDK guide](https://anyinfer.dev/csharp/),
+[C# reference](https://anyinfer.dev/csharp/reference/), and
+[Python-to-C# migration map](https://anyinfer.dev/csharp/migrating-from-python/).
+
+The following examples use the Python SDK.
 
 ```python
 import anyinfer as ai
@@ -136,7 +145,8 @@ pip install "anyinfer[demo]"         # the PySide6 pack-in demo app
 pip install "anyinfer[all]"
 ```
 
-Python 3.11+. Windows, macOS, and Linux are all first-class.
+These are Python SDK installation commands. Python 3.11+; Windows, macOS, and Linux are all
+first-class.
 
 ### Two commands to a working call
 
@@ -174,19 +184,23 @@ python workspace.py demo     # launch the demo app
 `python workspace.py` with no arguments lists every verb. See
 [Contributing](https://anyinfer.dev/contributing/).
 
-The [C# SDK guide](https://anyinfer.dev/guides/csharp-sdk/) documents the native .NET 8
-development surface. It is locally packaged as `0.1.0-proof` and is not published to
-NuGet; Python remains the supported published SDK.
+The native C# SDK has separate
+[application setup](https://anyinfer.dev/csharp/#use-in-a-net-application),
+[reference](https://anyinfer.dev/csharp/reference/), and
+[migration](https://anyinfer.dev/csharp/migrating-from-python/) documentation. It is locally
+packaged as `0.1.0-proof`, has no runtime Python dependency, and is not published to NuGet;
+Python remains the supported published SDK.
 
 ## Compatibility surface
 
-Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 20
-dedicated adapters plus 86 declarative OpenAI-compatible presets.
-This inventory describes the Python SDK; the native C# subset is listed in the
+Provider breadth is compatibility inventory, not the product thesis. The supported Python SDK
+ships 20 dedicated adapters plus 86 declarative OpenAI-compatible presets. This inventory
+describes the Python SDK; the native C# subset is listed in the
 [SDK capability map](https://anyinfer.dev/concepts/foundation/#c-capability-map).
 **[See the complete inventory →](https://anyinfer.dev/providers/all/)**
 
-The dedicated adapters, each handling provider-specific protocol or discovery behavior:
+The Python SDK's dedicated adapters each handle provider-specific protocol or discovery
+behavior:
 
 | Provider | Target prefix | Notes |
 |---|---|---|
@@ -212,11 +226,11 @@ The dedicated adapters, each handling provider-specific protocol or discovery be
 | llama.cpp | `llama-cpp:` | Supervised `llama-server`, loopback-only |
 | 86 more, preconfigured | `groq:` `together:` `mistral:` `vllm:` … | [OpenAI-compatible presets](https://anyinfer.dev/providers/presets/) |
 
-See the [complete provider list](https://anyinfer.dev/providers/all/),
-the [provider guides](https://anyinfer.dev/providers/) and the
-[conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
+See the [complete Python provider list](https://anyinfer.dev/providers/all/),
+the [Python provider guides](https://anyinfer.dev/providers/) and the
+[Python conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
 
-Embeddings and/or reranking are live today on OpenAI, Google Gemini, Azure AI Foundry,
+For the Python SDK, embeddings and/or reranking are live today on OpenAI, Google Gemini, Azure AI Foundry,
 Google Vertex AI, AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio,
 llama.cpp (against an embeddings-mode server), and four OpenAI-compatible presets
 (Together AI, Fireworks AI, DeepInfra, Mistral) — see
@@ -250,14 +264,17 @@ and [shared configuration](https://anyinfer.dev/reference/configuration/).
 ## Documentation
 
 **[anyinfer.dev](https://anyinfer.dev/)** is the published
-site, including the generated [SDK reference](https://anyinfer.dev/reference/api/)
+site, including the generated [SDK reference](https://anyinfer.dev/python/api/)
 and [runnable examples](https://anyinfer.dev/examples/). The same pages are
 browsable in-repo from the **[documentation index](https://github.com/anthturner/AnyInfer/blob/main/docs/README.md)**.
 
 Quick links by role:
 
-- **Integrating the Python SDK?** → [Python SDK guide](https://anyinfer.dev/guides/python-sdk/) ·
-  [Quickstart](https://anyinfer.dev/guides/quickstart/) · [SDK reference](https://anyinfer.dev/reference/api/)
+- **Integrating the Python SDK?** → [Python SDK guide](https://anyinfer.dev/python/) ·
+  [Quickstart](https://anyinfer.dev/python/quickstart/) · [Python reference](https://anyinfer.dev/python/api/)
+- **Evaluating the native C# prerelease?** → [C# SDK guide](https://anyinfer.dev/csharp/) ·
+  [C# reference](https://anyinfer.dev/csharp/reference/) ·
+  [Python-to-C# migration map](https://anyinfer.dev/csharp/migrating-from-python/)
 - **Running the HTTP service?** → [OpenAI-compatible sidecar](https://anyinfer.dev/serve/)
 - **Working from a shell?** → [Run a prompt from the shell](https://anyinfer.dev/guides/cli/)
 - **Sharing provider and route settings?** → [Configuration](https://anyinfer.dev/reference/configuration/)

@@ -149,11 +149,11 @@ changes require the generated reference and runnable examples.
   instead of what the page is about. Say what is true and let the reader carry it: "what
   this release supports is X, not Y" tells them everything the instruction was reaching
   for, and reads as documentation rather than as a caption for someone else's slide. This
-  applies to every rendered surface, docstrings included, since mkdocstrings publishes
-  those too.
+  applies to every rendered surface, docstrings included, since the generated Python
+  reference publishes them too.
 - **No ADR mentions in user-facing text.** `ADR-NNN` numbers are internal shorthand: they
   must not appear anywhere under `docs/`, in the root `README.md`, or in any public
-  docstring (mkdocstrings renders those onto the published site). State the rule in plain
+  docstring (the generated Python reference renders those onto the published site). State the rule in plain
   words instead. ADR citations belong only in DESIGN.md, AGENTS.md, and internal code
   comments that never render.
 

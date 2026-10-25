@@ -1,6 +1,6 @@
 name: Docs site
 
-# Builds the mkdocs site and publishes it to GitHub Pages. Runs on every merge to
+# Builds the static Docusaurus site and publishes it to GitHub Pages. Runs on every merge to
 # `main`, and again when a release publishes so the downloads page never lags a
 # release. Requires Settings -> Pages -> Source to be set to "GitHub Actions" once;
 # see docs/contributing/releasing.md.
@@ -42,6 +42,12 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: website/.nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm --prefix website ci
       # Same installer as CI, for the same reason: the ~1 GB `[all,dev]` environment is
       # this job's entire cost, and uv's cache hardlinks it into place instead of
       # re-unpacking it on every deploy.
@@ -50,11 +56,12 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
 
-      # mkdocstrings imports the package to render the SDK reference, so the site
-      # build needs a real install, same as the docs gates in CI.
+      # The public-boundary checks and executable examples use installed SDKs;
+      # source-based API rendering uses the separately locked docs dependencies.
       - run: uv pip install --system -e ".[all,dev]"
+      - run: uv pip install --system --require-hashes -r website/requirements.lock
 
-      # Sharded add-ons (src/python/anyinfer-*, own pyproject.toml) that ship a mkdocstrings
+      # Sharded add-ons (src/python/anyinfer-*, own pyproject.toml) that ship an API
       # reference page need their own editable install too — see the CI gates job.
       # All of them: this listed only `anyinfer-store` while `anyinfer-confidential`
       # already had a reference page in the nav, so the first run of this workflow died

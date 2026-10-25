@@ -21,15 +21,17 @@ semantics live in [routing](../concepts/routing.md).
     print("served by", result.target)
     ```
 
-=== "C# SDK proof"
+=== "C# SDK (prerelease)"
 
     ```csharp
     --8<-- "examples/csharp-sdk/RoutingExample.cs"
     ```
 
-The C# proof exposes model listing and health as explicit calls rather than a replacement for
+The C# SDK exposes model listing and health as explicit calls rather than a replacement for
 route policy. Its [source-linked lifecycle example](csharp-sdk.md#list-models-and-check-health)
-uses one configured instance at a time.
+uses one configured instance at a time. `RoutingExample.RunAsync` accepts the native `Route`,
+passes the caller cancellation token to `GenerateAsync`, and returns the final native
+`Generation`. The subsequent route-construction and retry recipes use Python APIs.
 
 ## Set a Default Route Once
 

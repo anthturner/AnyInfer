@@ -2,13 +2,18 @@
 
 AnyInfer is an application-owned hybrid inference runtime with a shared foundation and
 independent Python and C# SDK implementations. Python remains the supported published SDK;
-its CLI and OpenAI-compatible sidecar use the same engine. The native .NET 8 C# SDK is in
-development as a prerelease local package and does not claim full parity. See the
-[shared foundation](concepts/foundation.md) for the current capability map. This page is the
-table of contents; the documentation is published at **[anyinfer.dev](https://anyinfer.dev/)**.
+its CLI and OpenAI-compatible sidecar use the same engine. The native .NET 8 C# SDK is an
+independent prerelease, locally packaged as `0.1.0-proof`, with no runtime Python dependency.
+It is not published to NuGet and does not claim full parity. See the [shared foundation](concepts/foundation.md)
+for the current capability map. This page is the table of contents; the documentation is
+published at **[anyinfer.dev](https://anyinfer.dev/)**.
 
-In a hurry? The [quickstart](guides/quickstart.md) gets you from `pip install` to a
-working `generate()` call in ~5 minutes.
+Choose the [Python quickstart](guides/quickstart.md), [Python SDK guide](guides/python-sdk.md),
+or [Python reference](reference/api/README.md) for the supported published SDK. For the native
+prerelease, start with the [C# SDK guide](guides/csharp-sdk.md),
+[C# reference](reference/csharp-sdk.md), and
+[Python-to-C# migration map](guides/python-to-csharp.md). C# is independent native .NET 8,
+not a client for the Python sidecar.
 
 ## Choose Your Path
 
@@ -18,7 +23,9 @@ arranged.
 | I want to… | Go to |
 |---|---|
 | Decide whether AnyInfer is the right layer, and see what makes it different | [Why and when to use AnyInfer](why-anyinfer.md) |
-| Add AnyInfer to my application | [Integrate AnyInfer](guides/README.md) |
+| Add a Python application | [Python SDK guide](guides/python-sdk.md) and [installation](guides/installation.md) |
+| Add a native .NET application | [C# SDK guide](guides/csharp-sdk.md), [reference](reference/csharp-sdk.md), and [migration map](guides/python-to-csharp.md) |
+| Compare SDK, sidecar, and CLI integration paths | [Integrate AnyInfer](guides/README.md) |
 | Run it as a service my existing tools talk to | [OpenAI-compatible sidecar](serve/README.md) |
 | Understand how it works before committing | [Concepts](concepts/README.md) |
 | See a provider's setup and quirks | [Providers](providers/README.md) |
@@ -30,14 +37,17 @@ arranged.
 
 Read in roughly this order:
 
-1. [Quickstart](guides/quickstart.md): install to first result.
-2. [Integrate AnyInfer](guides/README.md): supported Python SDK, command-line tool, or
-   sidecar, plus task guides. The C# SDK in development has its own
-   [guide](guides/csharp-sdk.md) and [migration map](guides/python-to-csharp.md).
-3. [Installation and extras](guides/installation.md): which extras you need.
-4. [Shared configuration](reference/configuration.md): one file for the Python SDK, CLI,
+1. [Quickstart](guides/quickstart.md): Python installation to first result.
+2. [Python SDK guide](guides/python-sdk.md) and [Python reference](reference/api/README.md): the
+   supported published SDK.
+3. [C# SDK guide](guides/csharp-sdk.md), [C# reference](reference/csharp-sdk.md), and
+   [migration map](guides/python-to-csharp.md): the independent native .NET 8 prerelease.
+4. [Integrate AnyInfer](guides/README.md): choose the Python SDK, native C# SDK,
+   command-line tool, or Python sidecar.
+5. [Installation and extras](guides/installation.md): Python packages and extras.
+6. [Shared configuration](reference/configuration.md): one file for the Python SDK, CLI,
    and sidecar. C# reads its [documented v1 subset](guides/python-to-csharp.md).
-5. [Concepts](concepts/README.md): one line each; read them once and
+7. [Concepts](concepts/README.md): one line each; read them once and
    the rest of the API follows.
 
 Letting a coding agent write the integration?

@@ -26,13 +26,11 @@ constants.
 
 ## How the Published Site Uses the Marks
 
-[`mkdocs.yml`](https://github.com/anthturner/AnyInfer/blob/main/mkdocs.yml) points the
-header logo and favicon at the icon, and
-[`overrides/main.html`](https://github.com/anthturner/AnyInfer/blob/main/overrides/main.html)
-adds the SVG favicon, the Apple touch icon, and the Open Graph and Twitter card tags that
-decide how an AnyInfer link renders when pasted elsewhere. Every page unfurls with its own
-title and description over the shared 1200×630 card, a size Slack, Discord, X, LinkedIn,
-and iMessage all render without re-cropping.
+[`website/docusaurus.config.ts`](https://github.com/anthturner/AnyInfer/blob/main/website/docusaurus.config.ts)
+points the navbar logo and favicon at the icon and configures the Open Graph and Twitter
+card tags that decide how an AnyInfer link renders when pasted elsewhere. Every page unfurls
+with its own title and description over the shared 1200×630 card, a size Slack, Discord, X,
+LinkedIn, and iMessage all render without re-cropping.
 
 The card is not a hand-drawn file.
 [`scripts/render_social_card.py`](https://github.com/anthturner/AnyInfer/blob/main/scripts/render_social_card.py)

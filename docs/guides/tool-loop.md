@@ -1,10 +1,10 @@
 # Run the Tool Loop
 
-The Python API shown below is `run_tools`. The C# prerelease proof has a corresponding bounded
+The Python API shown below is `run_tools`. The C# prerelease SDK has a corresponding bounded
 loop with explicit `Tool` registration; it uses different public method names and delegate
 binding rules. Its offline example is source-linked and executed by the C# example runner.
 
-## C# SDK proof
+## C# SDK (prerelease) {#c-sdk-proof}
 
 `Tool.From` builds a declaration and typed binder from a supported CLR delegate. Supply the
 provider-visible name and description explicitly when they should not come from the method.
@@ -24,6 +24,13 @@ round runs again. Ordinary handler exceptions become error-flagged tool results.
 continues to the caller. The returned generation, usage, timing, and manifest describe only the
 final model round, not a sum across the loop. The built-in generic chat adapter uses the
 OpenAI-compatible tool-call dialect; custom adapters may provide the same typed event contract.
+
+The C# delegate binder can inject one `CancellationToken` into a supported handler signature;
+the token is supplied by the loop. For explicit schemas or handlers outside that binding surface,
+construct `Tool` with `ToolSpec` and a tagged-JSON callback. The Python decorator, Python-only
+MCP integration, and subsequent Python recipes do not describe the native SDK surface.
+
+## Python tool handlers
 
 `run_tools` runs the generate, call tools, feed results back loop for you, with bounded
 rounds and normalized errors:
