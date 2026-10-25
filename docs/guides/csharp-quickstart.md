@@ -42,9 +42,9 @@ also have registered descriptors with their own default endpoints; see
 --8<-- "examples/csharp-sdk/QuickstartExample.cs:first-call"
 ```
 
-For example, `await QuickstartExample.FirstCallAsync(QuickstartExample.LocalServer(), "openai-compat:qwen3:8b")`
-asks a model served by Ollama, and `QuickstartExample.Describe` formats the answer with its token
-counts.
+For example, `await QuickstartExample.FirstCallAsync(QuickstartExample.LocalServer(),
+"openai-compat:qwen3:8b")` asks a model served by Ollama, and `QuickstartExample.Describe` formats
+the answer with its token counts.
 
 `GenerateAsync` returns a buffered [`Generation`](/csharp/api/anyinfer.generation/) once the reply
 is complete. `Text` is the visible answer. [`Usage`](/csharp/api/anyinfer.usage/) holds the token
@@ -83,9 +83,9 @@ list each failure.
 `await using var client = new AsyncClient(...)` disposes the client when the method exits, however
 it exits. Disposal cancels calls still running, which then throw `OperationCanceledException`, and
 disposes the provider adapters the client owns and their HTTP handlers. A `transport` you supplied
-in `ProviderSettings` is disposed exactly once, even if no call used it. Disposing twice is harmless, and a call made after disposal
-throws `ObjectDisposedException`. Objects you pass to the client, such as observers and ledgers,
-stay yours.
+in `ProviderSettings` is disposed exactly once, even if no call used it. Disposing twice is
+harmless, and a call made after disposal throws `ObjectDisposedException`. Objects you pass to the
+client, such as observers and ledgers, stay yours.
 
 ## Use the synchronous facade
 
@@ -119,7 +119,7 @@ client-certificate settings do not apply to it. This helper scripts buffered res
 own tests, replace the `if` check with your test framework's assertions.
 
 To run it in the application from the installation page, copy both example files into it and
-call the test from `Program.cs`:
+call the test from `Program.cs`, using the absolute path of your clone for `<checkout>`:
 
 ```bash
 cd "<your-app>"

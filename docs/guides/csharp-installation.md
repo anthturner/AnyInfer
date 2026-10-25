@@ -52,10 +52,12 @@ type in the [C# API reference](/csharp/api/) comes from it.
 
 `examples/csharp-sdk/` holds a separate console project, `AnyInfer.Examples`, which is not
 packable. Its `*Example` classes, such as `QuickstartExample` and `GenerationExample`, are the
-source the C# pages include, and its offline runner executes and checks each one against scripted
-HTTP responses. They are not part of the library and are not meant to be referenced. Copy the
-calls you need, or a whole example file, into your application; the files use the
-`AnyInfer.Examples` namespace, which you can rename.
+source the C# pages include, and its offline runner executes and checks each one without a
+network or credential, using scripted HTTP responses or in-process adapters. They are not part of
+the library and are not meant to be referenced. Copy the calls you need, or a whole example file,
+into your application. The files use the `AnyInfer.Examples` namespace and rely on it to see the
+`AnyInfer` types; if you rename it to a namespace outside `AnyInfer`, add `using AnyInfer;` and any
+sub-namespace usings the file needs.
 
 ## What the library does not include
 
@@ -74,16 +76,17 @@ The rest of the native scope, including the Python features C# does not provide,
 ## Build and check a local package {#local-package}
 
 The library can also be packed as a NuGet package, `AnyInfer.0.1.0-proof.nupkg`, with a symbol
-package beside it. The checked way to produce one is the repository's package check. Run it from
-the root of a Git clone with Python and the .NET SDK available:
+package beside it. The checked way to produce one is the repository's package check. It packs
+from `src/csharp/`, so it needs the SDK version pinned by `src/csharp/global.json`. Run it from the
+root of a Git clone with Python, Git, and that .NET SDK available:
 
 ```bash
 python scripts/check_csharp_package.py
 ```
 
 The check packs `src/csharp/AnyInfer/AnyInfer.csproj` in Release configuration, stamped with the
-current Git revision. It confirms that the package holds only `lib/net8.0/AnyInfer.dll`,
-`README.md`, and `LICENSE`, that the separate `.snupkg` holds the symbols, and that the package
+current Git revision. It confirms that the package holds only `lib/net8.0/AnyInfer.dll`, its XML
+documentation `lib/net8.0/AnyInfer.xml`, `README.md`, and `LICENSE`, that the separate `.snupkg` holds the symbols, and that the package
 declares `JsonSchema.Net` and `PeterO.Numbers` as its only direct dependencies, whose resolved
 graph is the five packages listed under [requirements](#requirements). It then checks the hashes
 of those five packages, adds them to the same local folder, and restores, builds, and runs a
@@ -91,10 +94,15 @@ fresh `net8.0` console application from that folder alone, using a package cache
 run. The checked package and symbol package are copied to `.tmp-tests/nuget/`; `--output`
 selects another folder.
 
-This is a local verification, not a release: nothing is published, and every build carries the
-same `0.1.0-proof` version. A NuGet cache keeps the first copy it restores of a given version,
-which is why the check restores into a new cache folder each time. The project reference above
-remains the way to use the SDK in an application. The
+This is a local build, not a release: nothing is published, and every build carries the same
+`0.1.0-proof` version. To reference the checked package instead of the project, add the folder that
+holds it as a NuGet package source and reference package `AnyInfer` version `0.1.0-proof`; its five
+dependencies still restore from nuget.org or another source you configure. A NuGet cache keeps the
+first copy it restores of a given version, which is why the check restores into a new cache folder
+each time; after packing a newer build, remove the cached `anyinfer/0.1.0-proof` folder from your
+global packages folder (`dotnet nuget locals global-packages --list` prints where it is) before
+restoring again. The project reference above avoids that step and is the simpler way to follow the
+checkout. The
 [C# development workflow](../contributing/csharp-proof.md#validate-the-local-prerelease-package)
 shows the underlying `dotnet pack` command.
 

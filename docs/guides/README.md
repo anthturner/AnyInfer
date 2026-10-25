@@ -20,16 +20,16 @@ pages are the equivalent path through the native prerelease.
 results, the event stream, and in-process telemetry. The cost: AnyInfer is in your
 dependency tree and your process.
 
-**Embed the native [C# SDK](csharp-sdk.md)** when you are writing .NET 8 and want its
-async core or synchronous facade over typed events. Its bounded prerelease supports
-configured generation and retrieval; it does not manage a local runtime. Follow the
-[application setup](csharp-sdk.md#use-in-a-net-application), [reference](../reference/csharp-sdk.md),
-or [migration map](python-to-csharp.md). This is native .NET code, not a client for the
-Python sidecar.
+**Embed the native [C# SDK](csharp-sdk.md)** when you are writing .NET 8 and want its async core or
+synchronous facade over typed events. Its bounded prerelease supports configured generation and
+retrieval; it does not manage a local runtime. Follow the [application
+setup](csharp-sdk.md#use-in-a-net-application), [reference](../reference/csharp-sdk.md), or
+[migration map](python-to-csharp.md). This is native .NET code, not a client for the Python sidecar.
 
 **Run the [OpenAI-compatible sidecar](../serve/README.md)** when an application in any
-language needs the Python runtime over HTTP, when one process should hold provider credentials for several clients, or when
-existing OpenAI-speaking tools should use your configured hybrid route:
+language needs the Python runtime over HTTP, when one process should hold provider credentials
+for several clients, or when existing OpenAI-speaking tools should use your configured hybrid
+route:
 
 ```bash
 pip install "anyinfer[serve]"
@@ -53,7 +53,7 @@ it declares tools but never executes them (that is the [tool loop](tool-loop.md)
 | Configured generation / retrieval | Yes | Bounded subset | Via the Python engine | Generation only |
 | Local runtime management | Yes | No | Yes | Yes |
 | Credentials | In-process | In-process | Held by the server | Read per call |
-| Deployment | A library | A local prerelease package | A process | A command |
+| Deployment | A library | A library (project reference or local package) | A process | A command |
 
 The paths compose: `anyinfer.serve.create_app(async_client, auth_token=token)` returns
 a plain ASGI app, mountable inside an existing Starlette or FastAPI application, so one
@@ -64,8 +64,8 @@ runs against in-process fakes with no credentials.
 
 ## Tasks {#python-tasks}
 
-The first four guides give Python and native C# recipes side by side; the rest describe
-Python SDK features.
+The first four guides give Python and native C# recipes side by side. The rest are Python
+guides, with a note on the native C# equivalent where one exists.
 
 - [Stream typed events](streaming.md)
 - [Enforce a JSON schema](structured-output.md)
@@ -83,18 +83,22 @@ Start with [installation](csharp-installation.md), the [quickstart](csharp-quick
 and the [C# reference](../reference/csharp-sdk.md). The [foundation](../concepts/foundation.md)
 keeps the capability map and current exclusions together.
 
-- [Install the C# SDK](csharp-installation.md) and make a first call with the [C# quickstart](csharp-quickstart.md)
-- [Generate text](csharp-sdk.md#generate-text) with the async core or [sync facade](csharp-sdk.md#use-the-synchronous-facade)
-- [Stream typed events](streaming.md), [validate structured output](structured-output.md), and [route fallback](fallback.md) with the native recipes in each guide
+- [Install the C# SDK](csharp-installation.md) and make a first call with the
+  [C# quickstart](csharp-quickstart.md)
+- [Generate text](csharp-sdk.md#generate-text) with the async core or
+  [sync facade](csharp-sdk.md#use-the-synchronous-facade)
+- [Stream typed events](streaming.md), [validate structured output](structured-output.md), and
+  [route fallback](fallback.md) with the native recipes in each guide
 - [Run registered .NET tool handlers](tool-loop.md#c-sdk-proof)
 - [Embed and rerank text](csharp-sdk.md#embed-and-rerank-text)
 - [Move from Python to C#](python-to-csharp.md)
 
 ## Operations
 
-- [Run a model locally](local-inference.md)
-- [Keep the sidecar running across reboots](../serve/running-as-a-service.md)
-- [Observe requests and bridge to OpenTelemetry](observability.md)
+- [Run a model locally](local-inference.md) (Python)
+- [Keep the sidecar running across reboots](../serve/running-as-a-service.md) (Python sidecar)
+- [Observe requests](observability.md) in either SDK and
+  [bridge to OpenTelemetry](observability.md#opentelemetry) (Python)
 - [Credentials and redaction](../concepts/credentials.md)
 
 ## Confidentiality

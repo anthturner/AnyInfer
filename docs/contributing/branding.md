@@ -3,7 +3,8 @@
 AnyInfer's identity is a small kit: one mark, one logo, a palette of named color tokens,
 and three typefaces. The canonical files live in
 [`docs/assets/`](https://github.com/anthturner/AnyInfer/tree/main/docs/assets); the
-documentation site, the README, and the demo application all use them from there.
+documentation site and the README use them from there, and the demo application keeps mirrored
+copies.
 
 ## The Mark
 
@@ -54,7 +55,8 @@ Material), or a `.dark` class. Use the tokens by role rather than copying their 
 | `--ai-bg`, `--ai-surface`, `--ai-surface-2` | Page; panels and code; hover and selected states |
 | `--ai-border` | Decorative rules and dividers |
 | `--ai-text`, `--ai-text-muted` | Body text; secondary text |
-| `--ai-accent`, `--ai-on-accent` | Primary actions and focus; text on an accent fill |
+| `--ai-accent`, `--ai-on-accent` | Primary actions; text on an accent fill |
+| `--ai-focus` | Keyboard focus outlines |
 | `--ai-link`, `--ai-link-hover` | Links and teal text |
 | `--ai-accent-bg` | Note callouts and active navigation |
 | `--ai-signal`, `--ai-signal-text`, `--ai-signal-bg` | Amber fill; amber text; prerelease and warning callouts |
@@ -103,8 +105,8 @@ font service.
 
 The `anyinfer-icon-512.*` and `anyinfer-horizontal-*.svg` names predate the current kit,
 whose own names for that art are `anyinfer-mark-on-light` and `anyinfer-logo-on-*`. The
-old names stay because the README, the package READMEs on PyPI, and outside links point
-at them.
+old names stay because the README, which PyPI also shows, and outside links point at
+them.
 
 ## How the Published Site Uses the Marks
 

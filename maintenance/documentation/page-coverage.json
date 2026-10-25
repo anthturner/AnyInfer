@@ -441,13 +441,13 @@
     {
       "source": "contributing/branding.md",
       "scope": "shared",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "tests/test_branding.py",
         "docs/assets/anyinfer-palette.css"
       ],
       "unsupported_native": [],
-      "notes": "Repository brand assets; the demo-package mirror rule is Python-demo-specific."
+      "notes": "Repository brand assets; the demo-package mirror rule is Python-demo-specific. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "contributing/changelog.md",
@@ -541,12 +541,12 @@
     {
       "source": "downloads.md",
       "scope": "python",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         ".github/workflows/release.yml"
       ],
       "unsupported_native": [],
-      "notes": "Python wheel, demo, and sidecar bundles; C# is a status pointer. 'Previous Releases' says notes are generated from pull requests, contradicting contributing/releasing.md and contributing/changelog.md. Release-notes sentence corrected to the CHANGELOG-sliced notes the release workflow publishes."
+      "notes": "Python wheel, demo, and sidecar bundles; C# is a status pointer. 'Previous Releases' says notes are generated from pull requests, contradicting contributing/releasing.md and contributing/changelog.md. Release-notes sentence corrected to the CHANGELOG-sliced notes the release workflow publishes. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "examples/README.md",
@@ -712,14 +712,14 @@
     {
       "source": "guides/README.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "src/python/anyinfer/serve/app.py"
       ],
       "unsupported_native": [
         "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)"
       ],
-      "notes": "Index of integration paths; the Tasks list marks the four guides with Python and C# recipes; native section starts at installation and quickstart."
+      "notes": "Index of integration paths; the Tasks list marks the four guides with Python and C# recipes; native section starts at installation and quickstart. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/cli.md",
@@ -792,7 +792,7 @@
     {
       "source": "guides/csharp-installation.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "tests/test_csharp_quickstart.py",
         "scripts/check_csharp_package.py",
@@ -809,12 +809,12 @@
         "local runtime management",
         "fake-provider test kit (offline tests use a scripted HttpMessageHandler)"
       ],
-      "notes": "Requirements, project-reference steps executed verbatim by tests/test_csharp_quickstart.py, library vs AnyInfer.Examples helper source, and the local package exactly as scripts/check_csharp_package.py verifies it."
+      "notes": "Requirements, project-reference steps executed verbatim by tests/test_csharp_quickstart.py, library vs AnyInfer.Examples helper source, and the local package exactly as scripts/check_csharp_package.py verifies it. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/csharp-quickstart.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/QuickstartExample.cs",
         "examples/csharp-sdk/QuickstartTestingExample.cs",
@@ -828,12 +828,12 @@
         "dedicated Ollama and LM Studio descriptors (C# uses the OpenAI-compatible /v1 layer)",
         "starting or supervising a local server"
       ],
-      "notes": "Snippets are regions of files asserted by the quickstart.* runner cases; the offline and loopback steps run in a fresh consumer in tests/test_csharp_quickstart.py against a stand-in server, not a live Ollama or LM Studio."
+      "notes": "Snippets are regions of files asserted by the quickstart.* runner cases; the offline and loopback steps run in a fresh consumer in tests/test_csharp_quickstart.py against a stand-in server, not a live Ollama or LM Studio. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/csharp-sdk.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/SettingsExample.cs",
         "examples/csharp-sdk/CerebrasExample.cs",
@@ -890,7 +890,7 @@
         "batch inference jobs (retrieval input batching is supported)",
         "provider-run tools on built-in descriptors (none declares a server tool; application descriptors can)"
       ],
-      "notes": "C# overview and task index. Start here / Use in a .NET application (installation and quickstart links) and every prior heading anchor kept; existing H2 task sections are now H3 recipes under task-group H2s (connect, generate, embed and rerank, inspect, observe, account and policy). Each recipe includes executed source and links its concept page and /csharp/api/ type pages. New recipes: configuration file, credential references, provider-run tools, retrieval batching, operation routes and embedding spaces, trace/JSONL sinks and payload opt-in, shared ledger and spend store, spend admission, context-window fallback. TEI live evidence is the 2026-10-22 TEI 1.9.4 probe; Voyage/Jina/Cerebras/Hyperbolic/Nscale are offline scripted evidence only."
+      "notes": "C# overview and task index. Start here / Use in a .NET application (installation and quickstart links) and every prior heading anchor kept; existing H2 task sections are now H3 recipes under task-group H2s (connect, generate, embed and rerank, inspect, observe, account and policy). Each recipe includes executed source and links its concept page and /csharp/api/ type pages. New recipes: configuration file, credential references, provider-run tools, retrieval batching, operation routes and embedding spaces, trace/JSONL sinks and payload opt-in, shared ledger and spend store, spend admission, context-window fallback. TEI live evidence is the 2026-10-22 TEI 1.9.4 probe; Voyage/Jina/Cerebras/Hyperbolic/Nscale are offline scripted evidence only. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/custom-providers.md",
@@ -958,12 +958,12 @@
     {
       "source": "guides/installation.md",
       "scope": "python",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "pyproject.toml"
       ],
       "unsupported_native": [],
-      "notes": "Python packaging: extras, add-on packages, requirements; C# appears only as a pointer to the .NET application setup. Python install surface, not a native gap."
+      "notes": "Python packaging: extras, add-on packages, requirements; C# appears only as a pointer to the .NET application setup. Python install surface, not a native gap. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/local-inference.md",
@@ -1022,7 +1022,7 @@
     {
       "source": "guides/python-to-csharp.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/ConfigurationExample.cs",
         "examples/csharp-sdk/ConnectionExample.cs",
@@ -1044,12 +1044,12 @@
         "sessions, arena runs, evaluation/benchmarks, local runtime lifecycle, batch inference jobs, OpenTelemetry, keyring, MCP, CLI and sidecar",
         "Pydantic schema input, @ai.tool decorator, Retry.retry_on"
       ],
-      "notes": "Links csharp-installation.md and csharp-quickstart.md. Mapping table extended; Python-only features listed. Config statement corrected; asserted by migration.* cases."
+      "notes": "Links csharp-installation.md and csharp-quickstart.md. Mapping table extended; Python-only features listed. Config statement corrected; asserted by migration.* cases. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/quickstart.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/GenerationExample.cs",
         "examples/csharp-sdk/SyncGenerationExample.cs",
@@ -1059,7 +1059,7 @@
       "unsupported_native": [
         "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)"
       ],
-      "notes": "Only 'Your First Call' has C# tabs; streaming, aliases, structured output, fallback, and embed/rerank sections are Python-only although C# implements those journeys (with openai-compat-family targets, not anthropic/ollama)."
+      "notes": "Only 'Your First Call' has C# tabs; streaming, aliases, structured output, fallback, and embed/rerank sections are Python-only although C# implements those journeys (with openai-compat-family targets, not anthropic/ollama). Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/streaming.md",
@@ -1157,7 +1157,7 @@
     {
       "source": "index.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/GenerationExample.cs",
         "examples/csharp-sdk/Program.cs"
@@ -1168,7 +1168,7 @@
         "offline scripted-provider test kit and pytest fixtures (ScriptedProvider, anyinfer_* fixtures, cassettes)",
         "no-dispatch target comparison (compare()) and the compare_diff portability/regression tool"
       ],
-      "notes": "Native prerelease sentence starts with C# installation and quickstart; README.md mirrors it."
+      "notes": "Native prerelease sentence starts with C# installation and quickstart; README.md mirrors it. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "providers/README.md",

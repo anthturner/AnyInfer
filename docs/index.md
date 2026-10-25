@@ -73,8 +73,8 @@ what you sent, what you got back, what it cost, and what quietly didn't happen.
   and allows you to assert on the recovery, not on a mock of your own wrapper.
   [→ Testing your app](guides/testing-your-app.md)
 - **Every number says where it came from.** A context window, a price, a feature flag is
-  tagged cataloged, discovered, probed, or defaulted, and an unknown cost is `None`,
-  never `$0.00`. [→ Capabilities and provenance](concepts/capabilities.md)
+  tagged cataloged, discovered, probed, defaulted, or overridden by you, and an unknown
+  cost is `None`, never `$0.00`. [→ Capabilities and provenance](concepts/capabilities.md)
 - **Structured output is a contract.** A request carrying a schema always returns a
   client-side-validated result, using the strongest mechanism the provider offers, with
   an opt-in bounded repair loop.
@@ -121,9 +121,10 @@ operations on the same client; see
 
 - **Integrating into an app?**
 
-    The [Quickstart](guides/quickstart.md) is the five-minute route from install to a
-    result; [Integrate AnyInfer](guides/README.md) chooses between the SDK, CLI, and
-    sidecar.
+    The [Python quickstart](guides/quickstart.md) and the
+    [C# quickstart](guides/csharp-quickstart.md) are the short routes from install to a
+    result; [Integrate AnyInfer](guides/README.md) chooses between the Python SDK, the
+    native C# prerelease, the CLI, and the sidecar.
 
 - **Want existing OpenAI clients to use the same route?**
 
@@ -139,6 +140,6 @@ operations on the same client; see
 
 </div>
 
-Pre-1.0 and under active development. Python 3.11+; Windows, macOS, and Linux are all
-first-class. MIT licensed. Sources, design documents, and the issue tracker live at
+Pre-1.0 and under active development. The Python SDK needs Python 3.11+ and the C#
+prerelease needs .NET 8; Windows, macOS, and Linux are all first-class. MIT licensed. Sources, design documents, and the issue tracker live at
 [github.com/anthturner/AnyInfer](https://github.com/anthturner/AnyInfer).

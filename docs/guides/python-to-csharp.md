@@ -7,7 +7,7 @@ foundation](../concepts/foundation.md) for its current capabilities and limits. 
 [C# quickstart](csharp-quickstart.md); this page maps the Python API you already know onto
 the native one.
 
-| Python concept | C# SDK (development) |
+| Python concept | C# SDK (prerelease) |
 |---|---|
 | `AsyncClient` | `AsyncClient` |
 | `ProviderSettings.of(...)` | `ProviderSettings.Of(...)` |
@@ -58,7 +58,8 @@ native C# form.
 These Python SDK features have no C# counterpart in this prerelease; keep them in Python, the
 CLI, or the sidecar:
 
-- Pydantic models as schemas, the `@ai.tool` decorator, and `Retry(retry_on=...)` predicates.
+- Pydantic models as schemas, the `@ai.tool` decorator syntax (C# binds a delegate with
+  `Tool.From`), and `Retry(retry_on=...)` predicates.
 - MCP tool sources and the `mcp` configuration block.
 - Sessions, history reduction, and context reduction (`anyinfer.context`); C# has only the
   standalone `ContextTuning` settings values.
@@ -77,16 +78,16 @@ an `env://CEREBRAS_API_KEY` credential reference and use a `cerebras:model` targ
 [registered Cerebras provider example](csharp-sdk.md#use-the-registered-cerebras-provider) is
 the source-linked executable example.
 
-Its verifier uses a scripted handler, not hosted Cerebras traffic. Hosted behavior remains
-unverified; Hyperbolic and Nscale are the other provider-specific presets selected in the default registry.
-Choose a model available to the configured account through discovery; the example's
+Its verifier uses a scripted handler, not hosted Cerebras traffic, so hosted behavior remains
+unverified. Choose a model available to the configured account through discovery; the example's
 `gpt-oss-120b` is not a static catalog guarantee.
 
 ## Registered Hyperbolic generation
 
 The C# default registry also includes Hyperbolic generation. Configure the ordinary
 `ProviderSettings.Of("hyperbolic", apiKey: "env://HYPERBOLIC_API_KEY")` and target
-`hyperbolic:model`; see the [source-linked Hyperbolic example](csharp-sdk.md#use-the-registered-hyperbolic-provider).
+`hyperbolic:model`; see the
+[source-linked Hyperbolic example](csharp-sdk.md#use-the-registered-hyperbolic-provider).
 Its default endpoint migrated from the decommissioned `https://api.hyperbolic.xyz/v1` to
 `https://api.hyperbolic.ai/inference/v1`. The included example checks the default request path
 offline; hosted Hyperbolic traffic remains unverified. Choose a model available to the account
@@ -104,9 +105,9 @@ hosted Nscale traffic remains unverified. The example's
 terminal usage timing, and the accepted reasoning-effort enum remain unverified; generic typed
 history does not retain `reasoning_content`.
 
-Cerebras, Hyperbolic, and Nscale are the reviewed registered generation presets selected in this
-C# proof; all other generated compatibility-preset rows remain inert and are not default
-registrations. Broader SDK work remains open.
+Cerebras, Hyperbolic, and Nscale are the only provider-specific generation presets in the C#
+default registry; the other compatibility-preset rows bundled in the assembly are inert data and
+are not registered.
 
 ## Shared configuration
 
@@ -123,9 +124,10 @@ ignores `_comment` and the bundled demo's settings (`targets`, `system_prompt`, 
 shared. `default_route` loads as a plain target list with the default retry policy and health
 gate; `Dumps` refuses a route with custom retry, health-gate, or context-window settings,
 which version 1 cannot represent. Credential references remain references while configuration
-is read; resolution belongs to the selected provider's first use. The schema mechanism is a bounded proof
-subset, so port a schema only after checking its supported shape. The C# proof evaluates Draft 6,
-Draft 7, Draft 2019-09, and Draft 2020-12; Draft 3 and Draft 4 remain deferred. Native numeric
+is read; resolution belongs to the selected provider's first use. Schema validation covers
+Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12; Draft 3 and Draft 4 are not supported. The
+enforcement mechanism is chosen from the target's capabilities rather than from the request, and
+the chat adapter has no `grammar` mechanism. Native numeric
 and regular-expression behavior applies, with a timeout per regular-expression match. Registered
 resources are explicit and external schema retrieval requires an explicit retriever.
 
@@ -211,13 +213,15 @@ one after completion. They do not calculate account totals or create automatic p
 `AsyncClient.Budget(...)` and `Client.Budget(...)` calculate a planning budget without choosing a
 route winner, resolving credentials, constructing an adapter, or sending a request. Pricing applies
 only when its provenance is catalog, discovered, probed, or caller override; default facts leave a
-calculated cost unknown, while a trusted zero price is free. The current request extractor counts
-text, reports other content as unpriced, and has no offered-tools input.
+calculated cost unknown, while a trusted zero price is free. The request estimator counts text,
+reports other content as unpriced, and has no offered-tools input.
 
-`SpendLedger`, `SpendStore`, and `RateLimiter` are explicit caller-owned helpers. They do not make
-client admission decisions, persist automatically, pace client transport, or represent a provider
-invoice or all-wire total. Dispose every standalone limiter lease, and serialize store updates when
-you need transactional read-modify-write behavior.
+`SpendLedger`, `SpendStore`, and `RateLimiter` are caller-owned helpers. Used on their own, as in
+this example, they make no admission decision, pace no client request, and persist nothing
+automatically. Passed to a client, a ledger records the client's completed spend and holds its
+spend-policy reservations, and a `limiters` entry paces requests to that provider instance. None
+of them represents a provider invoice or an all-wire total. Dispose every standalone limiter
+lease, and serialize store updates when you need transactional read-modify-write behavior.
 
 ```csharp
 --8<-- "examples/csharp-sdk/AccountingExample.cs"
@@ -229,22 +233,25 @@ you need transactional read-modify-write behavior.
 inputs. A client commits only its winning request to a client-local or caller-supplied ledger.
 Version 1 configuration keeps `default_route` as an ordinary target list; it has no specialized
 context-chain encoding. The generic OpenAI-compatible descriptor declares no cache mechanism.
-`ToolSpec`, `ToolCall`, and `ToolResult` are also available as typed raw values. The C#
-proof provides a separate bounded loop over explicitly registered `Tool` handlers.
+`ToolSpec`, `ToolCall`, and `ToolResult` are also available as typed raw values. The C# SDK
+provides a separate bounded loop over explicitly registered `Tool` handlers.
 
 ```csharp
 --8<-- "examples/csharp-sdk/RequestPolicyExample.cs"
 ```
 
-Callers own supplied ledgers, estimators, limiters, and stores. Normal configured HTTP, including
-a supplied handler for a normal configured descriptor, is paced inside the entry deadline when
-`RateLimits` are active. An own-transport descriptor, or an opaque prebuilt registration with an
-active injected limiter, uses an outer slot before entry. This proof does not claim provider-invoice
-or all-wire accounting, context reduction, history reduction, or universal provider transport parity.
+Callers own supplied ledgers, estimators, limiters, and stores. When an instance has active
+`RateLimits`, the SDK paces its requests inside the HTTP handler it creates or wraps around a
+handler you supply, so time spent waiting counts against the request's deadline. An adapter whose
+descriptor declares that it governs its own transport, or a prebuilt adapter registration given a
+limiter through `limiters`, is paced around each call instead: it waits for its slot before the
+request's deadline starts. The C# SDK does not provide provider-invoice or all-wire accounting,
+context reduction, or history reduction.
 
 ## What to use in an application
 
-Use the [Python SDK](python-sdk.md), sidecar, or CLI for supported application integration. The native C# SDK gives .NET developers a source-linked async API and synchronous facade
+Use the [Python SDK](python-sdk.md), sidecar, or CLI for supported application integration. The
+native C# SDK gives .NET developers a source-linked async API and synchronous facade
 implemented by its own C# core. Rich inputs and bounded tool execution are available in that
 prerelease SDK. Python remains the supported published SDK; the local C# package is not published
 to NuGet and makes no full-parity claim.

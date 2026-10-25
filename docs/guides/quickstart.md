@@ -1,10 +1,10 @@
 # Quickstart
 
 From `pip install` to a working Python result. Every Python example on this page is executed in
-CI against the fake providers, so none of it can quietly rot. The C# tab is a bounded prerelease
-proof example; its contributor commands are in the [C# SDK proof guide](csharp-sdk.md). For the
-full native path from a .NET 8 project to a first call, see the
-[C# quickstart](csharp-quickstart.md).
+CI against the fake providers, so none of it can quietly rot. The two C# tabs are examples from
+the native prerelease SDK, executed by its offline example runner; the
+[C# SDK overview](csharp-sdk.md) explains them. For the full native path from a .NET 8 project to
+a first call, see the [C# quickstart](csharp-quickstart.md).
 
 ## Install
 
@@ -80,9 +80,9 @@ read.
     --8<-- "examples/csharp-sdk/SyncGenerationExample.cs"
     ```
 
-The C# tabs cover bounded generation through the prerelease proof. Model discovery and health
-are explicit instance calls; the [C# SDK guide](csharp-sdk.md) shows their source-linked async
-and synchronous forms.
+The C# tabs cover buffered generation in the native prerelease. Model discovery and health are
+explicit instance calls; the [C# SDK overview](csharp-sdk.md) shows their async and synchronous
+forms.
 
 The highlighted line is the only one that changes when you point the same call at a
 different provider or a local model.

@@ -77,10 +77,11 @@ constructing a client resolve no credential, build no adapter, and send nothing;
 operation that needs an instance resolves its credential and builds its adapter.
 
 
-Background: [what each SDK accepts in configuration](../reference/configuration.md#what-each-sdk-accepts),
-the C# [configuration](../reference/csharp-sdk.md#configuration) and
-[credential](../reference/csharp-sdk.md#credentials) semantics, and
-[credentials and redaction](../concepts/credentials.md#in-the-c-sdk).
+Background: [what each SDK accepts in
+configuration](../reference/configuration.md#what-each-sdk-accepts), the C#
+[configuration](../reference/csharp-sdk.md#configuration) and
+[credential](../reference/csharp-sdk.md#credentials) semantics, and [credentials and
+redaction](../concepts/credentials.md#in-the-c-sdk).
 
 ### Create provider settings
 
@@ -106,9 +107,7 @@ provider with `cerebras:model`; no generic OpenAI-compatible provider setup is n
 ```
 
 The included executable example substitutes a scripted HTTP handler and checks its request and
-result offline. It does not make hosted Cerebras traffic live-verified. Hyperbolic and Nscale
-are the other provider-specific generation presets selected in the C# default registry; remaining
-generated compatibility-preset rows are inert there.
+result offline. It does not make hosted Cerebras traffic live-verified.
 Choose a model available to the configured account through discovery; this example's
 `gpt-oss-120b` target is not a static catalog guarantee.
 
@@ -128,8 +127,9 @@ The executable example uses a scripted handler to check the implicit default URI
 request model and body, returned text and usage, and disposal without contacting Hyperbolic.
 Hosted Hyperbolic traffic remains unverified. Choose a model available to the configured account
 through discovery; `glm-5.3-flash` is the documentation example identifier, not a static catalog
-guarantee. Cerebras, Hyperbolic, and Nscale are the reviewed registered generation presets in
-this C# registry; all other generated preset rows remain inert.
+guarantee. Cerebras, Hyperbolic, and Nscale are the only provider-specific generation presets in
+the C# default registry; the other compatibility-preset rows bundled in the assembly are inert
+data.
 
 ### Use the registered Nscale provider
 
@@ -148,8 +148,9 @@ disposal. It does not make hosted Nscale traffic live-verified. The
 `meta-llama/Llama-3.1-8B-Instruct` target is a scripted documentation example, not an account
 catalog guarantee; discover models available to the configured account. Exact SSE framing and
 terminal usage timing remain unverified. Only the `medium` reasoning value is shown; the accepted
-effort enum remains unverified. Generic typed history does not retain `reasoning_content`.
-The current capability map and exclusions are maintained in the [shared foundation](../concepts/foundation.md).
+effort enum remains unverified. Generic typed history does not retain `reasoning_content`. The
+current capability map and exclusions are maintained in the [shared
+foundation](../concepts/foundation.md).
 
 ### Load a configuration file
 
@@ -219,8 +220,8 @@ Pass the same chain to `AnyInferConfig.Loads` and to the client: loading uses it
 the `env://` timing, the `credential://` failure, the load-time rejection of an unhandled scheme,
 and a missing application secret, each failing before any request.
 
-Concept: [Credentials and redaction](../concepts/credentials.md#custom-resolvers); the operating-system
-keyring described there is Python-only. Types:
+Concept: [Credentials and redaction](../concepts/credentials.md#custom-resolvers); the
+operating-system keyring described there is Python-only. Types:
 [`ICredentialResolver`](/csharp/api/anyinfer.credentials.icredentialresolver/),
 [`EnvResolver`](/csharp/api/anyinfer.credentials.envresolver/),
 [`KeyringResolver`](/csharp/api/anyinfer.credentials.keyringresolver/),
@@ -269,8 +270,9 @@ file; the SDK does not add the certificate to the system certificate store. Rele
 and certificate releases SDK references, but native references can defer normal key-file cleanup.
 The SDK does not promise memory-only storage or immediate file deletion.
 
-Concept: [Proxies, private CAs, and mTLS](../reference/configuration.md#proxies-private-cas-and-mtls).
-Types: [`ProviderProxy`](/csharp/api/anyinfer.providerproxy/),
+Concept: [Proxies, private CAs, and
+mTLS](../reference/configuration.md#proxies-private-cas-and-mtls). Types:
+[`ProviderProxy`](/csharp/api/anyinfer.providerproxy/),
 [`TlsVerification`](/csharp/api/anyinfer.tlsverification/),
 [`ClientCertificate`](/csharp/api/anyinfer.clientcertificate/).
 
@@ -322,8 +324,9 @@ invent reasoning, citation, or provider-run tool support.
 Concept: [Multimodal inputs](../concepts/multimodal-inputs.md). Types:
 [`GenerationRequest`](/csharp/api/anyinfer.generationrequest/),
 [`Message`](/csharp/api/anyinfer.message/), [`ImagePart`](/csharp/api/anyinfer.imagepart/),
-[`DocumentPart`](/csharp/api/anyinfer.documentpart/), [`AudioPart`](/csharp/api/anyinfer.audiopart/),
-[`VideoPart`](/csharp/api/anyinfer.videopart/), [`TokenLogprob`](/csharp/api/anyinfer.tokenlogprob/).
+[`DocumentPart`](/csharp/api/anyinfer.documentpart/),
+[`AudioPart`](/csharp/api/anyinfer.audiopart/), [`VideoPart`](/csharp/api/anyinfer.videopart/),
+[`TokenLogprob`](/csharp/api/anyinfer.tokenlogprob/).
 
 ### Request provider-run tools
 
@@ -404,9 +407,10 @@ disposal and the synchronous facade with caller-owned document IDs.
 --8<-- "examples/csharp-sdk/TeiExample.cs"
 ```
 
-The offline example verifier uses scripted HTTP responses. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22.
-The [TEI page](../providers/tei.md#use-tei-from-c) shows the matching settings for the two local
-server processes and model discovery.
+The offline example verifier uses scripted HTTP responses. Buffered C# embedding and reranking were
+exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22. The [TEI
+page](../providers/tei.md#use-tei-from-c) shows the matching settings for the two local server
+processes and model discovery.
 
 The Voyage example accepts a caller-provided credential value or `env://VOYAGE_API_KEY`
 reference, configures an instance alias, and requests raw payload retention explicitly. Its
@@ -445,9 +449,9 @@ split and combine scores by default because results from separate batches may no
 scale. `EmbeddingResult` records its `EmbeddingSpace`, so applications should compare or store
 vectors only when their spaces are compatible. The next two recipes cover both.
 
-Both calls request a content-free manifest. Raw provider payload retention remains off unless a
-caller explicitly enables it, so the result's `Raw` is normally `null` and the manifest has no
-payload facet.
+The `RetrievalExample` embedding and reranking calls request a content-free manifest. Raw provider
+payload retention remains off unless a caller explicitly enables it, so the result's `Raw` is
+normally `null` and the manifest has no payload facet.
 
 Concept: [Embeddings and reranking](../concepts/embeddings.md#reranking-and-document-identity).
 Types: [`EmbeddingResult`](/csharp/api/anyinfer.embeddingresult/),
@@ -459,13 +463,13 @@ Types: [`EmbeddingResult`](/csharp/api/anyinfer.embeddingresult/),
 
 ### Batch large retrieval requests
 
-Retrieval batching splits one embedding or rerank call into several provider requests; it is not
-a batch inference job, which C# does not provide. Splitting needs a ceiling. Voyage's descriptor
-declares 1,000 embedding inputs and 1,000 rerank documents per request for its listed models.
-TEI and Jina declare none: an unknown ceiling is never guessed, so the call is sent as one
-bounded request. With no ceiling at all, more than 2,048 embedding inputs or more than 1,000
-rerank documents fail locally with `ConfigException`. When your deployment has a limit you have verified, such as the
-`max_client_batch_size` a TEI server reports, pass it as `BatchPolicy.MaxItemsOverride`:
+Retrieval batching splits one embedding or rerank call into several provider requests; it is not a
+batch inference job, which C# does not provide. Splitting needs a ceiling. Voyage's descriptor
+declares 1,000 embedding inputs and 1,000 rerank documents per request for its listed models. TEI
+and Jina declare none: an unknown ceiling is never guessed, so the call is sent as one bounded
+request. With no ceiling at all, more than 2,048 embedding inputs or more than 1,000 rerank
+documents fail locally with `ConfigException`. When your deployment has a limit you have verified,
+such as the `max_client_batch_size` a TEI server reports, pass it as `BatchPolicy.MaxItemsOverride`:
 
 ```csharp
 --8<-- "examples/csharp-sdk/RetrievalBatchingExample.cs:embed"
@@ -531,8 +535,9 @@ generation call without a route does not borrow them, that an incompatible store
 that fallback to another instance is refused unless allowed, and that a `Generation` operation
 route is rejected with `ArgumentException`.
 
-Concept: [The embedding-space safety rule](../concepts/embeddings.md#the-embedding-space-safety-rule).
-Types: [`EmbeddingSpace`](/csharp/api/anyinfer.embeddingspace/),
+Concept: [The embedding-space safety
+rule](../concepts/embeddings.md#the-embedding-space-safety-rule). Types:
+[`EmbeddingSpace`](/csharp/api/anyinfer.embeddingspace/),
 [`InferenceOperation`](/csharp/api/anyinfer.capabilities.inferenceoperation/),
 [`Route`](/csharp/api/anyinfer.route/).
 
@@ -697,15 +702,16 @@ Background: [cost and spending](../concepts/cost.md#in-the-c-sdk),
 
 ### Calculate explicit accounting facts
 
-Pricing uses only trusted catalog, discovered, probed, or caller-override provenance. A
-default price leaves calculated cost unknown; a trusted zero price remains a known free result.
-`Budget` is a pure planning calculation for one explicit target. The request estimator currently counts text only: nontext parts are reported as unpriced, and it has no offered-tools input.
+Pricing uses only trusted catalog, discovered, probed, or caller-override provenance. A default
+price leaves calculated cost unknown; a trusted zero price remains a known free result. `Budget` is
+a pure planning calculation for one explicit target. The request estimator currently counts text
+only: nontext parts are reported as unpriced, and it has no offered-tools input.
 
 The ledger, store, and limiter below are caller-selected helpers. They do not create default disk
 output, refuse a request, pace client transport, or provide a provider invoice or all-wire total.
 The caller owns the store path and explicitly acquires and disposes each standalone limiter lease.
-Store accumulation is atomic for replacement readability, but it is not transactional read-modify-write
-coordination across threads or processes.
+Store accumulation is atomic for replacement readability, but it is not transactional
+read-modify-write coordination across threads or processes.
 
 ```csharp
 --8<-- "examples/csharp-sdk/AccountingExample.cs"
@@ -766,12 +772,12 @@ registered-tool loop is documented in [Run the tool loop](tool-loop.md).
 --8<-- "examples/csharp-sdk/RequestPolicyExample.cs"
 ```
 
-Normal configured HTTP, including a supplied handler for a normal configured descriptor, is paced
-inside the generation entry deadline when `RateLimits` are active. Only an own-transport
-descriptor, or an opaque prebuilt registration with an active injected limiter, uses an outer slot
-before that deadline. Callers retain ownership of injected estimators, ledgers, limiters, and
-stores. Pool-owned raw transport differs from wrapper ownership, and transferred raw transport
-cannot rebuild through the wrapper path.
+When an instance has active `RateLimits`, the SDK paces its requests inside the HTTP handler it
+creates or wraps around a handler you supply, so time spent waiting counts against the request's
+deadline. An adapter whose descriptor declares that it governs its own transport, or a prebuilt
+adapter registration given a limiter through `limiters`, is paced around each call instead: it waits
+for its slot before the request's deadline starts. Callers retain ownership of injected estimators,
+ledgers, limiters, and stores.
 
 Types: [`SpendPolicy`](/csharp/api/anyinfer.spendpolicy/),
 [`CachePolicy`](/csharp/api/anyinfer.cachepolicy/), [`ToolSpec`](/csharp/api/anyinfer.toolspec/),
@@ -780,14 +786,14 @@ Types: [`SpendPolicy`](/csharp/api/anyinfer.spendpolicy/),
 
 ### Refuse requests over a spend ceiling
 
-A `SpendPolicy` is checked before each attempt is dispatched. It takes the high end of the
-request's preflight cost estimate from trusted pricing, here a price the application asserts
-with `capabilityOverrides`, and refuses with `SpendLimitException` when that estimate exceeds
+A `SpendPolicy` is checked before each attempt is dispatched. It takes the high end of the request's
+preflight cost estimate from trusted pricing, here a price the application asserts with
+`capabilityOverrides`, and refuses with `SpendLimitException` when that estimate exceeds
 `maxRequestUsd`, or when recorded spend plus outstanding reservations plus the estimate exceeds
-`maxTotalUsd`. With `onUnknown: "refuse"`, a request whose cost cannot be estimated is refused
-too; the default, `"allow"`, sends it. A refused request sends nothing and is not retryable, and the exception is
-thrown directly rather than as a routing failure: a ceiling is client-wide, so another target
-would not satisfy it.
+`maxTotalUsd`. With `onUnknown: "refuse"`, a request whose cost cannot be estimated is refused too;
+the default, `"allow"`, sends it. A refused request sends nothing and is not retryable, and the
+exception is thrown directly rather than as a routing failure: a ceiling is client-wide, so another
+target would not satisfy it.
 
 ```csharp
 --8<-- "examples/csharp-sdk/SpendAdmissionExample.cs:client"
@@ -804,8 +810,9 @@ spend admission. The offline runner checks a priced request within both ceilings
 request refused after recorded spend crossed `maxTotalUsd`, a prompt whose own estimate exceeds
 `maxRequestUsd`, and an unpriced target refused, all without a request for any refused call.
 
-Concept: [Stopping before you spend too much](../concepts/cost.md#stopping-before-you-spend-too-much).
-Types: [`SpendPolicy`](/csharp/api/anyinfer.spendpolicy/),
+Concept: [Stopping before you spend too
+much](../concepts/cost.md#stopping-before-you-spend-too-much). Types:
+[`SpendPolicy`](/csharp/api/anyinfer.spendpolicy/),
 [`SpendLimitException`](/csharp/api/anyinfer.spendlimitexception/),
 [`Pricing`](/csharp/api/anyinfer.capabilities.pricing/),
 [`Sourced<T>`](/csharp/api/anyinfer.capabilities.sourced-1/).
@@ -822,13 +829,13 @@ context-length error redirects the same way.
 --8<-- "examples/csharp-sdk/ContextWindowRouteExample.cs:route"
 ```
 
-The offline runner checks that a short prompt stays on the usual target, that a long prompt is
-never sent to it and is served by the large-context target with the refused attempt recorded,
-and that when neither window fits the call throws `AllTargetsFailedException` without any
-request. Only the estimate's lower bound is compared with the whole window, a default-provenance
-window never blocks a request, and neither does a request with nontext parts, which the
-estimator cannot size; pass `contextGate: false` to the client to turn the check off. Context reduction, which would shorten the prompt instead, is
-Python-only.
+The offline runner checks that a short prompt stays on the usual target, that a long prompt is never
+sent to it and is served by the large-context target with the refused attempt recorded, and that
+when neither window fits the call throws `AllTargetsFailedException` without any request. Only the
+estimate's lower bound is compared with the whole window, a default-provenance window never blocks a
+request, and neither does a request with nontext parts, which the estimator cannot size; pass
+`contextGate: false` to the client to turn the check off. Context reduction, which would shorten the
+prompt instead, is Python-only.
 
 Concept: [The pre-dispatch gate](../concepts/budgeting.md#the-pre-dispatch-gate) and
 [failure-specific fallback chains](../concepts/routing.md#failure-specific-fallback-chains).
@@ -841,14 +848,14 @@ Types: [`Route`](/csharp/api/anyinfer.route/),
 The native C# SDK currently covers asynchronous and synchronous text generation, typed rich-input
 generation through the OpenAI-compatible adapter, and an explicit bounded loop over registered
 tools. It also supports buffered text embeddings and reranking through built-in TEI, Voyage, and
-Jina adapters and application-owned retrieval adapters. The
-OpenAI-compatible adapter remains chat-only. It also covers structured JSON validation and repair,
-configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
-caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free typed telemetry, immutable manifests, and declarative setup
-metadata. The local package is not published to NuGet and does not claim full provider parity,
-provider invoice or all-wire totals, context reduction, history reduction, or production report
-publication. Built-in retrieval coverage is limited to TEI, Voyage, and Jina; generic
-OpenAI-compatible retrieval is not implemented.
+Jina adapters and application-owned retrieval adapters. The OpenAI-compatible adapter remains
+chat-only. It also covers structured JSON validation and repair, configuration, routing, reported
+token usage, bounded winning-request pricing, explicit budgets, caller-owned ledger and store
+helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free typed
+telemetry, immutable manifests, and declarative setup metadata. The local package is not published
+to NuGet and does not claim full provider parity, provider invoice or all-wire totals, context
+reduction, history reduction, or production report publication. Built-in retrieval coverage is
+limited to TEI, Voyage, and Jina; generic OpenAI-compatible retrieval is not implemented.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

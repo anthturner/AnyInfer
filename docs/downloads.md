@@ -5,7 +5,7 @@ hide:
 
 # Download AnyInfer
 
-<span class="anyinfer-badge">v{{ extra.anyinfer_version }}</span>
+<span class="anyinfer-badge">Python v{{ extra.anyinfer_version }}</span>
 
 Every merge to `main` with a version bump produces a
 [GitHub Release](https://github.com/anthturner/AnyInfer/releases) carrying the packages
@@ -22,8 +22,9 @@ below, built by the
 
 ### :material-language-python: Python Wheel
 
-For applications. Published to [PyPI](https://pypi.org/project/anyinfer/); installing
-from the repository is byte-identical.
+For applications. Published to [PyPI](https://pypi.org/project/anyinfer/); the PyPI wheel is
+byte-identical to the one attached to the GitHub Release. Installing from the repository builds
+the current `main` source instead.
 
 </div>
 
@@ -124,11 +125,10 @@ anyinfer serve --config anyinfer.json
   [Installation and extras](guides/installation.md) lists which ones you need.
 - The native .NET 8 C# SDK is not a release artifact or public NuGet package. It is an
   independent prerelease packaged locally as `0.1.0-proof`, with no runtime Python
-  dependency. Build it from the checkout using the
-  [C# application setup](guides/csharp-sdk.md#use-in-a-net-application), which the
-  [C# installation](guides/csharp-installation.md) and [C# quickstart](guides/csharp-quickstart.md)
-  pages walk through; see the [C# reference](reference/csharp-sdk.md) and
-  [migration map](guides/python-to-csharp.md) for its bounded capability surface.
+  dependency. [Install the C# SDK](guides/csharp-installation.md) from the checkout and make a
+  first call with the [C# quickstart](guides/csharp-quickstart.md); see the
+  [C# reference](reference/csharp-sdk.md) and [migration map](guides/python-to-csharp.md) for its
+  bounded capability surface.
 - Unzip the demo bundle and run the `anyinfer-demo` executable inside; `BUNDLE-INFO.txt`
   records the exact version. Bundles never embed `llama-server` binaries or model
   weights; install a runtime explicitly and let the local subsystem acquire verified

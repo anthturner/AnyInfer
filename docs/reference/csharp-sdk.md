@@ -133,7 +133,7 @@ model stopped to call tools; unlike Python, an unrecognized value is not normali
 ## Structured Output {#structured-output}
 
 Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and
-Draft 4 remain deferred. Numeric and regular-expression behavior is native to .NET,
+Draft 4 are not supported. Numeric and regular-expression behavior is native to .NET,
 regular-expression timeouts apply per match, and an external resource must be registered
 in `SchemaValidationOptions.Resources` or returned by its `Retrieve` callback. Modern
 schema input and generated values retain arbitrary-size integers, while native `const`,
