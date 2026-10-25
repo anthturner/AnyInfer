@@ -3,6 +3,10 @@
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
 
+This matrix covers the Python SDK's provider adapters. The native C# SDK is checked
+separately, against the shared specification corpus and its own tests; see
+[the C# development workflow](../contributing/csharp-proof.md).
+
 Legend: ✅ verified · 🔗 implemented, verified by that adapter's dedicated tests ·
 ➖ declared unsupported · ❌ failing
 
@@ -19,7 +23,7 @@ how to record a cassette are covered in
 [the conformance suite](../contributing/conformance.md).
 
 
-Last generated: 2026-10-23.
+Last generated: 2026-10-25.
 
 | Provider | list_models | health | non_streaming | streaming | event_ordering | ttft | usage | usage_survives_streaming | tool_calls | streaming_tool_calls | reasoning | structured_output | schema_repair | error_mapping | retry_after | byte_cap | cancellation | unknown_finish_reason | embedding | embedding_duplicates | rerank | rerank_top_n | rerank_duplicate_text | embedding_normalization_probe | embedding_byte_cap | rerank_byte_cap | embedding_retry_after | rerank_retry_after |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

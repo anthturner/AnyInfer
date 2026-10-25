@@ -145,6 +145,6 @@ anyinfer serve --config anyinfer.json
 ## Previous Releases and Checksums
 
 The [releases page](https://github.com/anthturner/AnyInfer/releases) keeps every prior
-version with its changelog, generated from the pull requests that landed between
-releases, plus the checksums for every attached asset. The versioning and branch policy
+version with its release notes (that version's `CHANGELOG.md` section, copied verbatim,
+plus a compare link) and the checksums for every attached asset. The versioning and branch policy
 is documented in the [release strategy](contributing/releasing.md).

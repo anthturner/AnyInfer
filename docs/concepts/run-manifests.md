@@ -79,7 +79,7 @@ golden-file testing helper is Python-only.
 
 - [Test your application offline](../guides/testing-your-app.md): manifests as golden
   files.
-- [Regression-test fallback and repair](../examples/golden-manifest.md): the runnable
+- [Regression-test a fallback chain](../examples/golden-manifest.md): the runnable
   example.
 - [Telemetry](telemetry.md): the live event channel manifests are derived from.
 

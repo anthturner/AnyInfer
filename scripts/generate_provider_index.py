@@ -56,10 +56,11 @@ icon: material/format-list-bulleted
 
 # Every Provider
 
-This is AnyInfer's compatibility inventory, not its primary value proposition:
+This is the Python SDK's compatibility inventory, not AnyInfer's primary value proposition:
 **{total} providers** comprising {adapters} dedicated adapters with provider-specific
 behavior and {presets} presets over the shared OpenAI-compatible adapter. Each is a
-first-class target prefix: `groq:`, `vllm:`, `bedrock:`.
+first-class target prefix: `groq:`, `vllm:`, `bedrock:`. The native C# SDK registers a
+smaller set; see the [C# capability map](../concepts/foundation.md#c-capability-map).
 
 !!! note "This page is generated"
 

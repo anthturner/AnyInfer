@@ -191,7 +191,7 @@
         "Distill a Corpus": "examples/distill-a-corpus.md"
       },
       {
-        "Regression-Test Fallback and Repair": "examples/golden-manifest.md"
+        "Regression-Test a Fallback Chain": "examples/golden-manifest.md"
       },
       {
         "Semantic Search over a Small Corpus": "examples/semantic-search.md"
@@ -276,7 +276,7 @@
         "C# API Reference": "generated:csharp-api"
       },
       {
-        "SDK Reference": [
+        "Python API Reference": [
           "reference/api/README.md",
           {
             "Clients and Streams": "reference/api/client.md"

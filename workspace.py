@@ -1215,6 +1215,10 @@ def _matrix_header(providers: Sequence[str]) -> str:
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
 
+This matrix covers the Python SDK's provider adapters. The native C# SDK is checked
+separately, against the shared specification corpus and its own tests; see
+[the C# development workflow](../contributing/csharp-proof.md).
+
 Legend: ✅ verified · 🔗 implemented, verified by that adapter's dedicated tests ·
 ➖ declared unsupported · ❌ failing
 
