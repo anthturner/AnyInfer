@@ -2,7 +2,8 @@
 
 Running a model on the local machine should be one target string, with the same guarantees
 as a hosted call. This page covers the machinery behind that string: hardware detection,
-server tuning, supervision, and measurement.
+server tuning, supervision, and measurement. The local subsystem is part of the Python SDK;
+the C# SDK has no local runtime lifecycle.
 
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid

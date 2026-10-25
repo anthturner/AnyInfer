@@ -6,6 +6,12 @@ send and tells you exactly what it dropped. Together with
 contract: the selected target supplies the limit, the reducer stays within it, and the
 result carries a machine-readable account of lost fidelity.
 
+Context reduction and history compaction are Python SDK features. The C# SDK exposes only
+the standalone [`ContextTuning`](/csharp/api/anyinfer.context.contexttuning/) settings record
+(see the [C# reference](../reference/csharp-sdk.md#context-tuning)); it has no reducer, no
+history policy, and no request-path context handling, and its configuration loader rejects
+the `context` and `history` blocks.
+
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
 flowchart LR

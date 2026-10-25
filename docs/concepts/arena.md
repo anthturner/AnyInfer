@@ -6,7 +6,9 @@ before selection, and the `judge` or `synthesize` strategies add one more. It is
 on-demand comparison tool, not a router that learns from winners; results are not
 stored, ranked across runs, or fed back into future target selection. In order to
 compare targets *without* spending anything, use the
-[portability diff](../guides/comparing-targets.md) instead.
+[portability diff](../guides/comparing-targets.md) instead. Arena runs are a Python SDK
+feature, available through its client, CLI, and sidecar; the C# SDK does not provide them,
+and its configuration loader rejects the `arena` and `arenas` blocks.
 
 The strongest mode is structured consensus: candidates must satisfy the same
 [schema](structured-output.md), their canonical JSON values are grouped without regard to

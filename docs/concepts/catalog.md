@@ -241,6 +241,16 @@ against upstream and opens a human-reviewed pull request when something moved. A
 entry therefore either points at bytes that hash to what was recorded, or it fails
 loudly.
 
+## In the C# SDK {#in-the-c-sdk}
+
+The C# SDK embeds the same catalog data.
+[`Catalog.LoadDefault()`](/csharp/api/anyinfer.catalog.catalog/) returns it; `Model`,
+`ModelsFor` (by provider, `best_at` tag, or [`ModelKind`](/csharp/api/anyinfer.catalog.modelkind/)),
+`WithAliasTarget`, and `Overlay` behave as described above, and `Catalog.BestAtCategories`
+is the closed `best_at` vocabulary. [Hardware-fit classification](#will-it-run),
+acquisition, file verification, `locate_model()`, and engine pulls are Python-only: in C#
+the catalog is data, and the SDK has no local runtime.
+
 !!! tip "Key Takeaways"
     - One catalog serves both "give me a default tier" and "show me what fits", and a
       user's pick bridges into the alias ladder with `with_alias_target()`.

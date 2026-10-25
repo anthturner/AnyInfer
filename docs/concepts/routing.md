@@ -165,9 +165,9 @@ or contradict it.
 
 ## Pacing Before the Limit
 
-Everything above reacts to failure. Rate limiting anticipates one kind: an
-`asyncio.gather` over a hundred requests would otherwise send a hundred requests, take a
-wall of 429s, and only then back off. Client-side pacing is opt-in: with no limits
+Everything above reacts to failure. Rate limiting anticipates one kind: a concurrent
+fan-out of a hundred requests would otherwise send a hundred requests, take a wall of
+429s, and only then back off. Client-side pacing is opt-in: with no limits
 configured, requests dispatch exactly as before.
 
 Limits belong to a provider instance, not to the application, because a rate limit is a
@@ -226,21 +226,43 @@ stream:
 result.timing.phases.get("queued_ms")  # present only when this request waited
 
 
-def observer(event):
-    if isinstance(event, ai.RateLimitWaited):
-        print(f"{event.provider_id} held a request {event.waited_s:.2f}s ({event.reason})")
+class WaitReporter:
+    def on_event(self, event):
+        if isinstance(event, ai.RateLimitWaited):
+            print(f"{event.provider_id} held a request {event.waited_s:.2f}s ({event.reason})")
 
 
-client.events.subscribe(observer)
+client.subscribe(WaitReporter())
 ```
 
 `reason` is one of `concurrency`, `interval`, or `provider-headers`, so a slow fan-out
-can be attributed to the bound that caused it. `anyinfer doctor` prints the configured
-limits for the same reason.
+can be attributed to the bound that caused it. The Python CLI's `anyinfer doctor` prints
+the configured limits for the same reason.
 
 One interaction worth knowing: queue time counts against the request's own `timeout_s`.
 Aggressive pacing and a tight timeout will fight each other, so raise `timeout_s` when
 pacing hard.
+
+## In the C# SDK {#in-the-c-sdk}
+
+[`Route`](/csharp/api/anyinfer.route/) carries `Targets`, `Retry`, `HealthGate`,
+`HealthTtlS`, and `ContextWindowTargets`, and [`Retry`](/csharp/api/anyinfer.retry/) carries
+`MaxAttempts`, `BackoffBaseS`, and `BackoffMaxS`, with the same defaults and the same
+default retry classification as above. Two Python features are absent: there is no custom
+retry predicate (`retry_on`), and no `content_policy_targets` chain, so a C# attempt trail
+never records `redirected`. A client route passed to the constructor keeps its retry and
+health-gate policy when a call names its own target, and its `ContextWindowTargets` chain is
+not inherited, as described above. When every target fails, the call raises
+[`AllTargetsFailedException`](/csharp/api/anyinfer.alltargetsfailedexception/), whose
+`Attempts` holds the trail.
+
+Pacing uses the same [`RateLimits`](/csharp/api/anyinfer.ratelimits/) fields on
+`ProviderSettings` (`limits` in configuration), records `queued_ms` in `Timing.Phases`,
+and emits `RateLimitWaited` with the same three reasons;
+[`AnyInfer.Routing.RateLimiter`](/csharp/api/anyinfer.routing.ratelimiter/) is the standalone
+limiter. No built-in C# provider declares a rate-limit header dialect, so on those providers
+`respect_headers` cannot read allowance headers: pacing follows the configured bounds only,
+and each generation request reports the unread setting as a `ParameterDropped` event.
 
 !!! tip "Key Takeaways"
     - Targets are tried in order with no scoring or load balancing; only failures that

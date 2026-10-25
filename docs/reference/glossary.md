@@ -21,7 +21,8 @@ through the catalog; see [targets and aliases](../concepts/targets.md#aliases).
 <div class="anyinfer-card" markdown>
 #### Arena { #arena }
 Running one request against several targets at once and picking a winner by a declared
-strategy, rather than falling back only on failure; see [arena](../concepts/arena.md).
+strategy, rather than falling back only on failure; a Python SDK feature. See
+[arena](../concepts/arena.md).
 </div>
 
 <div class="anyinfer-card" markdown>
@@ -39,7 +40,7 @@ Something a model can do, paired with the provenance of how that is known; see
 
 <div class="anyinfer-card" markdown>
 #### Cassette { #cassette }
-Recorded HTTP traffic replayed in tests, so conformance can run without credentials;
+Recorded HTTP traffic replayed in Python tests, so conformance can run without credentials;
 [recording one](../contributing/conformance.md#contributing-a-cassette) takes a single
 command.
 </div>
@@ -85,8 +86,8 @@ in [the event stream](../concepts/events.md); the non-streaming API drains it.
 
 <div class="anyinfer-card" markdown>
 #### Extra { #extra }
-An optional install group (`anyinfer[serve]`, `[otel]`, `[demo]`) naming a capability
-rather than a provider, so the core install stays two dependencies wide. The full table
+An optional Python install group (`anyinfer[serve]`, `[otel]`, `[demo]`) naming a
+capability rather than a provider, so the core install stays two dependencies wide. The full table
 is in [installation](../guides/installation.md#extras).
 </div>
 
@@ -111,15 +112,16 @@ How [structured output](../concepts/structured-output.md) was requested: `gramma
 
 <div class="anyinfer-card" markdown>
 #### Posture { #posture }
-How much of a machine [local inference](../concepts/local.md) may commit:
-`conservative`, `balanced`, or `aggressive`.
+How much of a machine the Python SDK's [local inference](../concepts/local.md) may
+commit: `conservative`, `balanced`, or `aggressive`.
 </div>
 
 <div class="anyinfer-card" markdown>
 #### Preset { #preset }
-A named configuration of the shared `openai_compat` adapter for one OpenAI-compatible
+A named configuration of the shared OpenAI-compatible adapter for one OpenAI-compatible
 service — a registry entry, not a dedicated adapter; see
-[presets](../providers/presets.md).
+[presets](../providers/presets.md). The C# registry registers only the Cerebras,
+Hyperbolic, and Nscale presets; its other preset rows are inert data.
 </div>
 
 <div class="anyinfer-card" markdown>
@@ -139,7 +141,7 @@ application's `override` outranks everything the library collected.
 <div class="anyinfer-card" markdown>
 #### Reduction { #reduction }
 Selecting and packing a caller-approved corpus down to a token budget before dispatch,
-with the application deciding what may be sent; see
+with the application deciding what may be sent; a Python SDK feature. See
 [context reduction](../concepts/context-reduction.md).
 </div>
 
@@ -171,14 +173,14 @@ A model id meaning "the provider chooses" (Copilot's `auto`). Capabilities for o
 <div class="anyinfer-card" markdown>
 #### Session { #session }
 An opaque, target-bound handle that lets capable providers reuse server-side state
-across calls. It never changes an answer, and reuse is reported rather than assumed;
-see [sessions](../concepts/sessions.md).
+across calls. It never changes an answer, and reuse is reported rather than assumed; a
+Python SDK feature. See [sessions](../concepts/sessions.md).
 </div>
 
 <div class="anyinfer-card" markdown>
 #### Sidecar { #serve-frontend }
-The OpenAI-compatible HTTP service, [`anyinfer serve`](../serve/README.md). A wire codec
-around a normal client, never a second core.
+The Python SDK's OpenAI-compatible HTTP service, [`anyinfer serve`](../serve/README.md). A
+wire codec around a normal client, never a second core.
 </div>
 
 <div class="anyinfer-card" markdown>

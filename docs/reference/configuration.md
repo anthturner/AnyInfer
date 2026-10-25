@@ -1,12 +1,13 @@
 # Shared Configuration
 
 AnyInfer has one JSON configuration format for every integration method: load it from
-Python with `load_config`, pass it to `anyinfer run`, or start the OpenAI-compatible
-sidecar with it; each path is walked through in [the guides](../guides/README.md).
-Since every deployment reads the same file, provider identity, credentials, endpoint
-overrides, and the default route do not drift between them. Full API signatures for the
-loader and the validated config object are in
-[the configuration API](api/configuration.md).
+Python with `load_config`, pass it to `anyinfer run`, start the OpenAI-compatible
+sidecar with it, or read it in C# with `AnyInferConfig.Load`; each path is walked through
+in [the guides](../guides/README.md). Since every deployment reads the same file, provider
+identity, credentials, endpoint overrides, and the default route do not drift between
+them. Full API signatures for the loader and the validated config object are in
+[the Python configuration API](api/configuration.md) and on
+[`AnyInferConfig`](/csharp/api/anyinfer.config.anyinferconfig/) in the C# API reference.
 
 ```json
 {
@@ -24,8 +25,42 @@ field was introduced. Unknown versions, unknown keys, duplicate instance ids, in
 types, and files larger than 1 MiB fail with `ConfigError` before a client is created.
 The one exception: an entry with `enabled: false` is skipped without validating its other
 keys, so a disabled entry can hold settings for a provider that is not installed. The
-demo app writes a few UI-only fields of its own alongside the shared ones; the SDK, CLI,
-and sidecar ignore them. See [the demo app guide](../guides/demo-app.md).
+demo app writes a few UI-only fields of its own alongside the shared ones; both SDKs, the
+CLI, and the sidecar ignore them. See [the demo app guide](../guides/demo-app.md).
+
+## What Each SDK Accepts {#what-each-sdk-accepts}
+
+Both SDKs read format version 1 with the same validation rules: the 1 MiB ceiling, the
+unknown-key and duplicate-id refusals, and the `enabled: false` exception. In C#, failures
+are `ConfigException`. The C# loader implements a subset of the top-level blocks and
+refuses the rest by name rather than ignoring them:
+
+| Top-level key | Python | C# |
+|---|---|---|
+| `format_version`, `providers`, `default_route` | Accepted | Accepted |
+| [`operation_routes`](#the-operation_routes-block) | Accepted | Accepted |
+| [`cache`](#the-cache-block), [`repair`](#the-repair-block) | Accepted | Accepted |
+| [`context`](#the-context-block), [`history`](#the-history-block) | Accepted | Rejected as not implemented |
+| [`observers`](#the-observers-block), [`mcp`](#the-mcp-block) | Accepted | Rejected as not implemented |
+| [`arena`, `arenas`](#the-arena-and-arenas-blocks) | Accepted | Rejected as not implemented |
+
+Every provider-entry key is accepted by both: `id`, `adapter` (and `provider_id`),
+`alias`, `enabled`, `base_url`, `api_key`, `api_version`, `headers`, `options`,
+`timeout_s`, `values` and declared setup fields, [`limits`](#provider-limits), and
+[`proxy`, `verify`, and `client_cert`](#proxies-private-cas-and-mtls). What a key does at
+run time can still differ by SDK:
+
+- A `credential://` reference loads in both, but in C# resolving it always fails with
+  `CredentialException`, because the C# SDK has no OS keyring integration. A custom
+  credential scheme reaches the C# loader through the `ResolverChain` passed to
+  `Load`, not through an entry-point group.
+- In C#, `timeout_s` is the default deadline for generation calls only; embedding and
+  rerank calls default to 120 seconds.
+- In C#, `verify` must name a PEM bundle file; a CA directory is refused.
+- No built-in C# provider declares rate-limit headers, so `respect_headers` has no
+  allowance headers to read there.
+
+The [C# reference](csharp-sdk.md#configuration) covers the native reader and writer.
 
 ## Provider Settings
 
@@ -98,15 +133,19 @@ authorities — the environments that most often break an otherwise working inst
 They are **per provider instance** on purpose: one provider can trust a corporate CA while
 another keeps the public roots, which a process-wide environment variable cannot express.
 All three combine: the example above is one instance behind an intercepting proxy,
-trusting a private CA, presenting a client certificate. A path that cannot be read or
-parsed is a `ConfigError` naming the setting, not a bare filesystem error.
+trusting a private CA, presenting a client certificate. Loading a configuration never opens
+these files. In Python, a path that cannot be read or parsed is a `ConfigError` naming the
+setting, not a bare filesystem error. In C#, the files are read when the provider's HTTP
+handler is first created, and one that cannot be loaded fails then with a
+`ConfigException` naming the provider instance.
 
 !!! warning "`verify: false` disables certificate checking"
     It makes the connection interceptable by anything on the path. Point `verify` at the
     CA bundle instead — that is what it is for, and it keeps verification on.
 
-These are ignored when a `transport` is supplied in code, since a caller bringing its own
-transport has taken over connection handling; that is what the offline test modes do.
+These are ignored when a `transport` is supplied in code (in C#, an `HttpMessageHandler`
+passed as `transport`), since a caller bringing its own transport has taken over connection
+handling; that is what the offline test modes do.
 
 #### What They Cover, and What They Do Not
 
@@ -115,8 +154,8 @@ generation, embedding, and reranking calls, plus — for Vertex — the Google O
 exchange that authenticates them, since one instance having two different trust decisions
 is not something a user could infer.
 
-Four things stay outside that boundary and follow the process environment
-(`HTTPS_PROXY`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`) instead:
+In the Python SDK, four things stay outside that boundary and follow the process
+environment (`HTTPS_PROXY`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`) instead:
 
 - **Auth token endpoints other than Google's.** Microsoft Entra token acquisition rides
   the `azure-identity` SDK's own HTTP stack, which AnyInfer does not configure.
@@ -259,6 +298,9 @@ endpoint id keeps `base_url` essential, because no default could be right.
 
 ## Client Settings
 
+The Python `Client` and `AsyncClient` take these settings; the C# constructors are on
+[`AsyncClient`](/csharp/api/anyinfer.asyncclient/) and [`Client`](/csharp/api/anyinfer.client/).
+
 ```python
 ai.Client(
     providers,
@@ -286,6 +328,10 @@ telemetry omits.
 
 ## Per-Request Options
 
+The Python per-call options. The C# `GenerateAsync` overloads take the same options as
+camelCase arguments, without `arena` and `context`, and an omitted `timeoutS` uses the
+provider instance's `timeout_s`.
+
 ```python
 client.generate(
     messages,
@@ -310,6 +356,9 @@ temperature; an unset value is omitted from the wire request entirely.
 
 ## Environment Variables
 
+These variables are read by the Python SDK, CLI, and sidecar. The C# SDK reads only the
+variables an `env://` reference names.
+
 | Variable | Effect |
 |---|---|
 | `ANYINFER_MODEL_DIR` | Override where downloaded models are stored (also `Client(model_dir=...)`). |
@@ -328,7 +377,8 @@ magic credential variable names.
 (running loopback engines and credential variables that are actually set), plus a runnable
 starter program beside it. See [the CLI guide](../guides/cli.md#getting-a-config-file-in-the-first-place).
 
-In Python, the same format is written by `anyinfer.dumps_config` and `anyinfer.dump_config`:
+In Python, the same format is written by `anyinfer.dumps_config` and `anyinfer.dump_config`
+(C# `AnyInferConfig.Dumps` and `Dump`):
 
 ```python
 import anyinfer as ai
@@ -359,7 +409,9 @@ literal secrets before writing or committing them; `anyinfer init` itself writes
 ## File Format
 
 Each provider entry needs an `id`. The other top-level provider settings are `adapter`,
-`base_url`, `api_key`, `api_version`, `headers`, `timeout_s`, and `options`. Setup fields
+`base_url`, `api_key`, `api_version`, `headers`, `timeout_s`, `options`, `enabled`,
+[`limits`](#provider-limits), and [`proxy`, `verify`, and
+`client_cert`](#proxies-private-cas-and-mtls). Setup fields
 declared by that provider may also be written directly, or grouped under a `values`
 object (the shape setup UIs write); unrecognized fields fail validation. Two more keys
 exist for compatibility: `provider_id` is the legacy spelling of `adapter`, and `alias`,
@@ -686,6 +738,8 @@ otherwise, since an unauthenticated gateway would let anyone on the network spen
 configured provider credentials.
 
 ## Cache and Data Locations
+
+The Python SDK's local subsystem stores its data here; the C# SDK stores nothing.
 
 | Purpose | Windows | macOS | Linux |
 |---|---|---|---|

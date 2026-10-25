@@ -72,7 +72,7 @@ application safe; when refusing, only an underestimate justifies the refusal.
 
 ## Counting Exactly
 
-`pip install anyinfer[tokenizers]` ships an exact counter for the OpenAI-family
+In Python, `pip install anyinfer[tokenizers]` ships an exact counter for the OpenAI-family
 encodings:
 
 ```python
@@ -216,6 +216,23 @@ route = ai.Route(
 
 The gate is on by default and can be disabled per client with
 `Client(..., context_gate=False)`.
+
+## In the C# SDK {#in-the-c-sdk}
+
+`AsyncClient.Budget` / `Client.Budget` return a
+[`ContextBudget`](/csharp/api/anyinfer.capabilities.contextbudget/) computed from the same
+reserve and headroom rules (the constants are on
+[`ContextBudgeting`](/csharp/api/anyinfer.capabilities.contextbudgeting/)), and the client's
+`contextGate` argument, `true` by default, controls the same pre-dispatch gate. The default
+estimator is [`HeuristicTokenEstimator`](/csharp/api/anyinfer.capabilities.heuristictokenestimator/),
+with the same planning count and floor, and
+[`ITokenEstimator`](/csharp/api/anyinfer.capabilities.itokenestimator/) is the extension
+point; the exact and service-backed estimators above are Python-only.
+
+`InputAllowanceTokens`, `RemainingTokens`, and `Fits` are computed from whatever window the
+budget carries, including a `default`-provenance one; only the pre-dispatch gate insists on
+trusted provenance. Check `ContextWindow.Provenance` before treating those figures as a
+bound.
 
 !!! tip "Key Takeaways"
     - `budget()` never touches the network: it is a preflight calculation against the same

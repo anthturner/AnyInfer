@@ -1,11 +1,15 @@
 # Concepts
 
 These concepts explain the shared foundation and runtime behavior. They build on
-each other roughly in this order, but each page stands alone.
+each other roughly in this order, but each page stands alone. Behavior is shared by both
+SDKs unless a page says otherwise, and each page names its C# types where the native SDK
+implements it; sessions, context reduction, the local subsystem, and arena runs are
+Python SDK features.
 
 ## Shared Foundation
 
-- [Shared foundation and SDK map](foundation.md) | How normative contracts, shared assets, and independent SDK implementations relate.
+- [Shared foundation and SDK map](foundation.md): how normative contracts, shared assets,
+  and independent SDK implementations relate, and which concepts the C# SDK implements.
 
 ## The Request Path
 
@@ -51,9 +55,9 @@ each other roughly in this order, but each page stands alone.
 
 Retry, fallback, health gating, schema validation, repair, TTFT measurement, usage
 normalization, cost computation, telemetry, and redaction all live in the core,
-implemented once, behaving identically no matter which provider served the request. A
-provider adapter does exactly four things: list models, report health, translate a
-request into its wire format and its responses back into events, and close.
+implemented once in each SDK, behaving identically no matter which provider served the
+request. A provider adapter does exactly four things: list models, report health,
+translate a request into its wire format and its responses back into events, and close.
 
-When a developer changes `target=` from a hosted model to a local one, the behavior the
+When a developer changes the target from a hosted model to a local one, the behavior the
 application depends on does not change with it.

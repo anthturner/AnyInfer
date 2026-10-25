@@ -101,7 +101,9 @@ has to apply even to errors raised by code that never saw the client that resolv
 Values shorter than six characters are not registered: redacting them would corrupt
 unrelated text far more often than it would protect anything.
 
-An application can register additional secrets it resolves itself:
+A secret that reaches AnyInfer some other way, such as a token written into a custom
+header or an option the provider does not declare as `secret`, is not registered. An
+application registers additional secrets like that, or ones it resolves itself:
 
 ```python
 ai.register_secret(my_token)
@@ -208,6 +210,23 @@ failure than a client that stops working because a vault went briefly unreachabl
 When the [sidecar](../serve/README.md) is running, it authenticates *clients to itself*
 with its own bearer token. The provider credentials it uses stay on the server. A client
 pointed at the frontend never sees, sends, or needs them.
+
+## In the C# SDK {#in-the-c-sdk}
+
+[`ResolverChain.CreateDefault()`](/csharp/api/anyinfer.credentials.resolverchain/) holds the
+keyring, environment, and literal resolvers, in that order, and `Add` places an
+[`ICredentialResolver`](/csharp/api/anyinfer.credentials.icredentialresolver/) ahead of them
+unless you pass `first: false`. The chain registers every credential it resolves with
+[`Redaction`](/csharp/api/anyinfer.redaction/), which applies the same six-character
+minimum; `Redaction.RegisterSecret` is the C# `register_secret`. SDK-created connections
+also register a configured proxy user name and password and a client-certificate password.
+`env://` references and literal values behave as described above, and failures raise
+[`CredentialException`](/csharp/api/anyinfer.credentialexception/).
+
+A `credential://` reference is accepted when configuration loads, but resolving it always
+fails with `CredentialException`: the C# SDK has no OS keyring integration. Use `env://`
+or a custom resolver instead. Entry-point credential stores, rotation
+(`credential_ttl_s` and the `CredentialRotated` event), and the sidecar are Python-only.
 
 !!! tip "Key Takeaways"
     - Credentials are referenced (`env://`, `credential://`), never embedded, so config

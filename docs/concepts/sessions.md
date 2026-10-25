@@ -4,7 +4,7 @@ Every request is independent by default, which keeps results reproducible and fa
 safe. A conversation is the case where that default wastes work: the provider often
 already has everything the next turn needs. A **session** is how a caller says *these
 requests belong together*, without having to know what any particular provider does
-about it.
+about it. Sessions are a Python SDK feature; the C# SDK does not provide them.
 
 ```python
 with client.session("copilot:auto") as chat:

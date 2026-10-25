@@ -60,7 +60,18 @@ evidence.
 dropped or estimated, and it still took thirty seconds because the model had spilled out of
 VRAM since yesterday. See [runtime diagnostics](capabilities.md#runtime-diagnostics).
 
+**Pacing and caching:** `RateLimitWaited` (a request held back by client-side pacing) ·
+`RateLimitObserved` (the allowance a provider reported) · `CachePlanned` (how a prompt
+cache was engaged)
+
 **Context reduction:** `ContextReduced` (counts and ceilings only, never content).
+
+**Arena runs:** `ArenaCompleted` (target count, strategy, and agreement, never answer
+content).
+
+**Credentials:** `CredentialRotated` (a rotated credential rebuilt an adapter).
+
+**Deferred batches:** `BatchSubmitted` · `BatchCompleted`
 
 **Local subsystem:** `ServerLifecycle` · `DownloadProgress`
 
@@ -90,13 +101,35 @@ from anyinfer import otel
 otel.install(client)  # spans and metrics, payload-free
 ```
 
-Requires the `[otel]` extra; nothing OTel-related is imported otherwise. What the bridge
+The bridge is part of the Python SDK and requires the `[otel]` extra; nothing
+OTel-related is imported otherwise. What the bridge
 emits (one span per request, attempts as span events, GenAI semantic-convention metrics)
 is covered in [the observability guide](../guides/observability.md#opentelemetry).
 
 The bridge is one consumer of the event contract. Applications that want structured data
 in-process (a JSONL trail, a SQLite evidence table) consume the events directly rather
 than round-tripping through spans.
+
+## In the C# SDK {#in-the-c-sdk}
+
+The C# SDK has the same typed events, deriving from
+[`TelemetryEvent`](/csharp/api/anyinfer.events.telemetryevent/), delivered to an
+[`IObserver`](/csharp/api/anyinfer.events.iobserver/) through the client's `observers`
+argument or `Subscribe(observer, payloads)`. Observers run synchronously on the emitting
+thread, may be called concurrently by concurrent requests, and are isolated: an exception
+is suppressed, and the first one per subscription is traced as a warning. Payload fields
+are `null` unless the subscription opts in.
+
+Seven of the event types are never emitted by the C# SDK, because it has no feature that
+would produce them: `ArenaCompleted`, `ContextReduced`, `CredentialRotated`,
+`BatchSubmitted`, `BatchCompleted`, `ServerLifecycle`, and `DownloadProgress`. The
+`ProviderDiagnostic` it emits for an unstable prompt-cache prefix carries no request ID.
+
+[`JsonlObserver`](/csharp/api/anyinfer.events.jsonlobserver/) appends redacted events to a
+file you own. [`LoggingObserver`](/csharp/api/anyinfer.events.loggingobserver/) writes to a
+.NET `TraceSource`; constructed without one, it creates an `AnyInfer.Telemetry` source
+whose switch is off, so it records nothing until that source is configured or you pass
+your own. There is no OpenTelemetry bridge.
 
 !!! tip "Key Takeaways"
     - Telemetry is typed in-process events to registered observers; OpenTelemetry is an

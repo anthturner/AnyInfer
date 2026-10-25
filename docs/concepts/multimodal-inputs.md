@@ -69,23 +69,30 @@ inventing a token count.
 
 ## Frontends
 
-### C# SDK proof
+### C# SDK {#c-sdk-proof}
 
-The C# proof exposes the same typed part names with PascalCase properties. Byte inputs are
-copied and read-only, with defaults of 20 MiB per inline part and 50 MiB total. The core never
-fetches URL references. Its built-in OpenAI-compatible adapter supports images, inline
-documents, and inline audio; it rejects video and document URLs before HTTP. See the
+The C# SDK exposes the same typed parts, deriving from
+[`ContentPart`](/csharp/api/anyinfer.contentpart/) with PascalCase properties:
+[`ImagePart`](/csharp/api/anyinfer.imagepart/), [`DocumentPart`](/csharp/api/anyinfer.documentpart/),
+[`AudioPart`](/csharp/api/anyinfer.audiopart/), and [`VideoPart`](/csharp/api/anyinfer.videopart/).
+Byte inputs are copied and read-only. The same 20 MiB and 50 MiB defaults are the
+`maxInputPartBytes` and `maxInputBytes` arguments, and a request over either one throws
+`ArgumentOutOfRangeException` when it is built, before any provider call. The core never
+fetches URL references. The built-in OpenAI-compatible adapter projects images, inline
+documents, and inline audio; it refuses video and document URLs with
+[`UnsupportedInputException`](/csharp/api/anyinfer.unsupportedinputexception/) before any
+HTTP request. See the
 [source-linked C# example](../guides/csharp-sdk.md#rich-generation-inputs-and-outputs) for
 the executed inline request.
 
-The [CLI](../guides/cli.md) reads attachments in the frontend and passes bytes to the
-same typed request:
+The Python [CLI](../guides/cli.md) reads attachments in the frontend and passes bytes to
+the same typed request:
 
 ```console
 anyinfer run "What is important here?" --image diagram.png --document report.pdf
 ```
 
-The [sidecar](../serve/README.md) preserves OpenAI message content arrays containing
+The Python [sidecar](../serve/README.md) preserves OpenAI message content arrays containing
 `image_url`, `input_audio`, and `file` parts, subject to the same request caps. Video has
 no chat-completions content type, so it travels as an
 [`anyinfer_video` content item](../serve/README.md#sending-video). No attachment content
@@ -93,13 +100,13 @@ appears in [telemetry](telemetry.md), manifests, or error messages.
 
 ## Which Providers Accept What
 
-Support varies by part type, provider, and model. The
-[conformance matrix](../reference/conformance-matrix.md) records per-provider multimodal
-support from actual test runs, and each provider page states its own quirks: for
-example, [Ollama](../providers/ollama.md) takes inline images only, and the supervised
+Support varies by part type, provider, and model. Each Python provider page states what
+its adapter projects and what it refuses, in its multimodal section: for example,
+[Ollama](../providers/ollama.md) takes inline images only, and the supervised
 [llama.cpp](../providers/llama-cpp.md) path needs a catalog artifact with a pinned
-projector companion. Provider contract snapshots record the wire spellings and their
-verification sources.
+projector companion. Those statements are backed by the adapters' multimodal tests; the
+[conformance matrix](../reference/conformance-matrix.md) has no multimodal cases. Provider
+contract snapshots record the wire spellings and their verification sources.
 
 !!! tip "Key Takeaways"
     - Parts are typed (`ImagePart`, `DocumentPart`, `AudioPart`, `VideoPart`) and
@@ -108,15 +115,14 @@ verification sources.
       one defers to the adapter's explicit accept-or-raise.
     - Unpriceable parts make the budget honest: `fits` and `estimated_cost` go `None`
       instead of guessing.
-    - Per-provider support lives in the conformance matrix, not in a hand-maintained
-      list here.
+    - Per-provider support lives on each provider page, not in a hand-maintained list
+      here.
 
 ## See Also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Conformance matrix](../reference/conformance-matrix.md): per-provider multimodal
-  support, from test runs.
+- [Providers](../providers/README.md): each provider page's multimodal section.
 - [Capabilities and provenance](capabilities.md): the flags that gate dispatch.
 - [Token estimation and context budgets](budgeting.md): how unpriceable parts are
   reported.

@@ -65,7 +65,7 @@ what to do instead. It never silently substitutes a different model:
 ```python
 client.generate(prompt, target="gpt-5")
 # ConfigError: unknown target 'gpt-5'
-#   (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-4-5'),
+#   (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-5'),
 #          or one of these aliases: large, medium, small)
 ```
 
@@ -122,7 +122,20 @@ curl localhost:8080/v1/chat/completions \
   -d '{"model": "ollama:qwen3:8b", "messages": [{"role": "user", "content": "hi"}]}'
 ```
 
-This is enforced by a round-trip test, not just intended.
+This is enforced by a round-trip test, not just intended. The sidecar is part of the
+Python SDK.
+
+## In the C# SDK {#in-the-c-sdk}
+
+Targets resolve the same way in C#: the first-colon split, provider-name normalization,
+and first-configured-provider alias order. [`AsyncClient.Resolve`](/csharp/api/anyinfer.asyncclient/)
+and `Client.Resolve` return a [`ResolvedTarget`](/csharp/api/anyinfer.resolvedtarget/)
+(`ProviderId`, `Model`, `ViaAlias`) without a request, and an unknown target raises
+[`ConfigException`](/csharp/api/anyinfer.configexception/). The bundled catalog is
+[`Catalog.LoadDefault()`](/csharp/api/anyinfer.catalog.catalog/); `Catalog.FromMapping` and
+`Catalog.Overlay` build an application overlay that replaces same-named aliases wholesale,
+and the result is passed as the client's `catalog` argument. C# has no `verify()`;
+`ProbeAsync` / `Probe` is its way to [prove a target works](capabilities.md#proving-a-target-works).
 
 !!! tip "Key Takeaways"
     - A target is either `provider:model` or a catalog alias; both resolve through the

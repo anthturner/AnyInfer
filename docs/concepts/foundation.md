@@ -41,17 +41,18 @@ frozen contracts and declarative data while keeping native execution and APIs in
 
 C# does not provide context reduction, history reduction, local runtime lifecycle, sessions,
 arena runs, evaluation, benchmarks, batch jobs, MCP, OpenTelemetry, keyring integration, or
-the Python SDK's full provider breadth. Ordinary message history is part of requests; history
-reduction is the absent feature. Retrieval input batching is implemented and is distinct from
-batch inference jobs. Native schema and TLS limits are documented in the [C# reference]
-(../reference/csharp-sdk.md).
+the Python SDK's full provider breadth. A `credential://` reference is accepted when
+configuration loads but always fails to resolve. Ordinary message history is part of requests;
+history reduction is the absent feature. Retrieval input batching is implemented and is
+distinct from batch inference jobs. Native schema and TLS limits are documented in the
+[C# reference](../reference/csharp-sdk.md).
 Offline hosted-provider fixtures show adapter behavior against scripted responses, not live
-provider verification. See the [provider guide](../providers/retrieval.md) and [TEI guide]
-(../providers/tei.md) for the current retrieval evidence.
+provider verification. See the [provider guide](../providers/retrieval.md) and
+[TEI guide](../providers/tei.md) for the current retrieval evidence.
 
 ## Read next
 
 - [Python SDK guide](../guides/python-sdk.md) and [Python API reference](../reference/api/README.md)
 - [C# SDK guide](../guides/csharp-sdk.md), [migration guide](../guides/python-to-csharp.md),
-  and [C# reference](../reference/csharp-sdk.md)
+  [C# reference](../reference/csharp-sdk.md), and the generated [C# API reference](/csharp/api/)
 - [Architecture](../contributing/architecture.md) and [C# development workflow](../contributing/csharp-proof.md)

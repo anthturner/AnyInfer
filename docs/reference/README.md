@@ -3,22 +3,27 @@
 Look things up.
 
 The Python reference documents the supported published SDK. The native .NET 8 SDK is in
-development as a prerelease local package (`0.1.0-proof`) with a hand-written reference. It
-is not published to NuGet and does not claim full parity. See the [foundation capability
-map](../concepts/foundation.md).
+development as a prerelease local package (`0.1.0-proof`) with a generated API reference and
+an authored reference for the behavior its signatures do not show. It is not published to
+NuGet and does not claim full parity. See the
+[foundation capability map](../concepts/foundation.md).
 
 - **[Python API reference](api/README.md)**: the generated API reference for the supported
   published Python SDK: every public class,
   function, and event, from the docstrings.
-- **[C# API reference](csharp-sdk.md)**: the bounded prerelease .NET surface, including
-  pure catalog metadata, explicit lifecycle calls and capability probes, declarative setup
-  metadata, and modern JSON Schema validation, with executable source examples.
-- **[Python error catalog](errors.md)**: every Python exception, when it is raised, whether it retries,
-  and the `hint` the user will see.
-- **[Python conformance matrix](conformance-matrix.md)**: what each Python provider actually supports,
-  from test results rather than assertion.
-- **[Shared configuration](configuration.md)**: provider settings, environment variables,
-  and the common JSON file.
+- **[C# API reference](/csharp/api/)**: the generated reference for the prerelease .NET
+  SDK: every public type, constructor, overload, property, and operator, from the source
+  documentation comments.
+- **[C# SDK reference](csharp-sdk.md)**: native behavior, limits, and differences from
+  Python that the C# signatures do not show, with a map into the generated reference.
+- **[Python error catalog](errors.md)**: every Python exception, when it is raised, whether
+  it retries, and the `hint` the user will see. C# exceptions are in the generated C# API
+  reference.
+- **[Python conformance matrix](conformance-matrix.md)**: what each Python provider actually
+  supports, from test results rather than assertion.
+- **[Shared configuration](configuration.md)**: the common JSON file, which top-level
+  blocks and provider settings each SDK accepts, provider settings, and the Python
+  environment variables.
 - **[Run manifests](../concepts/run-manifests.md)**: the manifest format, serialization
   compatibility, and its executable JSON Schema.
 - **[Glossary](glossary.md)**: the vocabulary this project uses precisely.
@@ -47,7 +52,8 @@ before upgrading. What earns an entry is in
 ## Module Map
 
 This module map is for the Python SDK. The native C# prerelease has its own
-[C# API reference](csharp-sdk.md) and does not claim this module layout or Python API stability.
+[generated API reference](/csharp/api/), organized by namespace, and does not claim this
+module layout or Python API stability.
 
 | Module | Responsibility |
 |---|---|
@@ -63,6 +69,8 @@ This module map is for the Python SDK. The native C# prerelease has its own
 | [`anyinfer.credentials`](api/registry.md) | Credential resolvers. |
 | [`anyinfer.catalog`](api/registry.md) | Alias catalog and target resolution. |
 | [`anyinfer.capabilities`](api/capabilities.md) | Capability assembly, cost computation, token estimation, context budgets, and the pre-dispatch gate. |
+| [`anyinfer.context`](api/context.md) | Context reduction and history compaction. |
+| [`anyinfer.evaluate`](api/compare-diff.md) | The portability diff over `compare()` snapshots. |
 | [`anyinfer.local`](api/local.md) | Hardware, backends, tuning, downloads, supervision. |
 | [`anyinfer.providers`](api/registry.md) | One module per adapter. |
 | [`anyinfer.testing`](api/testing.md) | Fakes, cassettes, and the conformance suite. |

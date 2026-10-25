@@ -39,7 +39,7 @@ stronger one, and unknown stays `None` rather than becoming a guess:
 ```python
 caps = ModelCapabilities(context_window=Sourced(8192, "catalog"))
 caps = caps.overlay(ModelCapabilities(context_window=Sourced(32768, "discovered")))
-caps.context_window  # Sourced(32768, 'discovered'); discovery wins
+caps.context_window  # Sourced(value=32768, provenance='discovered'); discovery wins
 ```
 
 Some providers report rich model listings. OpenRouter includes per-model pricing,
@@ -58,8 +58,8 @@ weaker layers rather than failing.
 - **Pre-dispatch gating.** A request that provably cannot fit a known context window
   fails fast instead of paying a round trip. Only trusted-provenance windows gate; see
   [context budgets](budgeting.md).
-- **Probe sizing.** A target known to reason gets a larger budget for the `verify()`
-  probe, since a thinking model spends the ordinary one before it says anything.
+- **Probe sizing.** A target known to reason gets a larger budget for the Python
+  `verify()` probe, since a thinking model spends the ordinary one before it says anything.
 
 `default_temperature` and `default_top_p` record what "provider default" concretely means
 for a model, populated only from the provider's own documentation via its contract
@@ -213,6 +213,21 @@ for model in client.models("openrouter"):
     if caps and caps.context_window:
         print(model.id, caps.context_window.value, f"({caps.context_window.provenance})")
 ```
+
+## In the C# SDK {#in-the-c-sdk}
+
+[`ModelCapabilities`](/csharp/api/anyinfer.capabilities.modelcapabilities/) holds
+[`Sourced<T>`](/csharp/api/anyinfer.capabilities.sourced-1/) facts tagged with the same five
+[`Provenance`](/csharp/api/anyinfer.capabilities.provenance/) values, and its `Overlay` and
+`Conjunction` follow the rules above. `AsyncClient.Capabilities(target)` returns the
+assembled record for a target without a request. The client's `capabilityOverrides`
+argument is keyed by provider instance ID and then by exact model name, rather than by a
+`"provider:model"` string. `ProbeAsync` / `Probe` probes the same four features by default,
+returns a [`ProbeReport`](/csharp/api/anyinfer.capabilities.probereport/), and records
+findings at `probed` provenance unless `record` is `false`; each probe goes straight to the
+target's adapter, without routing, retries, repair, or spend-policy admission. C# has no
+`verify()` and no runtime-diagnostics call; the providers that report diagnostics above
+are Python providers.
 
 !!! tip "Key Takeaways"
     - Every capability value carries provenance (`default`, `catalog`, `discovered`,

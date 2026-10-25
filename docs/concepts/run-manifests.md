@@ -1,15 +1,15 @@
 # Run Manifests
 
-A run manifest is the portable explanation of one generation. It records the route that
-won, attempts and fallback, structured-output and cache mechanisms, context reductions,
-capability provenance, usage, cost, and timing. It is derived from the same typed events
-and final result the client already produces; it is not another measurement or log
-stream.
+A run manifest is the portable explanation of one generation, embedding, or rerank call.
+It records the route that won, attempts and fallback, structured-output and cache
+mechanisms, context reductions, capability provenance, usage, cost, and timing. It is
+derived from the same typed events and final result the client already produces; it is
+not another measurement or log stream.
 
-Every buffered `Generation` carries `generation.manifest` by default. A stream exposes
-its current manifest through `stream.manifest`, including after cancellation. Set
-`manifests=False` on the client to avoid allocating manifests, or pass `manifest=False`
-on one call.
+Every buffered `Generation` carries `generation.manifest` by default, and so do embedding
+and rerank results. A stream exposes its current manifest through `stream.manifest`,
+including after cancellation. Set `manifests=False` on the client to avoid allocating
+manifests, or pass `manifest=False` on one call.
 
 ```python
 result = client.generate("Summarize this", target="medium")
@@ -52,6 +52,19 @@ Cost values are decimal strings or `null`, and capability facts retain their
 This is a pre-1.0 contract. The top-level `format` is currently `"1"`, and readers must
 ignore unknown keys: adding a field does not change the format, while changing an
 existing field's meaning does.
+
+## In the C# SDK {#in-the-c-sdk}
+
+`Generation.Manifest`, `EmbeddingResult.Manifest`, `RerankResult.Manifest`, and the stream
+`Manifest` properties carry a [`RunManifest`](/csharp/api/anyinfer.manifest.runmanifest/),
+controlled by the client's `manifests` (on by default) and `manifestPayloads` (off by
+default) arguments and each call's `manifest` argument. `ToJson` and `FromJson` serialize
+it, and [`ManifestUtilities`](/csharp/api/anyinfer.manifest.manifestutilities/) provides
+`JsonSchema()`, `SchemaDigest`, and `Render`; the format is the same `"1"`. A C# manifest
+records less than a Python one in three places: its context facet is always empty,
+because the C# SDK has no context reducer; `request.estimated_tokens` is always `null`; and
+embedding and rerank manifests number every attempt `1`, even after a retry. The
+golden-file testing helper is Python-only.
 
 !!! tip "Key Takeaways"
     - A manifest explains one generation's decisions (route, mechanisms, reductions,

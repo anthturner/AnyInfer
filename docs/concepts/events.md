@@ -27,6 +27,8 @@ flowchart LR
 | `TextDelta(text)` | A fragment of the visible answer. |
 | `ReasoningDelta(text)` | A fragment of thinking, excluded from the answer. |
 | `ToolCallDelta(index, call_id, name, arguments_fragment)` | Part of a tool call; correlate by `index`. |
+| `CitationDelta(citation)` | One attribution the model reported, as soon as it arrived. |
+| `ServerToolDelta(kind, status, sources, output, detail)` | A provider-run tool (such as web search) started, completed, or failed. |
 | `UsageUpdate(usage)` | A usage report. May arrive mid-stream, and more than once. |
 | `TimingMark(name, at_ms)` | `"attempt_start"` or `"first_token"`, measured by the core. |
 | `AttemptFailed(record)` | A target attempt failed; a retry or fallback may follow. |
@@ -47,7 +49,10 @@ These are a binding contract, verified by
    `StreamEnded.result.text`.
 
 Guarantee 4 is what allows a consumer to render deltas as they arrive and still trust the
-final result.
+final result. The content deltas are `TextDelta`, `ReasoningDelta`, and `ToolCallDelta`. A
+`CitationDelta` or `ServerToolDelta` is not one and does not start the first-token clock,
+because a citation or a provider-run search is not a token the model produced; one can
+therefore arrive before `TimingMark("first_token")`.
 
 Guarantees 2 and 4 are scoped **per attempt**: when a schema violation triggers the
 opt-in [repair loop](structured-output.md#repair), the repair re-runs the target inside
@@ -99,11 +104,12 @@ Usage often arrives *after* the finish reason, in a trailing chunk. Two conseque
 
 `FinishReason` is `"stop" | "length" | "tool_calls" | "content_filter" | "other"`. A value a
 provider invents tomorrow normalizes to `"other"` rather than crashing the reassembler.
+The C# SDK differs here; see [below](#in-the-c-sdk).
 
 ## Timing Is Measured by the Core
 
-`first_token_ms`, `total_ms`, and `output_tokens_per_s` are measured centrally against
-`time.monotonic()`, so they mean the same thing across every provider and are comparable.
+`first_token_ms`, `total_ms`, and `output_tokens_per_s` are measured centrally against a
+monotonic clock, so they mean the same thing across every provider and are comparable.
 Throughput is measured over the *decode* window (first token → completion), because
 including queue and prefill time would understate a model's generation rate.
 
@@ -123,6 +129,27 @@ with client.stream(prompt, target=target) as stream:
         if enough(event):
             break  # the provider request is cancelled here
 ```
+
+## In the C# SDK {#in-the-c-sdk}
+
+The C# SDK has the same event records, deriving from
+[`StreamEvent`](/csharp/api/anyinfer.streamevent/) with PascalCase properties, and the same
+ordering guarantees. [`AsyncClient.StreamAsync`](/csharp/api/anyinfer.asyncclient/) returns an
+[`AsyncStream`](/csharp/api/anyinfer.asyncstream/) that starts the generation on first
+enumeration; disposing it (`await using`) cancels a generation still running. The
+synchronous `Client.Stream` returns a [`SyncStream`](/csharp/api/anyinfer.syncstream/) that
+starts the generation as soon as it is created and buffers up to 256 events ahead of the
+consumer; dispose it to cancel. `Collect`/`CollectAsync` drain a stream and return the
+`Generation`. The built-in C# OpenAI-compatible adapter, which also serves the Cerebras,
+Hyperbolic, and Nscale presets, never emits `ReasoningDelta`, `CitationDelta`, or
+`ServerToolDelta`; those come only from an application-owned adapter, such as one
+registered through `AsyncClient.FromAdapters` or a custom provider descriptor.
+
+`Generation.FinishReason` is a string, not a normalized enum: the built-in OpenAI-compatible
+adapter reports the provider's own value (`stop` when the provider sent none), and the core
+reports `tool_calls` when the model stopped to call tools. An unrecognized value is not
+rewritten to `other`, so compare against the values you handle. Ollama's synthesized usage
+event above is Python-only, because the C# SDK has no Ollama adapter.
 
 !!! tip "Key Takeaways"
     - A generation is one ordered stream of typed events; `generate()` is just the drained

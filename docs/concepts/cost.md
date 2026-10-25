@@ -130,19 +130,44 @@ does not satisfy it.
 The library writes nothing on its own. For durability, own the file:
 
 ```python
-store = ai.SpendStore("~/.myapp/spend.json")
+from pathlib import Path
+
+store = ai.SpendStore(Path.home() / ".myapp" / "spend.json")
 store.accumulate(ledger)  # atomic; folds today's ledger into the stored total
 store.load()["total"].cost
 ```
 
-Reads are total: a missing, truncated, or foreign file yields nothing rather than
-raising.
+The path is used as given; `~` is not expanded. Reads are total: a missing, truncated, or
+foreign file yields nothing rather than raising.
+
+`accumulate()` adds the ledger's current totals to the named bucket (`"total"` unless you
+pass `bucket=`) and does not reset the ledger, so folding the same ledger in twice counts
+its spend twice; fold each ledger once, or start a fresh one afterwards. A file keeps at
+most 512 buckets and drops the earliest when a new one would exceed that. The replacement
+is atomic, but writers are not coordinated: two processes accumulating into the same file
+at once can lose an update, so give each process its own file or bucket.
 
 ## Scope
 
 This is accounting for one client in one process. It cannot see other processes or other
 consumers of the same API key. Organization-wide quotas and fleet-level spend controls
 belong to a deployment around AnyInfer, not inside it.
+
+## In the C# SDK {#in-the-c-sdk}
+
+The C# SDK embeds the same pricing table
+([`PricingTable.LoadDefault`](/csharp/api/anyinfer.capabilities.pricingtable/), or the
+client's `pricingTable` argument) and computes cost with the same trust rule; money is a
+PeterO `EDecimal`, and an unknown cost is `null`. The client's `ledger` argument takes a
+[`SpendLedger`](/csharp/api/anyinfer.capabilities.spendledger/) with `ByTarget` and
+`ByLabel`, `Spend()` returns its [`SpendTotals`](/csharp/api/anyinfer.capabilities.spendtotals/),
+and `spendPolicy` takes a [`SpendPolicy`](/csharp/api/anyinfer.spendpolicy/) whose
+refusal raises [`SpendLimitException`](/csharp/api/anyinfer.spendlimitexception/) with
+`LimitUsd`, `SpentUsd`, and `EstimatedUsd`.
+[`SpendStore`](/csharp/api/anyinfer.capabilities.spendstore/) has the same file format and the
+same accumulation, bucket, and concurrency rules as above. `fetch_pricing()`, and the
+OpenRouter, Ollama, llama.cpp, Azure AI Foundry, and Copilot providers named above, are
+Python-only.
 
 !!! tip "Key Takeaways"
     - Cost is tri-state: a number from trusted pricing, a genuine `Decimal(0)` for local

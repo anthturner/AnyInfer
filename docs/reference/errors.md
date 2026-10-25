@@ -1,6 +1,16 @@
 # Error Catalog
 
-Every exception AnyInfer raises, when it is raised, and what the user will see.
+Every exception the Python SDK raises, when it is raised, and what the user will see.
+
+The C# SDK has its own exception types, documented in the generated C# API reference:
+[`AnyInferException`](/csharp/api/anyinfer.anyinferexception/) and the types derived from it,
+such as [`ProviderException`](/csharp/api/anyinfer.providerexception/) and
+[`AllTargetsFailedException`](/csharp/api/anyinfer.alltargetsfailedexception/). They use
+`…Exception` names for the classes below, without `LocalRuntimeError` or
+`ConfidentialExecutionError`, and add `SchemaReferenceException` and
+`SchemaEvaluationException` for schema resources and native schema evaluation. The
+[differences](#native-c-differences) that change how a C# caller handles an error are at the
+end of this page.
 
 ## The Shape of Every Error
 
@@ -61,7 +71,7 @@ a provider whose optional extra is not installed.
 
 ```
 ConfigError: unknown target 'gpt-5'
-  (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-4-5'), or one of these
+  (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-5'), or one of these
    aliases: large, medium, small)
 
 ConfigError: the copilot provider requires the github-copilot-sdk extra
@@ -367,3 +377,25 @@ Four behaviors are reported as bugs often enough to state as intended:
 What the router retries, in what order, and when it falls back to the next target is
 covered in [routing and rate limits](../concepts/routing.md). Application-side handling
 patterns are in [the integration instructions](../agents/INTEGRATION.md).
+
+## Native C# Differences {#native-c-differences}
+
+The C# exceptions carry the same structured fields as properties (`Detail`, `Hint`,
+`Provider`, `Phase`, `Retryable`, `RetryAfterS`, `HttpStatus`) plus a stable `Category`
+such as `rate_limit` or `timeout`. Three behaviors differ from the catalog above:
+
+- **Branch on `Category`, not only on the type.** Built-in adapters throw the derived type
+  for a classified failure, but a `ProviderException` created through its public
+  constructor stays a plain `ProviderException` whatever its category, and a category
+  with no derived type, such as `invalid_request`, is always plain. Catching
+  `RateLimitException` alone misses a `ProviderException` whose `Category` is
+  `rate_limit`.
+- **Retrieval deadlines are not `TransportException`.** An embedding or rerank call that
+  exceeds its `timeoutS` deadline fails as a plain, retryable `ProviderException` whose
+  `Category` is `timeout`. A timeout inside a provider's own HTTP transport is still a
+  `TransportException`.
+- **Schema failures are split three ways.** `SchemaViolationException` carries the
+  validation `Issues` only, with no raw response text or partial members;
+  `SchemaReferenceException` reports a schema resource that could not be resolved; and
+  `SchemaEvaluationException` reports a native evaluation failure such as a
+  regular-expression timeout. All three are terminal and never trigger fallback.

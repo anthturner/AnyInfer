@@ -128,7 +128,7 @@ except ai.SchemaViolationError as error:
     print(error.raw_text)  # what the model actually said
 ```
 
-The error carries the validation errors, bounded raw output, and (when a truncated
+The error carries up to five validation errors, bounded raw output, and (when a truncated
 top-level JSON object contains delimiter-confirmed complete members) `error.partial` plus
 `error.missing_required`. Partial members are evidence, not a valid result: AnyInfer never
 guesses a cut-off scalar, asks another provider to continue it, or treats recovered fields
@@ -146,6 +146,25 @@ it tries the whole string, then scans for the first balanced `{...}` or `[...]`,
 string literals so a brace inside a string does not end the scan.
 
 Validation, once a value is extracted, is strict.
+
+## In the C# SDK {#in-the-c-sdk}
+
+Pass a [`SchemaSpec`](/csharp/api/anyinfer.schemaspec/) as the `schema` argument, with an
+optional [`Repair`](/csharp/api/anyinfer.repair/) budget; `Generation.Structured`,
+`StructuredMechanism`, and `RepairAttempts` report the same facts as the Python result. The
+mechanism ladder, validation against the original schema, and same-model repair work as
+described above, with these differences:
+
+- Validation is native: JSON Schema Draft 6, Draft 7, 2019-09, and 2020-12, with .NET
+  numeric and regular-expression semantics; the limits are in the
+  [C# reference](../reference/csharp-sdk.md).
+- [`SchemaViolationException`](/csharp/api/anyinfer.schemaviolationexception/) carries the
+  validation `Issues` (at most five) but no raw response text, recovered partial members,
+  or missing-required list.
+- The built-in OpenAI-compatible adapter has no `grammar` mechanism; the grammar engines
+  named above are Python providers. A `schemaMechanism` value on the request is carried but
+  not consulted: the mechanism always comes from the target's capabilities.
+- Passing a Pydantic model is Python-only.
 
 !!! tip "Key Takeaways"
     - A schema is a contract: the caller always gets a client-side-validated value,

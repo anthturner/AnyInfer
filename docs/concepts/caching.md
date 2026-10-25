@@ -75,8 +75,8 @@ never billed as an outcome), and when a provider does not report cache accountin
 figures stay `None` rather than becoming zero.
 
 Subscribers see a `CachePlanned` [telemetry event](telemetry.md) carrying the mechanism,
-the mark count, and the estimated cacheable size. Both events are content-free:
-positions and counts, never text.
+the mark count, and the estimated cacheable size. It and the `ParameterDropped` event for a
+dropped policy are content-free: positions and counts, never text.
 
 ## Making Caching Actually Work
 
@@ -93,8 +93,8 @@ this reason.
 
 ## Over the Sidecar
 
-A caller reaching the [sidecar](../serve/README.md) sets the same policy per request with
-the `anyinfer_cache` body extension, which decodes into exactly this `CachePolicy`:
+A caller reaching the Python [sidecar](../serve/README.md) sets the same policy per request
+with the `anyinfer_cache` body extension, which decodes into exactly this `CachePolicy`:
 
 ```json
 {
@@ -110,6 +110,19 @@ Absent, the gateway's own configuration applies — which is normally no caching
 This matters most for the decision in the other direction: a caller who must not have
 their prompt held on the provider's side can guarantee that per request, without needing
 their own deployment.
+
+## In the C# SDK {#in-the-c-sdk}
+
+[`CachePolicy`](/csharp/api/anyinfer.cachepolicy/) has the same fields and
+[`CacheMode`](/csharp/api/anyinfer.cachemode/) values. Set it per request with `cache`, on the
+client with `cachePolicy`, or with the `cache` configuration block; `Generation.CacheMechanism`
+reports the plan, and `Usage.CacheReadTokens` and `CacheWriteTokens` report what the provider
+said. No built-in C# provider declares a cache mechanism, so with the built-in providers an
+active policy engages nothing: each request reports it as a `ParameterDropped` event for
+`cache.mode`, and `CacheMechanism` stays `null`. A provider descriptor that declares a
+`cacheMechanism` is what engages planning. For an implicit-cache target, a changed cacheable
+prefix is reported as a `cache.prefix-unstable` `ProviderDiagnostic` event that carries no
+request ID. The providers named above are Python providers.
 
 !!! tip "Key Takeaways"
     - Caching is opt-in, and a policy on a target that supports neither mechanism is

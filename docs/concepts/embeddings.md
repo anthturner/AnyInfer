@@ -121,11 +121,32 @@ one global ordering.
 
 ## Frontends
 
-The [sidecar](../serve/README.md) exposes `POST /v1/embeddings` as an OpenAI-compatible
-codec and `POST /v1/anyinfer/rerank` as an AnyInfer-native route (there is no
-established OpenAI-shaped rerank dialect to emulate). The [CLI](../guides/cli.md)
+The Python [sidecar](../serve/README.md) exposes `POST /v1/embeddings` as an
+OpenAI-compatible codec and `POST /v1/anyinfer/rerank` as an AnyInfer-native route (there
+is no established OpenAI-shaped rerank dialect to emulate). The [CLI](../guides/cli.md)
 exposes `anyinfer embed` and `anyinfer rerank`. All three surfaces are projections over
 the same `AsyncClient` calls.
+
+## In the C# SDK {#in-the-c-sdk}
+
+`AsyncClient.EmbedAsync` / `Client.Embed` and `RerankAsync` / `Rerank` follow the same
+rules, with camelCase arguments: `expectedSpace`, `allowIncompatibleFallback`, `inputType`
+(an [`EmbeddingInputIntent`](/csharp/api/anyinfer.capabilities.embeddinginputintent/)), and
+`batch` (a [`BatchPolicy`](/csharp/api/anyinfer.batchpolicy/), whose default dispatches up to
+four batches concurrently). They return an [`EmbeddingResult`](/csharp/api/anyinfer.embeddingresult/)
+carrying its [`EmbeddingSpace`](/csharp/api/anyinfer.embeddingspace/), or a
+[`RerankResult`](/csharp/api/anyinfer.rerankresult/) of [`RankedItem`](/csharp/api/anyinfer.rankeditem/)
+values, and a refused fallback, a space mismatch, or an unsplittable request is a
+`ConfigException`. A [`RerankDocument`](/csharp/api/anyinfer.rerankdocument/) needs a
+non-empty ID. The client's `operationRoutes` argument, or the `operation_routes`
+configuration block, supplies embedding and rerank defaults.
+
+The built-in C# retrieval providers are [TEI](../providers/tei.md),
+[Voyage AI, and Jina AI](../providers/retrieval.md); the Ollama examples above, the store
+add-on, the sidecar routes, and the CLI commands are Python. Each C# provider call's deadline
+is the `timeoutS` argument, 120 seconds when omitted, whatever `ProviderSettings.TimeoutS`
+says; a call that runs out of time fails as a retryable `ProviderException` whose
+`Category` is `timeout`.
 
 !!! tip "Key Takeaways"
     - Embedding and rerank requests are their own typed operations with their own

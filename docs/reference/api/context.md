@@ -51,6 +51,11 @@ source-code corpus.
 | `chunk_tokens` | `512` | Chunk size for `packed` and `distill` |
 | `rollup_share` | `0.45` | Budget share `tiered` reserves for its rollup |
 
+The six remaining fields (`shingle_size`, `expansion_terms`, `feedback_documents`,
+`expansion_weight`, `salience_damping`, and `salience_iterations`) tune the
+near-duplicate, query-expansion, and salience passes; each is documented with its default
+on `ContextTuning` below.
+
 Two orderings deserve a note. `"rank"` admits documents strongest-first; `"density"`
 admits them by score divided by token cost, which packs measurably more relevance into a
 fixed budget (the classic knapsack result) at the risk of preferring two good small files
