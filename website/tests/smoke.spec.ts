@@ -116,9 +116,92 @@ test.describe('the static documentation artifact', () => {
     await expect(page).toHaveURL(/\/csharp\/$/);
     const application = page.getByRole('heading', {name: /^Use in a \.NET application/});
     await expect(application).toBeAttached();
-    await page.goto('/csharp/#use-in-a-net-application');
+    await page.goto('/csharp/installation/');
     await expect(page.locator('.theme-doc-markdown')).toContainText('dotnet add');
-    await expect(page.locator('.theme-doc-markdown')).toContainText('not published to NuGet');
+    await expect(page.locator('.theme-doc-markdown')).toContainText('NuGet');
+  });
+
+  test('teaches a first call in each SDK from executed source', async ({page}) => {
+    await page.goto('/python/quickstart/#your-first-call');
+    await expect(page.locator('.theme-doc-markdown pre').first()).toContainText('import anyinfer');
+    await page.goto('/csharp/quickstart/');
+    const article = page.locator('.theme-doc-markdown');
+    await expect(article.getByRole('heading', {level: 1})).toBeVisible();
+    await expect(article.locator('pre').filter({hasText: 'GenerateAsync'}).first()).toBeVisible();
+    await expect(article.locator('pre').filter({hasText: 'CancellationTokenSource'}).first()).toBeAttached();
+    await expect(page.locator('.theme-doc-version-badge')).toContainText('C#');
+    await page.goto('/csharp/examples/policies/');
+    await expect(page.locator('.theme-doc-markdown pre').first()).toBeVisible();
+  });
+
+  test('links generated C# overloads, member anchors and parameter types', async ({page}) => {
+    await page.goto('/csharp/api/anyinfer.asyncclient/');
+    await expect(page.getByRole('heading', {level: 1, name: 'AsyncClient class'})).toBeVisible();
+    const overloads = page.locator('table a[href^="#member-"]').filter({hasText: /^GenerateAsync\(/});
+    expect(await overloads.count()).toBeGreaterThanOrEqual(3);
+    const targets = new Set<string>();
+    for (const link of await overloads.all()) targets.add((await link.getAttribute('href'))!);
+    expect(targets.size).toBe(await overloads.count());
+    const first = [...targets][0];
+    await overloads.first().click();
+    await expect(page).toHaveURL(new RegExp(`${first}$`));
+    await expect(page.locator(`[id="${first.slice(1)}"]`)).toBeAttached();
+    const settings = page.locator('.theme-doc-markdown a[href="/csharp/api/anyinfer.providersettings/"]').first();
+    await settings.click();
+    await expect(page.getByRole('heading', {level: 1, name: 'ProviderSettings record'})).toBeVisible();
+    await page.goto('/csharp/api/');
+    await expect(page.locator('a[href="/csharp/api/anyinfer.asyncclient/"]').first()).toBeVisible();
+    await page.goto('/concepts/events/#in-the-c-sdk');
+    const native = page.locator('.theme-doc-markdown a[href^="/csharp/api/"]').first();
+    await native.click();
+    await expect(page).toHaveURL(/\/csharp\/api\/[a-z0-9.-]+\/$/);
+    await expect(page.locator('.theme-doc-version-badge')).toContainText('C#');
+  });
+
+  test('scopes search and versions to the SDK being read', async ({page}) => {
+    await page.goto('/');
+    const search = page.getByRole('searchbox', {name: 'Search documentation'});
+    await page.getByLabel('SDK scope').selectOption('csharp');
+    await search.fill('AsyncClient GenerateAsync');
+    const hits = page.locator('.anyinfer-search__results a');
+    await expect(hits.first()).toBeVisible();
+    for (const hit of await hits.all()) expect(await hit.getAttribute('href')).toMatch(/^\/csharp\//);
+    await page.goto('/python/');
+    await expect(page.locator('.navbar .anyinfer-sdk-version')).toContainText(/0\.1\.\d/);
+    await page.goto('/csharp/api/anyinfer.asyncclient/');
+    await expect(page.locator('.navbar .anyinfer-sdk-version')).toContainText('0.1.0-proof');
+    await page.goto('/concepts/targets/');
+    await expect(page.locator('.navbar .anyinfer-sdk-version')).toHaveCount(0);
+  });
+
+  test('keeps the generated C# API in the mobile drawer and contains wide signatures', async ({page}) => {
+    for (const theme of ['light', 'dark']) {
+      await page.addInitScript((value) => localStorage.setItem('theme', value), theme);
+      for (const width of [320, 390, 768, 1024, 1440]) {
+        await page.setViewportSize({width, height: 900});
+        for (const route of [
+          '/csharp/api/anyinfer.asyncclient/',
+          '/csharp/reference/',
+          '/csharp/examples/policies/',
+          '/concepts/routing/',
+        ]) {
+          await page.goto(route);
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth),
+            `${theme} ${width}: ${route}`,
+          ).toBeLessThanOrEqual(width);
+        }
+        if (width < 997) {
+          await page.goto('/csharp/api/anyinfer.asyncclient/');
+          await page.locator('.navbar__toggle').click();
+          const drawer = page.locator('.navbar-sidebar');
+          expect((await drawer.boundingBox())!.height).toBeGreaterThanOrEqual(900);
+          await expect(drawer.getByText('C# API Reference', {exact: true})).toBeVisible();
+          await page.getByRole('button', {name: 'Close navigation bar'}).click();
+        }
+      }
+    }
   });
 
   test('keeps navigation and local search usable on a mobile viewport', async ({page}) => {

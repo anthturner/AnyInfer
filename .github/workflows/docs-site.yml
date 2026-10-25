@@ -79,6 +79,14 @@ jobs:
       - name: build the site
         run: python workspace.py build docs
 
+      # The same browser acceptance CI runs, against the exact artifact uploaded below.
+      - name: install docs smoke-test browser
+        working-directory: website
+        run: npm exec -- playwright install --with-deps chromium
+      - name: browser checks against the static artifact
+        working-directory: website
+        run: npm run test:browser
+
       - id: pages-artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:

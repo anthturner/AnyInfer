@@ -417,6 +417,13 @@ class TestVerbs:
         manifest = json.loads((ROOT / ".config" / "dotnet-tools.json").read_text(encoding="utf-8"))
         assert re.fullmatch(r"\d+\.\d+\.\d+", manifest["tools"]["docfx"]["version"])
 
+    def test_pages_build_runs_browser_acceptance_on_the_uploaded_artifact(self):
+        workflow = (ROOT / ".github" / "workflows" / "docs-site.yml").read_text(encoding="utf-8")
+        build = workflow.index("run: python workspace.py build docs")
+        browser = workflow.index("run: npm run test:browser")
+        upload = workflow.index("actions/upload-pages-artifact@")
+        assert build < browser < upload
+
     def test_pages_deploy_isolated_from_reruns_and_upload_retries(self):
         workflow = (ROOT / ".github" / "workflows" / "docs-site.yml").read_text(encoding="utf-8")
         artifact_name = "github-pages-${{ github.run_id }}-${{ github.run_attempt }}"
