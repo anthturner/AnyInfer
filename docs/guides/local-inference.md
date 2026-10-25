@@ -5,6 +5,11 @@ model daemon. AnyInfer shows what this machine can run, downloads and hash-verif
 weights, fetches a pinned `llama-server` runtime after an explicit install command, and
 supervises the server from the application process.
 
+Everything on this page is the Python SDK and CLI. The native C# SDK does not acquire models,
+install runtimes, or supervise `llama-server`, and it does not register `ollama`; it can call an
+already-running OpenAI-compatible chat endpoint, local or hosted, through its `openai-compat`
+provider.
+
 ## 1. See What This Machine Can Run
 
 The [model catalog](../concepts/catalog.md) classifies every entry against detected

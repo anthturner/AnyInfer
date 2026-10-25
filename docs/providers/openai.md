@@ -10,6 +10,10 @@ reasoning-token accounting the older chat-completions shape does not. For the
 chat-completions dialect, point [openai-compat](openai-compat.md) at
 `https://api.openai.com/v1` instead.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `openai`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>

@@ -2,10 +2,14 @@
 
 [`CHANGELOG.md`](https://github.com/anthturner/AnyInfer/blob/main/CHANGELOG.md) is the
 short answer to "what changed in this version, and does it affect me?" It is written for
-someone who integrates the SDK, ships against the OpenAI-compatible sidecar, or runs the
+someone who integrates the Python SDK, ships against the OpenAI-compatible sidecar, or runs the
 demo app — not for someone reconstructing the development history. Git already holds the
 history, and a release that took 119 commits is not more legible for having 119 lines
 about it.
+
+Its version headings are versions of the Python distribution (`project.version`), the
+artifacts the [release workflow](releasing.md) publishes. The native C# SDK is versioned
+separately as an unpublished prerelease and has no released section.
 
 So the changelog is deliberately lossy. Most commits in a release do not appear in it,
 and that is the design rather than an omission.

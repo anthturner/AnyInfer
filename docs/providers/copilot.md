@@ -9,6 +9,10 @@ The only adapter that is not raw HTTP. Copilot is reached by driving the Copilot
 subprocess runtime through `github-copilot-sdk`, so there is no wire protocol for AnyInfer
 to speak (the slim core grants this one SDK exception, behind an extra).
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `copilot`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: structured output (prompt-only)</span>

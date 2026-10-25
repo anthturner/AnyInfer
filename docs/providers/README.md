@@ -9,9 +9,9 @@ This inventory describes the published Python SDK. The native C# prerelease regi
 subset of providers and operations; its canonical coverage and limits are in the
 [foundation capability map](../concepts/foundation.md) and [C# SDK guide](../guides/csharp-sdk.md).
 
-The generated [complete inventory](all.md) is the full accessible rendering: all 106
-providers (20 dedicated adapters, 86 presets), each with its target prefixes, key
-variable or default endpoint, and notes.
+The generated [complete inventory](all.md) is the full accessible rendering: every
+provider, dedicated adapter or preset, with its target prefixes, key variable or default
+endpoint, and notes.
 
 <div class="anyinfer-card-grid" markdown>
 
@@ -76,7 +76,7 @@ variable or default endpoint, and notes.
   <br>`Local` `Hosted`
 
 - :material-format-list-group: **[Hosted & local presets](presets.md)** `groq:` `together:` `mistral:` `vllm:` …
-  <br>Eighty-six OpenAI-compatible services and engines, preconfigured.
+  <br>OpenAI-compatible services and engines, preconfigured.
   <br>`Local` `Hosted`
 
 - :material-router-network: **[OpenRouter](openrouter.md)** `openrouter:`

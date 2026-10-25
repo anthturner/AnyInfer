@@ -5,6 +5,12 @@ Use the SDK when AnyInfer runs inside a Python application.
 reference for embedding the SDK properly: the client lifecycle and the error handling a
 long-lived application needs.
 
+For a .NET application, the [C# SDK guide](csharp-sdk.md) is the native counterpart. Most of
+this page maps across: `AsyncClient` and its synchronous `Client` facade, `Sampling`,
+`GenerationRequest.Logprobs`, `CiteDocuments` and `ServerTools`, the `Generation` result's
+`Logprobs`, `Citations` and `ServerToolUses`, and failures derived from `AnyInferException` with
+`Phase` and `Hint`. Batch jobs are Python-only.
+
 ## Configure the Client
 
 For deployed applications, keep provider identity and routing in the

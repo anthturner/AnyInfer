@@ -68,6 +68,17 @@ code is unaffected.
 - `response_format` support varies widely between implementations, which is one of the
   reasons validation is always client-side.
 
+## In the Native C# SDK
+
+The native C# SDK registers `openai-compat`, with the same aliases, in its default registry.
+It is a chat-only adapter over `POST {base_url}/chat/completions`: `base_url` is required, the
+API key is optional, and it neither embeds nor reranks. It accepts text, images, inline
+documents, and inline audio, and rejects video and document URLs. The reviewed Cerebras,
+Hyperbolic, and Nscale [presets](presets.md#in-the-native-c-sdk) use the same adapter. Its
+streaming, schema, and connection behavior is described in the
+[C# reference](../reference/csharp-sdk.md); the capability defaults, stream-ignoring handling,
+and Python descriptor mechanism above describe the Python adapter.
+
 ## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
@@ -77,7 +88,7 @@ For the exact request/response fields this adapter depends on, see
 
 <div class="anyinfer-see-also" markdown>
 
-- [Preset providers](presets.md): the eighty-six providers configured on this adapter.
+- [Preset providers](presets.md): the providers configured on this adapter.
 - [Add a provider](../guides/custom-providers.md): when a preset is not enough.
 
 </div>

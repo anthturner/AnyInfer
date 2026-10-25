@@ -7,6 +7,10 @@ icon: material/cloud-outline
 
 The Messages API over raw `httpx2`. Registered as `anthropic`, with the alias `claude`.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register
+`anthropic`; the [C# capability map](../concepts/foundation.md#c-capability-map) lists the
+providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output (emulated)</span>
@@ -46,7 +50,7 @@ maps to a budget:
 
 | Effort | Wire form |
 |---|---|
-| `minimal` | `{"type": "disabled"}` |
+| `none`, `minimal` | `{"type": "disabled"}` |
 | `low` | 1024 tokens |
 | `medium` | 4096 tokens |
 | `high` | 16384 tokens |

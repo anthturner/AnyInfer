@@ -9,6 +9,10 @@ The native `generateContent` protocol. Google's OpenAI-compatibility layer is do
 as beta and ignores parameters it does not implement, while thinking levels, response
 schemas, safety settings, and context caching are native-only or better supported.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `gemini`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>
@@ -62,8 +66,9 @@ with client.stream(prompt, target="gemini:gemini-2.5-flash", reasoning="medium")
             print(event.text, end="")
 ```
 
-Models that cannot disable thinking (2.5 Pro, and the Gemini 3 family) clamp a low
-request upward server-side rather than failing.
+`none` has no `thinkingLevel` spelling, so it sends `thinkingBudget: 0`, Gemini's documented
+way to disable thinking. Models that cannot disable thinking (2.5 Pro, and the Gemini 3
+family) clamp a low request upward server-side rather than failing.
 
 ## Structured Output
 

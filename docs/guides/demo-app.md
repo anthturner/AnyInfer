@@ -1,6 +1,6 @@
 # The Pack-In Demo Application
 
-AnyInfer ships a PySide6 reference application in
+AnyInfer ships a PySide6 reference application, built on the Python SDK, in
 [`src/python/anyinfer_demo/`](https://github.com/anthturner/AnyInfer/blob/main/src/python/anyinfer_demo).
 It is a worked example of integration, not part of the library's public API; nothing in
 `anyinfer` imports it, and nothing in it is importable from `anyinfer`. It runs with no

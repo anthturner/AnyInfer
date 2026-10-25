@@ -1,10 +1,11 @@
-# Regression-Test Fallback and Repair
+# Regression-Test a Fallback Chain {#regression-test-fallback-and-repair}
 
 This test asserts the part of inference that should be deterministic (which route ran and
 which mechanism enforced the schema), and it runs offline: a scripted provider and stored
-fixtures, no network, no spend. The pytest plugin stores the normalized
-[run manifest](../concepts/run-manifests.md) in `manifests/fallback-and-repair.json`
-beside the test.
+fixtures, no network, no spend. AnyInfer's own suite runs it as written. The pytest plugin
+stores the normalized [run manifest](../concepts/run-manifests.md) in
+`manifests/documented_fallback.json` beside the test. It is a Python pytest plugin; the native
+C# SDK builds `RunManifest` values but ships no golden-file fixture.
 
 ```python
 import anyinfer as ai
@@ -35,7 +36,7 @@ def test_fallback_contract(anyinfer_client, anyinfer_scripted, anyinfer_golden_m
         },
     )
 
-    anyinfer_golden_manifest(result.manifest, "fallback-and-repair")
+    anyinfer_golden_manifest(result.manifest, "documented_fallback")
 ```
 
 Create or refresh goldens with `pytest --update-manifests`, and review the JSON diff like
@@ -45,7 +46,8 @@ reduction should be intentional.
 ## What to Notice
 
 - The golden file is a normalized run manifest, so the assertion covers route, attempts,
-  and schema mechanism rather than model prose.
+  and schema mechanism rather than model prose. It also records the repair budget and
+  rounds, both zero here, so adding `repair=` later shows up as a reviewed diff.
 - The scripted 503 on `primary` puts a real fallback hop in the manifest; the
   `anyinfer_scripted` and `anyinfer_golden_manifest` fixtures come from the pytest plugin
   described in [testing your application offline](../guides/testing-your-app.md).

@@ -14,6 +14,11 @@ no sockets, no credentials, no network, and the same result on every machine.
 pip install anyinfer     # the fixtures come with it — no extra to install
 ```
 
+`anyinfer.testing` is part of the Python distribution. The native C# SDK ships no test kit:
+its own examples run offline by giving `ProviderSettings` a scripted `HttpMessageHandler` as
+its `transport`, and an application can also hand prebuilt adapters to
+`AsyncClient.FromAdapters`.
+
 ## Declare a Provider, Get a Real Client
 
 The fixtures are available as soon as `anyinfer` is installed. `anyinfer_scripted` builds a
@@ -158,7 +163,7 @@ def test_answer_path(anyinfer_golden_manifest):
 
 The fixture removes request IDs and timings before comparing `manifests/answer-path.json`
 beside your test. Run `pytest --update-manifests` only after an intentional behavior change,
-then review the JSON diff. The [complete fallback-and-repair example](../examples/golden-manifest.md)
+then review the JSON diff. The [complete fallback example](../examples/golden-manifest.md)
 runs offline in AnyInfer's own suite.
 
 ## The Fixtures
@@ -211,7 +216,7 @@ alongside a test cannot carry a registered credential.
 
 - [Run manifests](../concepts/run-manifests.md): what a manifest records and why it makes
   a stable golden file.
-- [Golden manifest example](../examples/golden-manifest.md): fallback and repair pinned
+- [Golden manifest example](../examples/golden-manifest.md): a fallback chain pinned
   end to end.
 - [Testing API reference](../reference/api/testing.md): every fixture and scripted type.
 

@@ -1,13 +1,13 @@
 # anyinfer-store
 
-A small-scale, single-process, embedded vector store for `anyinfer.embed()`/`anyinfer.rerank()`
+A small-scale, single-process, embedded vector store for `client.embed()`/`client.rerank()`
 results — never a clustered, replicated, or "production vector database" story, permanently,
 not just for v1.
 
 **Target corpus size:** thousands to low hundreds of thousands of vectors. Not millions; not
 billions. **Target deployment shape:** one process, one machine, one writer — no replication,
 no sharding. When you outgrow this, point a real vector database (pgvector, Qdrant, Weaviate,
-Pinecone, ...) at `anyinfer.embed()`/`anyinfer.rerank()` directly; both consume the same
+Pinecone, ...) at `client.embed()`/`client.rerank()` directly; both consume the same
 public `EmbeddingResult`/`RerankResult` types this package does.
 
 ```bash
@@ -22,5 +22,6 @@ store.add("doc-1", result.vectors[0], space=result.space, text="the document tex
 matches = store.query(query_vector, space=result.space, top_k=5)
 ```
 
-See DESIGN.md §29 and the published vector store guide for the full design
-and the explicit, permanent scale boundary.
+See the [vector store guide](https://anyinfer.dev/guides/vector-store/) and the
+[API reference](https://anyinfer.dev/python/api/vector-store/) for usage and the explicit,
+permanent scale boundary; DESIGN.md §29 is the internal design record behind both.

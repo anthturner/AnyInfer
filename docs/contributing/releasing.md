@@ -83,10 +83,11 @@ merge per fix, and each pull request spends the CI matrix again.
 
 ## What a Release Is
 
-The bounded C# core-generation proof is repository verification infrastructure. Its CI lane
-validates and retains local prerelease NuGet artifacts, but does not publish them to a registry,
-attach them to GitHub Releases, or create PyPI distributions. The release workflow does not
-build or publish C# proof packages.
+A release is a release of the Python distribution. The native C# SDK is versioned independently
+(`0.1.0-proof` in `src/csharp/Directory.Build.props`) and is not yet released: its CI lane
+validates and retains local prerelease NuGet artifacts, but does not publish them to a
+registry, attach them to GitHub Releases, or create PyPI distributions. The release workflow
+does not build or publish C# packages.
 
 The [release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/release.yml)
 runs on every merge to `main`:

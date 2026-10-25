@@ -17,15 +17,33 @@ that file:
 cd src/csharp
 dotnet --version
 dotnet restore AnyInfer.sln
-dotnet test AnyInfer.sln --no-restore
+dotnet test AnyInfer.sln --no-restore -m:1
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
-`workspace check` runs the same bounded phase after the repository's Python gates. The C# phase
-records the selected SDK version, restores the solution, runs the solution tests without a second
-restore, validates a local prerelease package, then runs the offline SDK proof examples.
+`workspace check` runs the same bounded phase after the repository's Python gates
+(`python workspace.py check --only=csharp` runs it alone). The phase, in order:
 
-The [C# SDK proof guide](../guides/csharp-sdk.md) links its snippets directly to those source
+1. records the selected SDK version;
+2. checks that `AnyInfer/Providers/CompatPresetTable.g.cs` still matches what
+   `scripts/generate_csharp_compat_presets.py` renders from the Python preset inventory;
+3. restores the solution and runs its tests without a second restore, one project build at a
+   time (`-m:1`);
+4. compares independent Python and native observations for the accounting, request-policy,
+   retrieval, rich-generation, tool-loop, and context-tuning development profiles
+   (`scripts/check_csharp_accounting.py`, `check_csharp_request_policy.py`,
+   `check_csharp_retrieval.py`, `check_csharp_rich_generation.py`, `check_csharp_tool_loop.py`,
+   and `check_csharp_context_tuning.py`);
+5. checks the native provider-binding inventory (`scripts/check_csharp_binding_inventory.py`)
+   and the C# API evidence ledger (`scripts/check_sdk_api_parity.py`);
+6. builds the library and checks its documentation inventory against the compiler's XML
+   documentation file, so every public declaration has a complete, non-placeholder comment
+   (`scripts/check_csharp_docs.py --build`); the docs build separately checks that the
+   generated API reference renders every declaration;
+7. validates a local prerelease package (below);
+8. runs the offline SDK examples.
+
+The [C# SDK guide](../guides/csharp-sdk.md) links its snippets directly to those example source
 files. The examples are not an application installation path or a release promise.
 
 ## Validate the local prerelease package
@@ -56,7 +74,8 @@ separate coordinator gate that requires a clean committed executable, release ve
 execution and publication, and the complete proof. It is not part of ordinary contributor testing
 or CI package delivery.
 
-The site build and release workflow do not provision .NET, publish NuGet content, or attach C#
-proof output to a release. The native CI lane retains local prerelease package artifacts for its
-own validation. The repository's [release guide](releasing.md) lists the artifacts that are
+The release workflow does not provision .NET, publish NuGet content, or attach C# proof output
+to a release. The site build provisions .NET only to extract the generated C# API reference with
+the pinned DocFX tool. The native CI lane retains local prerelease package artifacts for its own
+validation. The repository's [release guide](releasing.md) lists the artifacts that are
 actually published.

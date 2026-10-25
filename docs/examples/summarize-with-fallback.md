@@ -5,6 +5,11 @@ when a provider is not: it tries Anthropic first, falls back to OpenAI, and fina
 local Ollama model. As written it needs `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and a
 running Ollama; the shape itself is exercised in CI against in-process fakes.
 
+The same schema, route, and repair controls exist in the native C# SDK (`Route`, `Retry`,
+`Repair`, and a schema on `GenerationRequest`), though Anthropic, OpenAI, and Ollama are not
+among its built-in providers; the [fallback guide](../guides/fallback.md) and
+[structured output guide](../guides/structured-output.md) carry the C# examples.
+
 ```python
 """summarize.py — `python summarize.py < release-notes.txt`"""
 

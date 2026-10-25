@@ -22,6 +22,11 @@ guarantee, cost, and limits are stated once, in the table:
 | 3 (Attested local execution) | Not even root on the host can read the prompt in transit to or during local inference | Requires specific TEE hardware (SEV-SNP/TDX today) | `anyinfer` core |
 | 4 (Model provenance) | The model weights that ran are exactly what you signed, verified inside Tier 3's boundary | Only a Tier 4 claim when Tier 3 also holds | `anyinfer` core |
 
+Tiers 1–4 ship with the Python distribution or its add-on packages. The native C# SDK provides
+none of them: it has no sealed templates or Relay, and no local runtime to attest. Tier 0 holds
+for it as it does for any direct client, since its calls also go straight to the configured
+provider.
+
 The full design record, including exclusions and open questions, is DESIGN.md §30 in the
 repository.
 

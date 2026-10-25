@@ -8,6 +8,10 @@ application decides *what exists and what is safe to send*; the library decides 
 fits*. See [context reduction](../concepts/context-reduction.md) for why that line is
 drawn there.
 
+Context reduction is a Python SDK feature. The native C# SDK has the budget in step 2
+(`AsyncClient.Budget` returns a `ContextBudget`) but no reducers; its
+`AnyInfer.Context.ContextTuning` holds standalone settings only.
+
 ## 1. Build Documents
 
 ```python

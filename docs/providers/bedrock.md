@@ -9,6 +9,10 @@ The Converse API: Bedrock's unified interface, where one request shape serves Cl
 Nova, Llama, Mistral, and DeepSeek alike. Generation never uses `InvokeModel` and its
 per-model request bodies; only embeddings do, because Converse has no embeddings surface.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `bedrock`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>

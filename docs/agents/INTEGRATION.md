@@ -9,6 +9,14 @@ this library — that it is an OpenAI client with more providers — is wrong in
 compile, run, and produce plausible output while quietly duplicating work the core already
 does.
 
+This procedure is for Python applications using the `anyinfer` distribution: every step runs
+its command-line tool, its call shapes, or its test kit. The native .NET 8 C# SDK is a
+separate, unpublished prerelease with no CLI, `agents-md`, or test kit, and a narrower set of
+built-in providers. For a .NET application, work from the C# SDK guide at
+<https://anyinfer.dev/csharp/> and the API reference at <https://anyinfer.dev/csharp/api/>
+instead; the principles of Steps 3 and 4 still hold there: let the core retry, validate, count,
+and price, and treat an unknown cost or a defaulted capability as unknown.
+
 ## Step 0 — establish which version you are working against
 
 ```bash

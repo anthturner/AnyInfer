@@ -9,6 +9,10 @@ An [OpenAI-compatible](openai-compat.md) dialect with three deltas that would ot
 cost a developer silently: reasoning arrives on its own channel, thinking is on by default, and
 cache accounting is automatic and split.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register
+`deepseek`; the [C# capability map](../concepts/foundation.md#c-capability-map) lists the
+providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: structured output (JSON mode)</span>
@@ -56,14 +60,11 @@ DeepSeek accepts `low`/`high`/`max`, AnyInfer maps `minimal` and `low` to `low`,
 result = client.generate(prompt, target="deepseek:deepseek-v4-pro", reasoning="low")
 ```
 
-To turn thinking off (a behavior change, not an effort setting):
+To turn thinking off (a behavior change, not an effort setting), ask for `none`, which sends
+`{"thinking": {"type": "disabled"}}`:
 
 ```python
-client.generate(
-    prompt,
-    target="deepseek:deepseek-v4-pro",
-    provider_options={"deepseek": {"thinking": {"type": "disabled"}}},
-)
+client.generate(prompt, target="deepseek:deepseek-v4-pro", reasoning="none")
 ```
 
 !!! warning "Sampling is ignored while thinking"

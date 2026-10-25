@@ -8,6 +8,11 @@ order is preserved, and nothing is ranked. If an application wants a cost-first 
 local-first policy, make that selection visibly in application code and pass the
 resulting order to [`Route`](../concepts/routing.md).
 
+`compare()` and the `compare_diff` tool below are Python SDK features, with CLI and sidecar
+faces. The native C# SDK has no multi-target comparison; its pure `AsyncClient.Resolve`,
+`Capabilities`, and `Budget` calls answer resolution, capability, and fit for one target at a
+time without constructing an adapter.
+
 ## A Deterministic, Offline Example
 
 This complete shape uses a scripted provider with two different capability profiles, so
@@ -109,7 +114,8 @@ stable) as a small JSON file:
 ```
 
 ```python
-from anyinfer import Client, compare_diff
+from anyinfer import Client
+from anyinfer.evaluate import compare_diff
 
 client = Client(providers)
 fixtures = compare_diff.load_fixtures("fixtures.json")
@@ -169,7 +175,7 @@ change", while `compare_diff` answers "did this request's resolution change".
 <div class="anyinfer-see-also" markdown>
 
 - [Arena runs](../concepts/arena.md): judging answers by spending.
-- [Regression-test fallback and repair](../examples/golden-manifest.md): pinning a run's
+- [Regression-test a fallback chain](../examples/golden-manifest.md): pinning a run's
   behavior with a golden manifest.
 - [Capabilities and provenance](../concepts/capabilities.md): the data comparison reads.
 - [compare_diff API](../reference/api/compare-diff.md): full signatures and the fixture

@@ -4,6 +4,10 @@ An OpenAI-compatible projection of the same configured hybrid runtime used by th
 SDK and command-line tool. It allows existing clients to use hosted, hub, and local routes
 without creating a second routing or configuration system.
 
+The sidecar is part of the Python distribution and runs the Python engine. The native C# SDK
+has no sidecar of its own, and is not a client for this one, though any OpenAI client, in any
+language, can call it.
+
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
 sequenceDiagram
@@ -363,7 +367,9 @@ reservation, and tool-loop behavior are covered in [arena runs](../concepts/aren
 ## Configuration
 
 The sidecar, CLI, and Python SDK use the same
-[shared configuration file](../reference/configuration.md).
+[shared configuration file](../reference/configuration.md). The native C# SDK's
+`AnyInferConfig` reads a restricted subset of that format, without the `history`, `context`,
+`arena`/`arenas`, `observers`, or `mcp` blocks.
 
 !!! tip "Key Takeaways"
     - The sidecar is a wire codec over the same client the SDK uses; routing, credentials,

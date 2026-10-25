@@ -6,6 +6,10 @@ under [`anyinfer.testing`](../reference/api/testing.md), so a
 [third-party adapter](writing-an-adapter.md) certifies itself the same way the built-in
 ones do.
 
+This is the Python provider suite. The native C# SDK is checked differently: its driver runs the
+frozen shared `core-generation` corpus, and its adapters are tested in the C# solution; see the
+[C# development workflow](csharp-proof.md).
+
 ## Division of Labor
 
 The conformance suite proves the code matches its claims. The

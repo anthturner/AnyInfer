@@ -5,7 +5,8 @@ shorter: each chunk is summarized against your question, then the notes are synt
 into one answer. Since that spends inference (a corpus of N chunks costs N+1 requests),
 it is a separate function rather than a `select()` strategy, and this example needs a
 live provider: as written, [Anthropic](../providers/anthropic.md) with
-`ANTHROPIC_API_KEY` set.
+`ANTHROPIC_API_KEY` set. `distill` is part of the Python SDK's `anyinfer.context`; the native
+C# SDK has no context reduction.
 
 ## The Basic Shape
 

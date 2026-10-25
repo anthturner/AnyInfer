@@ -11,7 +11,7 @@ composing entry point: it takes core's attestation status for Tiers 3-4 and the 
 facts only the application knows.
 
 Field-by-field signatures are on the
-[confidentiality add-ons API reference](https://anyinfer.dev/reference/api/confidential/),
+[confidentiality add-ons API reference](https://anyinfer.dev/python/api/confidential/),
 and the [Confidentiality Tiers guide](https://anyinfer.dev/guides/confidentiality-tiers/)
 explains what each tier means. (DESIGN.md §30 is the internal record behind both.)
 

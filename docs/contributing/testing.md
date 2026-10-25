@@ -16,13 +16,16 @@ workspace test --provider cohere           # one provider's modules + shared inv
 workspace check                            # the gate: everything, plus lint/types/docs
 ```
 
-`workspace check` also runs the bounded C# core-generation proof. It uses the SDK pinned by
-`src/csharp/global.json`, restores and tests `src/csharp/AnyInfer.sln`, then validates a local
-prerelease package without publishing it or writing a canonical report, then runs its offline
-async SDK proof examples. The Python fast track remains `workspace test`.
+`workspace check` also runs the bounded C# SDK phase. It uses the SDK pinned by
+`src/csharp/global.json`, checks the generated compatibility-preset table, restores and tests
+`src/csharp/AnyInfer.sln` (`dotnet test --no-restore -m:1`), compares Python and native
+observations for the shared development profiles, checks the provider-binding inventory, the API
+evidence ledger and the library's documentation comments, validates a local prerelease package
+without publishing it or writing a canonical report, then runs the offline SDK examples. The
+Python fast track remains `workspace test`.
 
-[C# core-generation proof](csharp-proof.md) gives the exact native commands and explains why
-normal test runs do not produce a qualified report.
+The [C# development workflow](csharp-proof.md) lists every step with its script, gives the exact
+native commands, and explains why normal test runs do not produce a qualified report.
 
 `workspace test` cannot run the whole suite, by design. `check` runs
 [the quality gates](README.md#the-quality-gates) and is the only thing that tells you the
@@ -33,7 +36,7 @@ The fast track skips two markers:
 
 | Marker | What it covers | Run it when |
 |---|---|---|
-| `exhaustive` | The full preset matrix: eighty-six presets through every conformance case. Half the suite's wall time, and it re-proves the *shared* OpenAI dialect. | You changed `openai_compat.py`, a preset entry, or the conformance suite itself. |
+| `exhaustive` | The full preset matrix: every preset through every conformance case. Half the suite's wall time, and it re-proves the *shared* OpenAI dialect. | You changed `openai_compat.py`, a preset entry, or the conformance suite itself. |
 | `slow` | Packaging and subprocess builds. | Before committing; `check` runs it. |
 
 Adding or editing one adapter changes nothing either marker covers, which is the point:
@@ -64,6 +67,7 @@ in the llama-server supervisor.
 | One provider's dialect quirks | `tests/test_<provider>.py` |
 | Core logic (routing, schema, events) | The matching `tests/test_*.py` |
 | A serve-frontend invariant | `tests/test_openai_roundtrip.py` |
+| Native C# SDK behavior | `src/csharp/AnyInfer.Tests/` (the shared-corpus driver is `src/csharp/AnyInfer.Conformance/`) |
 
 If a behavior should hold for *all* providers, it belongs in the conformance suite so it is
 checked for all of them, not just the one you were looking at.

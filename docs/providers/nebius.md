@@ -9,6 +9,10 @@ Nebius uses the [OpenAI chat-completions dialect](openai-compat.md) but exposes 
 model listing. AnyInfer uses that listing to discover current context windows,
 quantization, feature support, and prices instead of shipping a catalog that will age.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `nebius`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: structured output (model-dependent)</span>
@@ -51,11 +55,11 @@ listing and returns model ids without inventing metadata.
 
 ## Reasoning
 
-Normalized reasoning levels are sent as `reasoning_effort`. Reasoning fragments are
-surfaced as `ReasoningDelta` events on the [event stream](../concepts/events.md) and
-remain separate from `Generation.text`. The upstream API also accepts reasoning levels
-outside AnyInfer's normalized four-level scale; send those explicitly through
-`provider_options` when needed.
+Normalized reasoning levels, `none` included, are sent verbatim as `reasoning_effort`.
+Reasoning fragments are surfaced as `ReasoningDelta` events on the
+[event stream](../concepts/events.md) and remain separate from `Generation.text`. The upstream
+API also documents `xhigh` and `max`, which are outside AnyInfer's normalized scale; send those
+explicitly through `provider_options` when needed.
 
 ## Wire Contract
 

@@ -11,6 +11,10 @@ native API carries grammar-enforced structured output, per-phase nanosecond timi
 the `/v1` layer does not implement all of these and drops the parameters it lacks
 without reporting it.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `ollama`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output (grammar)</span>

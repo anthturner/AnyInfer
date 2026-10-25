@@ -18,12 +18,13 @@ python workspace.py check                          # every gate CI runs
 
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
 The native .NET 8 C# SDK is in development; Python remains the only supported published
-package. The complete quality gate also runs C# conformance checks, so install the SDK selected
-by `src/csharp/global.json` before running `workspace check`. The gate validates a local
-prerelease package without publishing it, then runs offline SDK examples.
+package. The complete quality gate also builds, tests, and checks the C# SDK and extracts its
+generated API reference, so install the SDK selected by `src/csharp/global.json` before running
+`workspace check`. The gate validates a local prerelease package without publishing it, then
+runs offline SDK examples.
 
 For the current C# development and conformance workflow, see
-[C# core-generation proof](csharp-proof.md).
+[C# development workflow](csharp-proof.md).
 
 ## The Task Runner
 
@@ -59,22 +60,24 @@ first). It keeps going after a failure so one invocation tells you everything th
 
 | Phase | Runs |
 |---|---|
-| `lint` | `ruff check src tests workspace.py` (`--fix` applies fixes) |
+| `lint` | `ruff check` over `src/python`, `tests`, `workspace.py`, and the docs and maintenance scripts (`--fix` applies fixes) |
 | `types` | `mypy` (strict) |
-| `contracts` | `lint-imports`: the architecture contracts |
+| `contracts` | `lint-imports` (the architecture contracts), then `scripts/validate_contracts.py`: every provider snapshot still has the sections the drift check reads |
 | `fixtures` | Portable fixture and inventory schema validation |
 | `changelog` | `scripts/validate_changelog.py`: [changelog](changelog.md) shape, and that released sections have not been rewritten |
-| `test` | `pytest -q`, the full suite, headless |
+| `test` | `pytest -q -n auto`, the full suite, headless and parallel |
 | `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
 | `docs-build` | `scripts/build_docs.py build`: the prepared Docusaurus artifact, local Pagefind index, exports, and static checks that Pages publishes |
-| `csharp` | Record the pinned SDK version, check the generated compatibility-preset table, restore and test `src/csharp/AnyInfer.sln` (`-m:1`), validate the recorded C# observations, provider-binding inventory and API evidence ledger, check that every public declaration has complete documentation comments, validate a local prerelease package without publishing it, then run offline SDK examples |
+| `csharp` | Record the pinned SDK version, check the generated compatibility-preset table, restore and test `src/csharp/AnyInfer.sln` (`-m:1`), compare Python and native observations for the accounting, request-policy, retrieval, rich-generation, tool-loop, and context-tuning development profiles, check the provider-binding inventory and API evidence ledger, check that every public declaration has complete documentation comments, validate a local prerelease package without publishing it, then run offline SDK examples |
 
 The full code-change CI pipeline invokes these phases as
 `python workspace.py check --only=<phase>`. Docs-only changes deliberately skip jobs that do
 not apply to documentation, while a local `check` always runs every default phase. CI also runs
-the `test` phase across Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners
-can cover. The `csharp` phase uses the SDK pinned under `src/csharp/`; it runs native SDK tests and
+the `test` phase on interpreters and operating systems only the runners can cover: Linux with
+Python 3.11 and 3.14 and Windows with 3.14 on every code change, plus Linux 3.12 and 3.13 and
+macOS 3.14 on pull requests into `main` ([branching and releases](releasing.md) explains the
+split). The `csharp` phase uses the SDK pinned under `src/csharp/`; it runs native SDK tests and
 conformance checks, validates a local prerelease package, then runs offline SDK examples. It
 produces no canonical conformance report or registry publication.
 
@@ -112,10 +115,11 @@ move code, not to loosen the contract.
 
 ## Choose the Owning Workstream
 
-Core engine, shared configuration, CLI, sidecar, and demo code have separate ownership
-boundaries. The [coding-agent instructions](automation.md) page maps each workstream to its
-paths and explains the canonical-instructions model the tool-specific files defer to. The
-same boundaries apply whether the contributor is using an agent or editing by hand.
+The shared foundation, the native C# SDK, and the Python core engine, shared configuration,
+CLI, sidecar, and demo code have separate ownership boundaries. The [coding-agent
+instructions](automation.md) page maps each workstream to its paths and explains the
+canonical-instructions model the tool-specific files defer to. The same boundaries apply
+whether the contributor is using an agent or editing by hand.
 
 ## The One Rule
 
@@ -126,6 +130,10 @@ It belongs in the core, where it is implemented once and behaves identically for
 provider. That property is the product.
 
 ## Conventions
+
+These are the Python conventions. Native C# code builds with nullable reference types and
+warnings as errors, and every public declaration carries XML documentation that the `csharp`
+phase checks.
 
 - Frozen `dataclasses` with `slots=True` for domain types; `typing.Protocol` for interfaces.
 - **No pydantic dependency.** Caller-supplied pydantic models are accepted via duck-typed

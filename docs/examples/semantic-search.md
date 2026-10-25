@@ -7,7 +7,10 @@ by cosine similarity itself, with persistence left to the optional
 `anyinfer.testing.FakeEmbeddingRerankProvider` (a deterministic pseudo-embedding that
 proves the wiring, not retrieval quality), so point `EMBED_TARGET`/`RERANK_TARGET` at a
 real provider (`ollama:nomic-embed-text`, `openai:text-embedding-3-small`, a local
-[TEI](../providers/tei.md) server) when you want ranking by meaning.
+[TEI](../providers/tei.md) server) when you want ranking by meaning. In the native C# SDK the
+same steps are `AsyncClient.EmbedAsync`, `RerankAsync`, and `EmbeddingSpace.CompatibleWith`
+against its TEI, Voyage, or Jina providers; it has no offline fake like
+`FakeEmbeddingRerankProvider`.
 
 ```python
 import math
@@ -87,11 +90,15 @@ if query_embedded.space.compatible_with(stored_space):
 `--config`'s `operation_routes` key) sets the default route `embed()` uses when no
 `target=`/`route=` is passed; it is the same mechanism `default_route` gives generation, kept
 separate so an embedding fallback chain is never accidentally reused for chat traffic.
-Local engines are first-class fallback members: [TEI](../providers/tei.md),
-[Ollama](../providers/ollama.md), [LM Studio](../providers/lm-studio.md), and
-[llama.cpp](../providers/llama-cpp.md) against an embeddings-mode server all embed,
-so a chain like `[local-tei:bge-large, openai:text-embedding-3-small]` tries the free
-local model first and only spends money if it is unreachable.
+Local engines embed too: [TEI](../providers/tei.md), [Ollama](../providers/ollama.md),
+[LM Studio](../providers/lm-studio.md), and [llama.cpp](../providers/llama-cpp.md) against an
+embeddings-mode server. An embedding fallback is not a generation fallback, though: two
+different models produce vectors that cannot be compared, so a chain such as
+`[local-tei:bge-large, openai:text-embedding-3-small]` stops with a `ConfigError` when it
+reaches the second target rather than returning incomparable vectors. Only a request that sets
+`allow_incompatible_fallback=True` continues, and its result carries a warning naming both
+targets. Keep an embedding route on one `provider:model`, and re-embed the corpus when the
+model changes.
 
 ## See Also
 

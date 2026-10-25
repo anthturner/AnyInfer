@@ -5,13 +5,19 @@ on** — nothing else. These are the diff targets for the drift check
 ([DRIFT-CHECK.md](DRIFT-CHECK.md)) and the wire-level specification adapter implementers
 code against (with DESIGN.md §8 as the behavioral contract).
 
-Two procedures own this directory's lifecycle, and both are tool-agnostic:
+Three procedures own this directory's lifecycle, and all are tool-agnostic:
 
 - [NEW-PROVIDER.md](NEW-PROVIDER.md) — adding a provider. A snapshot is researched and
   written *before* the adapter it specifies; the rest of the procedure covers registration,
   the generated docs surfaces, tests, and verification.
 - [DRIFT-CHECK.md](DRIFT-CHECK.md) — auditing an existing snapshot against the provider's
   current public documentation.
+- [PROPAGATE-CHANGE.md](PROPAGATE-CHANGE.md) — carrying an adopted finding into the shared
+  specification and every registered implementation.
+
+A snapshot describes the upstream protocol, not one SDK. Where the native C# SDK speaks the same
+protocol as a Python adapter (OpenAI-compatible chat, TEI, Voyage, Jina), both implementations
+depend on the same file.
 
 [TEMPLATE.md](TEMPLATE.md) is the starting shape for a new snapshot.
 

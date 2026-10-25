@@ -10,6 +10,10 @@ the things worth choosing Cohere for live: grounded generation with document cit
 separate thinking channel, and usage that distinguishes what was processed from what was
 billed.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `cohere`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>
@@ -48,8 +52,8 @@ Unknown finish reasons normalize to `"other"` rather than propagating.
 
 ## Reasoning
 
-Cohere budgets thinking in tokens, so normalized effort maps to a budget: `minimal`
-disables thinking, and `low`/`medium`/`high` map to increasing token budgets. Thinking
+Cohere budgets thinking in tokens, so normalized effort maps to a budget: `none` and
+`minimal` disable thinking, and `low`/`medium`/`high` map to increasing token budgets. Thinking
 blocks arrive as `ReasoningDelta` events on the
 [event stream](../concepts/events.md) and stay out of `result.text`.
 
@@ -85,9 +89,12 @@ client.generate(
 )
 ```
 
-Document grounding and citations are reachable through the
-[escape hatch](README.md#reaching-provider-specific-parameters). Citations are not yet
-surfaced as typed results; read them from `result.raw` until they are modeled.
+Document grounding is reachable through the
+[escape hatch](README.md#reaching-provider-specific-parameters): this adapter does not
+translate `DocumentPart` inputs or `cite_documents=True`, so the documents and citation options
+go in `provider_options`. The citations Cohere returns are typed: each arrives as a
+`CitationDelta` event and lands on `result.citations`, with offsets into the answer itself, so
+`citation.span_of(result.text)` gives the supported span.
 
 ## Embeddings and Reranking
 
@@ -120,9 +127,8 @@ Three things worth knowing:
   re-assembled in input order, invisibly. Requested `dimensions` are forwarded as
   `output_dimension` (embed-v4 models only).
 - **Rerank usage is search units, not tokens.** Live rerank responses report only
-  `billed_units.search_units`, which AnyInfer never encodes as fake token counts, so
-  `result.usage` is typically empty for rerank. The billed units are on
-  `result.raw["meta"]["billed_units"]` for cost reconciliation.
+  `billed_units.search_units`, which AnyInfer never encodes as fake token counts: they land
+  on `result.usage.search_units`, and the token fields stay unset.
 
 ## Discovery
 

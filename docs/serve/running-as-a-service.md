@@ -4,7 +4,7 @@ An application pointing at `http://127.0.0.1:8080/v1` needs that endpoint to exi
 not just while somebody keeps a terminal window open. `anyinfer serve install` writes the
 systemd unit, launchd agent, or scheduled task that arranges it, and shows the file
 first. The service runs from the same
-[shared configuration file](../reference/configuration.md) as the CLI and SDK.
+[shared configuration file](../reference/configuration.md) as the CLI and Python SDK.
 
 ```bash
 anyinfer serve install --print --config anyinfer.json   # see it, write nothing

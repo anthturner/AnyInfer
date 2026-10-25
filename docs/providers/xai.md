@@ -9,6 +9,9 @@ An [OpenAI-compatible](openai-compat.md) dialect whose distinctive value is repo
 cost: xAI reports the exact amount billed on every response, and its model listing
 carries real prices and context windows.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `xai`; the
+[C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>
@@ -74,8 +77,8 @@ result = client.generate(prompt, target="xai:grok-4.5", reasoning="medium")
 
 `minimal` clamps to `low`: only some Grok models accept `none`, and silently disabling
 reasoning on a reasoning model would change the answer more than was asked for. Pass
-`provider_options={"xai": {"reasoning_effort": "none"}}` to disable it deliberately on a
-model that supports it. The `grok-4.20` generation ships as separate `-reasoning` and
+`reasoning="none"` to disable it deliberately; it is sent as written, so a model that does
+not accept it says so. The `grok-4.20` generation ships as separate `-reasoning` and
 `-non-reasoning` model ids instead of taking the parameter.
 
 ## The Anthropic-Compatible Endpoint

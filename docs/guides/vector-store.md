@@ -11,6 +11,8 @@ pip install -e src/python/anyinfer-store   # from a repository checkout, until a
 ```
 
 The core package installs [as usual](installation.md); the store is a separate sub-project.
+It is Python-only: the native C# SDK returns an `EmbeddingResult` whose `EmbeddingSpace` has
+`CompatibleWith`, but provides no store.
 
 ## Embed, Store, Query
 
@@ -41,7 +43,7 @@ store.close()
     `SIZE_WARNING_THRESHOLD` (200,000 entries) that brute force may stop being comfortably
     fast. When you outgrow that (millions of vectors, multi-region reads, a managed
     control plane), point a real vector database (pgvector, Qdrant, Weaviate, Pinecone,
-    ...) at `anyinfer.embed()`/`anyinfer.rerank()` directly: both consume the same public
+    ...) at `client.embed()`/`client.rerank()` directly: both consume the same public
     `EmbeddingResult`/`RerankResult` types this package does, so only where the vectors
     end up changes.
 

@@ -14,10 +14,10 @@
 </p>
 
 **AnyInfer is an application-owned hybrid inference runtime, with a shared foundation and
-independent Python and C# SDK implementations.** The runtime spans hosted providers, routing
-hubs, existing local services, and supervised `llama.cpp`; it owns routing, structured output,
-context preparation, telemetry, and configuration. The Python SDK, CLI, and OpenAI-compatible
-sidecar use the same engine.
+independent Python and C# SDK implementations.** The supported Python runtime spans hosted
+providers, routing hubs, existing local services, and supervised `llama.cpp`; it owns routing,
+structured output, context preparation, telemetry, and configuration. The Python SDK, CLI, and
+OpenAI-compatible sidecar use the same engine.
 
 Python remains the supported published SDK. The native .NET 8 C# SDK is an independent
 prerelease, locally packaged as `0.1.0-proof`, with no runtime Python dependency.
@@ -79,7 +79,11 @@ problem, you may not need AnyInfer. See
 
 AnyInfer is for applications that need those environments to behave as one runtime. It
 keeps provider translation, local process ownership, context preparation, routing, and
-result validation inside one testable boundary:
+result validation inside one testable boundary.
+
+The capabilities below describe the supported Python runtime. The
+[C# capability map](https://anyinfer.dev/concepts/foundation/#c-capability-map) covers the
+native prerelease.
 
 - **One primitive.** A `GenerationRequest` becomes a typed event stream. Non-streaming is
   the drained stream. It is *not* an OpenAI-API clone. The OpenAI dialect is one edge
@@ -139,12 +143,17 @@ pip install anyinfer                 # core + local lifecycle; runtimes fetched 
 pip install "anyinfer[copilot]"      # GitHub Copilot
 pip install "anyinfer[azure]"        # Azure AI Foundry (Entra auth)
 pip install "anyinfer[vertex]"       # Vertex service-account authentication
+pip install "anyinfer[attest]"       # Tier 4 model-manifest signature verification
 pip install "anyinfer[keyring]"      # credential:// references via the OS vault
 pip install "anyinfer[otel]"         # OpenTelemetry bridge
 pip install "anyinfer[serve]"        # the OpenAI-compatible HTTP frontend
+pip install "anyinfer[tokenizers]"   # exact token counting instead of the byte heuristic
 pip install "anyinfer[demo]"         # the PySide6 pack-in demo app
+pip install "anyinfer[mcp]"          # MCP tool sources (adds no dependencies)
 pip install "anyinfer[all]"
 ```
+
+See [installation and extras](https://anyinfer.dev/python/installation/) for what each one adds.
 
 These are Python SDK installation commands. Python 3.11+; Windows, macOS, and Linux are all
 first-class.
@@ -195,7 +204,7 @@ Python remains the supported published SDK.
 ## Compatibility surface
 
 Provider breadth is compatibility inventory, not the product thesis. The supported Python SDK
-ships 20 dedicated adapters plus 86 declarative OpenAI-compatible presets. This inventory
+ships dedicated adapters plus declarative OpenAI-compatible presets. This inventory
 describes the Python SDK; the native C# subset is listed in the
 [SDK capability map](https://anyinfer.dev/concepts/foundation/#c-capability-map).
 **[See the complete inventory →](https://anyinfer.dev/providers/all/)**
@@ -225,14 +234,14 @@ behavior:
 | Nebius Token Factory | `nebius:` | Live pricing, context, and quantization discovery |
 | Ollama | `ollama:` | Native API, grammar-enforced schemas |
 | llama.cpp | `llama-cpp:` | Supervised `llama-server`, loopback-only |
-| 86 more, preconfigured | `groq:` `together:` `mistral:` `vllm:` … | [OpenAI-compatible presets](https://anyinfer.dev/providers/presets/) |
+| OpenAI-compatible presets | `groq:` `together:` `mistral:` `vllm:` … | [Preconfigured services and engines](https://anyinfer.dev/providers/presets/) |
 
 See the [complete Python provider list](https://anyinfer.dev/providers/all/),
 the [Python provider guides](https://anyinfer.dev/providers/) and the
 [Python conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
 
 For the Python SDK, embeddings and/or reranking are live today on OpenAI, Google Gemini, Azure AI Foundry,
-Google Vertex AI, AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio,
+Google Vertex AI, AWS Bedrock, Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio,
 llama.cpp (against an embeddings-mode server), and four OpenAI-compatible presets
 (Together AI, Fireworks AI, DeepInfra, Mistral) — see
 [Embeddings and reranking](https://anyinfer.dev/concepts/embeddings/) and the
@@ -248,7 +257,7 @@ llama.cpp (against an embeddings-mode server), and four OpenAI-compatible preset
 | C# SDK (development) | .NET applications evaluating the native prerelease subset | Local .NET 8 package `0.1.0-proof` |
 
 The Python SDK, CLI, and sidecar use the same engine and versioned JSON configuration
-format. The C# SDK executes independently against shared contracts and assets:
+format:
 
 ```json
 {
@@ -258,9 +267,12 @@ format. The C# SDK executes independently against shared contracts and assets:
 }
 ```
 
-Load it with `ai.load_config("anyinfer.json")`, pass it to `anyinfer run --config`, or use
-it unchanged with the sidecar. See [choosing an integration path](https://anyinfer.dev/guides/#choose-a-path)
-and [shared configuration](https://anyinfer.dev/reference/configuration/).
+Load it with `ai.load_config("anyinfer.json")`, pass it to `anyinfer run --config`, or use it
+unchanged with the sidecar. The C# SDK executes independently against shared contracts and
+assets; its `AnyInferConfig` reads a restricted subset of the same format and accepts only the
+providers the C# registry has, so not the `ollama` entry above. See [choosing an integration
+path](https://anyinfer.dev/guides/#choose-a-path) and [shared
+configuration](https://anyinfer.dev/reference/configuration/).
 
 ## Documentation
 

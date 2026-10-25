@@ -7,6 +7,10 @@ icon: material/microsoft-office
 
 The most constrained provider in the set.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register
+`m365-copilot`; the [C# capability map](../concepts/foundation.md#c-capability-map) lists
+the providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-no">:material-close: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: structured output (prompt-only)</span>
@@ -66,9 +70,10 @@ This is the only workable path for automated use.
 
 ## Ignored Parameters
 
-Temperature, top-p, max tokens, stop sequences, tools, and reasoning effort are declared
-on the descriptor as ignored, so requesting them emits a `ParameterDropped`
-[telemetry event](../concepts/telemetry.md) rather than silently doing nothing:
+Temperature, top-p, max tokens, stop sequences, tools, reasoning effort, seed, the presence
+and frequency penalties, and logprobs are declared on the descriptor as ignored, so requesting
+them emits a `ParameterDropped` [telemetry event](../concepts/telemetry.md) rather than silently
+doing nothing:
 
 ```python
 class Watch:
@@ -104,10 +109,10 @@ mode when the shape matters more than the M365 grounding does.
 
 ## Notes
 
-- Citations and attributions are retained on `result.raw` rather than normalized: build
-  the client with `retain_raw=True` to keep them, since raw payloads are discarded by
-  default. v1 has no typed model for them, and inventing one would freeze a shape before
-  it is understood.
+- Citations and attributions are retained on `result.raw` rather than normalized into
+  `result.citations`: build the client with `retain_raw=True` to keep them, since raw
+  payloads are discarded by default. This adapter does not map them onto `Citation` values,
+  because a mapping invented now would freeze a shape before it is understood.
 - A 401/403 hints at both re-authentication *and* the tenant licensing and admin-consent
   requirements, because those are the usual real causes.
 - For automation, streaming, tools, or sampling control, use another provider;

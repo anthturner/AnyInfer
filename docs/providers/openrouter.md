@@ -10,6 +10,10 @@ listing: OpenRouter reports per-model context length and per-token pricing, so i
 [costs](../concepts/cost.md) carry `discovered` provenance rather than cataloged
 estimates.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register
+`openrouter`; the [C# capability map](../concepts/foundation.md#c-capability-map) lists the
+providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: structured output (model-dependent)</span>

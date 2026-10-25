@@ -10,6 +10,10 @@ enterprise addressing and Google Cloud authentication. AnyInfer reuses the Gemin
 adapter's translation wholesale: Vertex changes *where* requests go and *how* they are
 signed, not what they look like.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register `vertex`;
+the [C# capability map](../concepts/foundation.md#c-capability-map) lists the providers it
+does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>

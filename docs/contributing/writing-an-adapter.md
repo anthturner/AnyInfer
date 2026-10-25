@@ -11,6 +11,13 @@ It is the canonical checklist that this repository's coding-agent skills run, an
 where every provider should: fetching the current API reference and recording what it says,
 before any code exists to be biased by.
 
+This page describes the Python adapter contract. A native C# adapter follows the same rule
+through `AnyInfer.Providers.IProviderAdapter`: `GenerateAsync` yields `AdapterEvent` values,
+optional `IProviderLifecycle`, `IEmbedsText`, and `IReranksText` add discovery and retrieval,
+and the adapter is registered with a `ProviderDescriptor` or handed to
+`AsyncClient.FromAdapters` as a `ProviderRegistration`. The
+[C# API reference](/csharp/api/) has the exact signatures.
+
 ## The Contract
 
 Four methods:
@@ -31,8 +38,8 @@ class MyAdapter:
 schema, translated reasoning effort, merged options. You never see aliases, routing policy,
 or repair state.
 
-You may emit only: `TextDelta`, `ReasoningDelta`, `ToolCallDelta`, `UsageUpdate`, and
-exactly one terminal `AdapterFinal`.
+You may emit only: `TextDelta`, `ReasoningDelta`, `ToolCallDelta`, `CitationDelta`,
+`ServerToolDelta`, `UsageUpdate`, and exactly one terminal `AdapterFinal`.
 
 ## What You Must Not Do
 

@@ -9,6 +9,10 @@ LM Studio's local server. Generation uses its OpenAI-compatible endpoint, a shar
 well-understood dialect; discovery uses the native API, which reports what a local
 engine's model list actually holds.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register
+`lm-studio`; the [C# capability map](../concepts/foundation.md#c-capability-map) lists the
+providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output</span>
@@ -79,8 +83,8 @@ result = client.generate(prompt, target="lm-studio:qwen3-8b", reasoning="medium"
 ```
 
 `minimal` maps to the server's `low` rather than `off`; disabling reasoning changes the
-answer more than reducing it does. Pass `provider_options={"lm-studio": {"reasoning":
-"off"}}` to turn it off deliberately.
+answer more than reducing it does. Pass `reasoning="none"`, which sends `off`, to turn it off
+deliberately.
 
 ## Embeddings
 

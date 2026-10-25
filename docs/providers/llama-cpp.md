@@ -9,6 +9,10 @@ A supervised `llama-server` subprocess speaking the OpenAI-compatible dialect ov
 In-process `llama-cpp-python` is not supported: one wire protocol for every engine, crash
 isolation, and no GPU-wheel build matrix in the dependency tree.
 
+This page describes the Python SDK's adapter. The native C# SDK does not register
+`llama-cpp`; the [C# capability map](../concepts/foundation.md#c-capability-map) lists the
+providers it does.
+
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output (grammar)</span>

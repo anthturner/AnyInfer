@@ -32,10 +32,11 @@ Provider-specific extras go through
 [`provider_options`](README.md#reaching-provider-specific-parameters), passed to the
 provider verbatim.
 
-The full preset roster (86 services and engines, with each one's target prefix,
+The full preset roster (every service and engine, with each one's target prefix,
 conventional key variable or default endpoint, and one-line notes) is generated from the
 registry in [the complete inventory](all.md), so it cannot drift from what the library
-ships.
+ships. This page describes the Python SDK's presets; the native C# SDK registers three of
+them (see [below](#in-the-native-c-sdk)).
 
 ## What a Preset Does and Does Not Change
 
@@ -169,6 +170,15 @@ Several of these providers (Moonshot, Z.ai, MiniMax, SambaNova, Vercel's gateway
 others) also expose an Anthropic-Messages-compatible endpoint, reachable by
 [pointing the Anthropic adapter at it](anthropic.md#pointing-this-adapter-elsewhere).
 Use the OpenAI-compatible preset unless Messages-dialect behavior is specifically needed.
+
+## In the Native C# SDK
+
+The native C# SDK registers three reviewed presets, `cerebras`, `hyperbolic`, and `nscale`, for
+generation through its OpenAI-compatible chat adapter, with endpoints and key variables
+generated from the same preset data. The assembly carries every other preset row as generated
+data, but those rows are inert: they are not registered, so their targets do not resolve. No C#
+preset embeds. The [C# SDK guide](../guides/csharp-sdk.md) shows each registered preset's
+setup.
 
 ## Verification
 

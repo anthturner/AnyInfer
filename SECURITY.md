@@ -3,7 +3,9 @@
 ## Supported versions
 
 AnyInfer is pre-1.0. Security fixes are applied to the latest published `0.x` release and to
-the `main` branch; older pre-1.0 releases are not maintained in parallel.
+the `main` branch; older pre-1.0 releases are not maintained in parallel. Published releases
+are of the Python distribution. The native C# SDK is an unpublished local prerelease
+(`0.1.0-proof`), so fixes to it land on `main`; report issues in it through the same channel.
 
 ## Report a vulnerability
 

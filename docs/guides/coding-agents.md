@@ -12,7 +12,9 @@ around a call that already retries produces four attempts where you asked for tw
 nothing fails loudly enough to notice.
 
 Three artifacts exist to correct that, and every one of them is derived from something
-canonical rather than written twice.
+canonical rather than written twice. `anyinfer agents-md` and the integration procedure
+describe the Python distribution, since they run its command-line tool and test kit; `llms.txt`
+covers both SDKs.
 
 ## `anyinfer agents-md` — Instructions for Your Repository
 
@@ -48,11 +50,15 @@ Built with the site and published at its root:
   section (`llms/concepts.txt`, `llms/providers.txt`, …), each sized to fit one context
   window.
 - <https://anyinfer.dev/llms-full.txt>: the full text of every page in one file,
-  navigation chrome stripped, including the generated API reference. It has outgrown a
-  single context window; fetch a section bundle unless you truly want the whole corpus.
+  navigation chrome stripped, including the generated Python and C# API references. It has
+  outgrown a single context window; fetch a section bundle unless you truly want the whole
+  corpus.
 
 All of them are generated from the navigation and the built pages, so a page added to
-the docs appears without a hand edit and a deleted one cannot linger.
+the docs appears without a hand edit and a deleted one cannot linger. Each one opens with the
+Python and C# SDK versions it was built from. For a .NET application, which has no
+`agents-md` or integration procedure, point the agent at the C# bundles, the
+[C# SDK guide](csharp-sdk.md), and the [C# API reference](/csharp/api/).
 
 ## The Integration Skill
 

@@ -15,6 +15,9 @@ normalizes the behavior and reports every place it could not.
 This page argues both directions: what is genuinely unusual here, and when a smaller
 tool is the better boundary.
 
+The capabilities below describe the supported Python runtime. The
+[C# capability map](concepts/foundation.md#c-capability-map) covers the native prerelease.
+
 ## Five Things That Are Unusual
 
 ### 1. You Can Unit-Test Your Integration's Failure Paths, Offline
@@ -67,16 +70,16 @@ provenance may refuse a request pre-dispatch. The same rule governs money:
 
 ### 3. Portability Is a Test Result, Not a Claim
 
-106 providers is inventory, not a feature; the useful part is knowing which of them does
-what you need. The [conformance matrix](reference/conformance-matrix.md) is generated
-from real suite runs: every cell is one test case that executed against that adapter,
-and a `➖` is a declared limitation, not a pass. Providers without rows stay empty
-rather than turning missing evidence into a claim.
+A long [provider list](providers/all.md) is inventory, not a feature; the useful part is
+knowing which of them does what you need. The [conformance
+matrix](reference/conformance-matrix.md) is generated from real suite runs: every cell is one
+test case that executed against that adapter, and a `➖` is a declared limitation, not a pass.
+Providers without rows stay empty rather than turning missing evidence into a claim.
 
-Underneath it, 20
-[contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md)
-record exactly which upstream endpoints, fields, framing, and error shapes each adapter
-depends on, each dated, with a
+Underneath it,
+[contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md),
+one per dedicated adapter plus one covering every preset, record exactly which upstream
+endpoints, fields, framing, and error shapes each adapter depends on, each dated, with a
 [drift-check procedure](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md)
 that audits them against current provider documentation. Writing
 [your own adapter](guides/custom-providers.md) puts it on the same footing:
@@ -181,8 +184,8 @@ anyinfer run "..." --dry-run --target ollama:qwen3:8b   # cost and fit, nothing 
 model listing and useless for inference, and it distinguishes *unreachable* from
 *reachable but could not hold the requested shape*, which need different fixes. Nothing
 requires an account: the [demo app](guides/demo-app.md) runs entirely offline against
-in-process fakes, and every code example in this documentation is executed in CI against
-those same fakes, so none of it can quietly rot.
+in-process fakes, and the patterns this documentation teaches are exercised in CI against
+those same fakes; each example page says whether it runs offline as written.
 
 ## Confidential Execution
 

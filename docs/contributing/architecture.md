@@ -5,6 +5,8 @@ The condensed version. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/m
 
 ## The Shape
 
+The Python SDK's layers:
+
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
 flowchart TD
@@ -23,7 +25,15 @@ flowchart TD
 native execution; ordinary SDK calls use public requests and execute independently. Shared
 declarative assets supply data to both implementations. Python remains the supported published
 SDK; C# is prerelease and does not claim full parity. See the [foundation](../concepts/foundation.md)
-for its capability map and [C# development guide](csharp-proof.md) for local workflow.
+for its capability map and [C# development workflow](csharp-proof.md) for local workflow.
+
+The C# SDK follows rules 1, 2, 3, 5, 6, and 8 below in native form: `GenerationRequest` and a
+typed event stream, `AnyInfer.Providers.IProviderAdapter` adapters that only translate, an
+async `AsyncClient` with a synchronous `Client` facade, provenance-bearing `ModelCapabilities`,
+in-process `IObserver` telemetry with no OpenTelemetry bridge, and declarative
+`ProviderDescriptor` setup metadata. Rules 4, 7, and 9 describe Python-only parts: the
+supervised `llama.cpp` runtime, the Python dependency floor, and the sidecar. The Python method
+and module names below are the Python contract.
 
 ## The Load-Bearing Rules
 
@@ -64,15 +74,32 @@ event-stream sufficiency, target-in-model-string, concurrent streams. See
 
 ## Enforcement
 
-Three of these are checked mechanically by `lint-imports`, not left to review:
+The Python package's boundaries are checked mechanically by `lint-imports`, not left to
+review. Four contracts in `pyproject.toml` enforce them:
+
+| Contract | Forbids |
+|---|---|
+| Adapters never orchestrate | `anyinfer.providers` importing routing, schema validation or repair, the client, capabilities, or context reduction |
+| Sidecar is a codec around the client, never a second core | `anyinfer.serve` importing providers, routing, schema, catalog, credentials, the local subsystem, or context reduction |
+| Types are leaf modules (zero I/O) | `anyinfer.types` importing providers, routing, the client, schema, events, the local subsystem, context reduction, or `httpx2` |
+| Context reduction is a leaf consumer | `anyinfer.context` importing providers, routing, the client, the sidecar, the local subsystem, schema, catalog, credentials, or `httpx2` |
+
+The first, as written:
 
 ```toml
 [[tool.importlinter.contracts]]
 name = "Adapters never orchestrate"
+type = "forbidden"
+allow_indirect_imports = true
 source_modules = ["anyinfer.providers"]
-forbidden_modules = ["anyinfer.routing", "anyinfer.schema.validate",
-                     "anyinfer.schema.repair", "anyinfer._client",
-                     "anyinfer.capabilities"]
+forbidden_modules = [
+  "anyinfer.routing",
+  "anyinfer.schema.validate",
+  "anyinfer.schema.repair",
+  "anyinfer._client",
+  "anyinfer.capabilities",
+  "anyinfer.context",
+]
 ```
 
 When one fails, move the code. Loosening a contract requires a documented reason;
@@ -80,6 +107,8 @@ When one fails, move the code. Loosening a contract requires a documented reason
 local subsystem is translation, not orchestration.
 
 ## Request Lifecycle
+
+The Python client's path for one generation:
 
 1. Resolve the target: alias or `provider:model` → `ResolvedTarget`.
 2. Gate on health, if the target recently failed.

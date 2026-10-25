@@ -12,6 +12,11 @@ anyinfer run "Explain TCP slow start." --config anyinfer.json --target ollama:qw
 
 The reply streams to stdout as it arrives.
 
+The `anyinfer` command ships with the Python distribution and runs the Python engine. The
+native C# SDK has no command-line tool; a .NET application reads the shared configuration file
+through `AnyInfer.Config.AnyInferConfig`, which accepts a restricted subset of the format and
+only the providers the C# registry has.
+
 ## Getting a Config File in the First Place
 
 `anyinfer init` writes one from what this machine can already do, so the first five

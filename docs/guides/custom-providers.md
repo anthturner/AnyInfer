@@ -4,6 +4,9 @@ A provider AnyInfer does not ship is not a fork: a provider is a small installab
 package, and once it is installed, `yourprovider:model` targets resolve everywhere: the
 Python API, the command line, the sidecar, and any config UI built on the setup spec.
 
+This page covers Python provider packages. The native C# SDK has no entry-point discovery,
+scaffold, or `anyinfer conform`; see [in the native C# SDK](#in-the-native-c-sdk) below.
+
 ## Do You Need an Adapter at All?
 
 If your endpoint speaks `/chat/completions` and differs only by URL, authentication
@@ -140,6 +143,17 @@ client.generate("hello", target="acme:acme-large")
 Nothing in the application changed. If your package fails to load (a bad import, an id
 that collides with a built-in), `anyinfer doctor` says so by name, rather than leaving your
 provider mysteriously absent.
+
+## In the Native C# SDK
+
+A .NET application registers its own adapter in code. Implement
+`AnyInfer.Providers.IProviderAdapter`, adding `IProviderLifecycle`, `IEmbedsText`, or
+`IReranksText` for discovery and retrieval, then either describe it with a `ProviderDescriptor`
+and add that to a `ProviderRegistry` with `Register`, or hand constructed adapters to
+`AsyncClient.FromAdapters` as `ProviderRegistration` values. The same rule applies: the adapter
+translates, and retry, routing, validation, and repair stay in the native client core. An
+endpoint that speaks `/chat/completions` needs no adapter there either, since the C# registry
+includes `openai-compat`. The [C# API reference](/csharp/api/) has the signatures.
 
 !!! tip "Key Takeaways"
     - An endpoint that speaks `/chat/completions` needs no adapter; `openai-compat` with a

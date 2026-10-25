@@ -40,9 +40,13 @@ print(result.text)
 
 The model decides when to call `read_file` or `list_files`; AnyInfer runs the function,
 feeds the result back, and loops until the model produces a final answer (bounded: a
-runaway loop raises `ToolLoopError` rather than spinning). To stream the answer token by
-token instead of waiting for it, see [streaming](../guides/streaming.md); nothing else
-about the program changes.
+runaway loop raises `ToolLoopError` rather than spinning). `run_tools` returns the final
+`Generation` once the model stops calling tools; it does not stream.
+
+The native C# SDK has its own bounded loop over registered handlers
+(`AsyncClient.RunToolsAsync` / `Client.RunTools` with a `ToolRegistry`; see
+[run the tool loop](../guides/tool-loop.md)), but no `@ai.tool` decorator and no `ollama`
+provider.
 
 ## What to Notice
 
@@ -61,7 +65,7 @@ about the program changes.
 <div class="anyinfer-see-also" markdown>
 
 - [Run the tool loop](../guides/tool-loop.md): rounds, bounds, and error handling.
-- [Stream to a terminal](../guides/streaming.md): the same conversation, token by token.
+- [Stream to a terminal](../guides/streaming.md): token-by-token output for one generation.
 - [Run a local model end to end](../guides/local-inference.md): pulling models and
   supervised `llama-server`.
 

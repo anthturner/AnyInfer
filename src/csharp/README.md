@@ -1,67 +1,93 @@
 # AnyInfer for .NET
 
-`AnyInfer` is an independent native .NET 8 SDK in development. It provides sync and async generation,
-structured-output enforcement, rich generation inputs, and an explicit registered-tool loop. The
-built-in OpenAI-compatible adapter supports text, images, inline documents, and inline audio; it
-rejects video and document URL inputs. Built-in TEI, Voyage, and Jina adapters support buffered
-text embeddings and reranking. Applications configure adapters with `ProviderSettings` and
-credential references such as `env://ANYINFER_API_KEY`, `env://TEI_API_KEY`, or
-`env://VOYAGE_API_KEY`; custom adapters remain available for application-owned protocols.
+`AnyInfer` is the native .NET 8 SDK of [AnyInfer](https://anyinfer.dev/), an application-owned
+inference runtime with a shared language-neutral foundation. This package is an independent
+prerelease, versioned `0.1.0-proof`. It is not published to NuGet, has no runtime Python
+dependency, and makes no full-parity or support-matrix claim; the Python SDK remains the
+supported published SDK.
 
-This package is locally versioned `0.1.0-proof`, is not published to NuGet, and makes no full-parity or support-matrix claim. Python remains the supported published SDK. See the [shared foundation](https://anyinfer.dev/concepts/foundation/) for current capabilities and limits.
+## Documentation
 
-## Build a local package
+- [C# SDK guide](https://anyinfer.dev/csharp/): setting up a .NET application, the first call,
+  and source-linked examples for each feature.
+- [C# API reference](https://anyinfer.dev/csharp/api/): every public type, constructor,
+  overload, and member.
+- [C# reference notes](https://anyinfer.dev/csharp/reference/): behavior and limits the
+  signatures do not show, including the native schema and TLS differences.
+- [C# capability map](https://anyinfer.dev/concepts/foundation/#c-capability-map): what the
+  native SDK covers and what it does not.
 
-From `src/csharp`, pack the core project with the repository revision supplied by the
-build environment:
+## What It Provides
 
-```powershell
+- `AsyncClient` and its synchronous `Client` facade: buffered and streamed generation
+  (`AsyncStream`, `SyncStream`), routing with retry and fallback (`Route`, `Retry`), and
+  structured output validated client-side with bounded repair (`Repair`).
+- Rich generation inputs and outputs, and `RunToolsAsync` / `RunTools`, a bounded loop over
+  registered tool handlers.
+- Buffered text embedding and reranking, with input batching.
+- Catalog and capability queries, `AnyInferConfig` (a restricted subset of the shared
+  version 1 configuration format), `env://` credential references, typed in-process telemetry
+  and run manifests, and explicit pricing, budgeting, and accounting helpers.
+
+The default provider registry contains:
+
+| Provider | Operations |
+|---|---|
+| `openai-compat` | Chat generation against any OpenAI-compatible endpoint; a base URL is required. Accepts text, images, inline documents, and inline audio; rejects video and document URLs. |
+| `cerebras`, `hyperbolic`, `nscale` | Generation through the same chat adapter, with each service's endpoint preconfigured. |
+| `tei`, `voyage`, `jina` | Embedding and reranking. |
+
+The other OpenAI-compatible preset rows bundled in the assembly are inert data and are not
+registered. An application can register its own adapters (see below).
+
+Not provided: context or history reduction, local model and runtime management, sessions, arena
+runs, evaluation and benchmarks, batch inference jobs, MCP, OpenTelemetry, OS keyring
+credentials, a command-line tool, or an HTTP sidecar. Accounting values are not provider
+invoices or all-wire totals.
+
+Buffered embedding and reranking were exercised against a pinned TEI 1.9.4 CPU deployment on
+2026-10-22. The Voyage, Jina, Cerebras, Hyperbolic, and Nscale adapters have offline
+scripted-response evidence only; their hosted traffic has not been live-verified.
+
+## Reference the Package
+
+Target `net8.0`. The package is not on NuGet, so reference it in one of two ways:
+
+- From a checkout of the repository, add a project reference:
+
+  ```bash
+  dotnet add "<your-app.csproj>" reference "<checkout>/src/csharp/AnyInfer/AnyInfer.csproj"
+  ```
+
+- From a locally packed `AnyInfer.0.1.0-proof.nupkg`, add the folder that holds it as a NuGet
+  package source and reference package `AnyInfer` version `0.1.0-proof`.
+
+The package depends on `JsonSchema.Net` 8.0.5 and `PeterO.Numbers` 1.8.2, ships its XML
+documentation beside the assembly, and is packed with a portable symbol package (`.snupkg`).
+Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12; Draft 3 and
+Draft 4 are not supported.
+
+## Build It from Source
+
+From `src/csharp` in a checkout, pack the library with the repository revision:
+
+```bash
 dotnet pack AnyInfer/AnyInfer.csproj -c Release -p:SourceRevisionId=<40-character-git-revision>
 ```
 
-The package targets `net8.0`, carries the qualified `JsonSchema.Net` `8.0.5` and `PeterO.Numbers`
-`1.8.2` runtime dependencies for modern JSON Schema validation and exact public accounting values,
-and includes a portable symbol package. The SDK supports
-Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12; legacy Draft 3 and Draft 4 remain deferred.
-Modern schema input and generated values can retain arbitrary-size integers, but the pinned native
-validator compares numeric values for `const`, `enum`, and `uniqueItems` through .NET `decimal`.
-Values outside that range, such as `1e70`, raise a controlled schema-evaluation exception.
-For a complete local pack, archive inspection, and isolated consumer check, run this repository's
-`python scripts/check_csharp_package.py` command from the repository root.
+`python scripts/check_csharp_package.py`, run from the repository root, performs the complete
+local pack, inspects the archive, and builds and runs a fresh consumer against an isolated local
+feed. The offline examples run with:
 
-## Run the SDK proof examples
-
-From `src/csharp`, run the repository's offline async examples after restoring the solution:
-
-```powershell
+```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
-The examples demonstrate settings, buffered generation, streaming, structured output,
-configuration, fallback, built-in TEI, Voyage, and Jina embedding and reranking, explicit capability probes,
-declarative setup metadata, bounded
-winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
-explicit request-policy inputs, and the synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
-Capability probes can send up to four requests by default; a raw tool declaration in that probe
-measures provider behavior and is separate from `RunTools`, the explicit loop over registered
-handlers. Rich inputs and tool execution are bounded native capabilities, not provider-wide
-coverage promises. Accounting values do not represent provider invoices or all-wire totals.
-Context and history reduction and transactional cross-process store updates are not provided.
-Retrieval input batching is supported; batch inference jobs are not. Spend policy, cache planning,
-specialized context fallback, and raw tool values remain explicit caller inputs. The generic
-OpenAI-compatible descriptor declares no cache mechanism. Configured `RateLimits` pace normal provider HTTP inside the
-generation entry deadline; own-transport descriptors and opaque prebuilt registrations with active
-injected limiters use an outer slot before entry.
+## Use a Custom Adapter
 
-The TEI, Voyage, and Jina adapters are the bounded built-in native retrieval bindings. The TEI example
-uses separate loopback instances for embedding and reranking because a TEI process serves one
-model. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
-deployment on 2026-10-22. The Voyage and Jina examples use offline scripted responses. Hosted
-Voyage and Jina traffic has not been live-verified. The OpenAI-compatible adapter remains chat-only.
-
-## Use a custom adapter
-
-Register an implementation of `AnyInfer.Providers.IProviderAdapter` with a
-`ProviderRegistration`, then create an `AsyncClient`. The adapter translates its provider's
-wire protocol into `AdapterEvent` values; retries, routing, validation, and repair stay in
-the client core.
+Implement `AnyInfer.Providers.IProviderAdapter`, adding `IProviderLifecycle`, `IEmbedsText`, or
+`IReranksText` for discovery, embedding, or reranking. Then either describe it with a
+`ProviderDescriptor` and add that to a `ProviderRegistry`, or pass constructed adapters to
+`AsyncClient.FromAdapters` as `ProviderRegistration` values. The adapter translates its
+provider's wire protocol into `AdapterEvent` values; retries, routing, validation, and repair
+stay in the client core.

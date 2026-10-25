@@ -1,7 +1,7 @@
 # Illustrative `compare_diff` fixtures
 
 `fixtures.json` is a small, non-exhaustive example of the [portability diff
-tool](https://anyinfer.dev/guides/comparing-targets/#turning-comparisons-into-a-regression-test-or-a-portability-report)'s
+tool](https://anyinfer.dev/guides/comparing-targets/#from-one-comparison-to-a-diff)'s
 public fixture schema — copy it as a starting point for your own fixture set, built
 against your own real request shapes and targets. `baseline.snapshot.json` is a checked-in
 snapshot this repository's own test suite (`tests/test_compare_diff_regression.py`) diffs
@@ -18,7 +18,8 @@ anyinfer compare --snapshot --fixtures fixtures/compare-diff/fixtures.json \
 or, from Python:
 
 ```python
-from anyinfer import Client, ProviderSettings, compare_diff
+from anyinfer import Client, ProviderSettings
+from anyinfer.evaluate import compare_diff
 import json
 
 client = Client([

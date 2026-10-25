@@ -46,7 +46,8 @@ Read in roughly this order:
    command-line tool, or Python sidecar.
 5. [Installation and extras](guides/installation.md): Python packages and extras.
 6. [Shared configuration](reference/configuration.md): one file for the Python SDK, CLI,
-   and sidecar. C# reads its [documented v1 subset](guides/python-to-csharp.md).
+   and sidecar. C# reads a restricted version 1 subset, documented on its
+   [`AnyInferConfig` API page](https://anyinfer.dev/csharp/api/anyinfer.config.anyinferconfig/).
 7. [Concepts](concepts/README.md): one line each; read them once and
    the rest of the API follows.
 
