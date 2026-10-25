@@ -839,31 +839,58 @@
         "examples/csharp-sdk/CerebrasExample.cs",
         "examples/csharp-sdk/HyperbolicExample.cs",
         "examples/csharp-sdk/NscaleExample.cs",
+        "examples/csharp-sdk/ConfigurationFileExample.cs",
+        "examples/csharp-sdk/CredentialReferenceExample.cs",
         "examples/csharp-sdk/ConnectionExample.cs",
         "examples/csharp-sdk/GenerationExample.cs",
         "examples/csharp-sdk/RichGenerationExample.cs",
+        "examples/csharp-sdk/ServerToolExample.cs",
         "examples/csharp-sdk/SyncGenerationExample.cs",
         "examples/csharp-sdk/SyncStreamingExample.cs",
         "examples/csharp-sdk/TeiExample.cs",
         "examples/csharp-sdk/VoyageExample.cs",
         "examples/csharp-sdk/JinaExample.cs",
         "examples/csharp-sdk/RetrievalExample.cs",
+        "examples/csharp-sdk/RetrievalBatchingExample.cs",
+        "examples/csharp-sdk/EmbeddingSpaceExample.cs",
         "examples/csharp-sdk/CatalogExample.cs",
-        "examples/csharp-sdk/AccountingExample.cs",
+        "examples/csharp-sdk/SetupExample.cs",
         "examples/csharp-sdk/LifecycleExample.cs",
         "examples/csharp-sdk/ProbeExample.cs",
         "examples/csharp-sdk/TelemetryExample.cs",
         "examples/csharp-sdk/ManifestExample.cs",
-        "examples/csharp-sdk/SetupExample.cs",
+        "examples/csharp-sdk/TelemetrySinksExample.cs",
+        "examples/csharp-sdk/AccountingExample.cs",
+        "examples/csharp-sdk/SpendStoreExample.cs",
         "examples/csharp-sdk/RequestPolicyExample.cs",
-        "examples/csharp-sdk/Program.cs"
+        "examples/csharp-sdk/SpendAdmissionExample.cs",
+        "examples/csharp-sdk/ContextWindowRouteExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "examples/csharp-sdk/Cases/ExampleCase.cs",
+        "examples/csharp-sdk/Cases/RecipeHandlers.cs",
+        "examples/csharp-sdk/Cases/ConfigurationFileCases.cs",
+        "examples/csharp-sdk/Cases/CredentialReferenceCases.cs",
+        "examples/csharp-sdk/Cases/ServerToolCases.cs",
+        "examples/csharp-sdk/Cases/RetrievalBatchingCases.cs",
+        "examples/csharp-sdk/Cases/EmbeddingSpaceCases.cs",
+        "examples/csharp-sdk/Cases/MetadataBoundaryCases.cs",
+        "examples/csharp-sdk/Cases/TelemetrySinksCases.cs",
+        "examples/csharp-sdk/Cases/SpendStoreCases.cs",
+        "examples/csharp-sdk/Cases/SpendAdmissionCases.cs",
+        "examples/csharp-sdk/Cases/ContextWindowRouteCases.cs",
+        "src/csharp/AnyInfer.TeiProbe/Program.cs"
       ],
       "unsupported_native": [
         "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
         "history compaction (compact_history / HistoryPolicy)",
-        "generic OpenAI-compatible retrieval (stated unimplemented)"
+        "generic OpenAI-compatible retrieval (stated unimplemented)",
+        "OS keyring credentials (credential:// is admitted at load but always fails to resolve)",
+        "configuration observers/context/history/arena/arenas/mcp blocks (rejected at load)",
+        "OpenTelemetry bridge",
+        "batch inference jobs (retrieval input batching is supported)",
+        "provider-run tools on built-in descriptors (none declares a server tool; application descriptors can)"
       ],
-      "notes": "C# overview and task index; Start here and Use in a .NET application point to the installation and quickstart pages; headings and anchors kept."
+      "notes": "C# overview and task index. Start here / Use in a .NET application (installation and quickstart links) and every prior heading anchor kept; existing H2 task sections are now H3 recipes under task-group H2s (connect, generate, embed and rerank, inspect, observe, account and policy). Each recipe includes executed source and links its concept page and /csharp/api/ type pages. New recipes: configuration file, credential references, provider-run tools, retrieval batching, operation routes and embedding spaces, trace/JSONL sinks and payload opt-in, shared ledger and spend store, spend admission, context-window fallback. TEI live evidence is the 2026-10-22 TEI 1.9.4 probe; Voyage/Jina/Cerebras/Hyperbolic/Nscale are offline scripted evidence only."
     },
     {
       "source": "guides/custom-providers.md",
@@ -955,18 +982,26 @@
     },
     {
       "source": "guides/observability.md",
-      "scope": "python",
+      "scope": "mixed",
       "review": "pending",
       "evidence": [
+        "examples/csharp-sdk/TelemetryExample.cs",
+        "examples/csharp-sdk/TelemetrySinksExample.cs",
         "tests/test_observers.py",
         "tests/test_event_sinks.py",
-        "tests/test_otel_bridge.py"
+        "tests/test_otel_bridge.py",
+        "examples/csharp-sdk/Program.cs",
+        "examples/csharp-sdk/Cases/TelemetrySinksCases.cs",
+        "examples/csharp-sdk/Cases/SpendStoreCases.cs",
+        "src/csharp/AnyInfer/Events/EventSinks.cs",
+        "src/csharp/AnyInfer/Events/TelemetryEvent.cs"
       ],
       "unsupported_native": [
         "OpenTelemetry bridge (anyinfer.otel)",
-        "config-file `observers` block (C# config rejects it)"
+        "config-file `observers` block (C# config rejects it)",
+        "logging.Logger-based LoggingObserver (C# LoggingObserver writes to a TraceSource whose default switch is off)"
       ],
-      "notes": "Python observers, sinks, and OTel. C# has IObserver, LoggingObserver, JsonlObserver and payload opt-in, but no recipe here."
+      "notes": "Python observers, sinks, and OTel, with C# tabs for in-process observers (TelemetryExample) and payload opt-in (TelemetrySinksExample:observe), a C# trace/JSONL sinks subsection, the never-emitted C# records, and a C# cost note. OTel and configuration-named sinks stated Python-only."
     },
     {
       "source": "guides/python-sdk.md",
@@ -1389,27 +1424,35 @@
         "examples/csharp-sdk/VoyageExample.cs",
         "examples/csharp-sdk/JinaExample.cs",
         "examples/csharp-sdk/Program.cs",
+        "examples/csharp-sdk/Cases/RetrievalBatchingCases.cs",
+        "examples/csharp-sdk/Cases/RecipeHandlers.cs",
         "src/python/anyinfer/providers/voyage.py",
         "src/python/anyinfer/providers/jina.py",
         "tests/test_voyage.py",
-        "tests/test_jina.py"
+        "tests/test_jina.py",
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs"
       ],
       "unsupported_native": [],
-      "notes": "Python Voyage/Jina tabs plus a 'C# proof boundary' section with both C# snippets; hosted traffic for C# is offline-only evidence."
+      "notes": "Python Voyage/Jina tabs plus 'Use Voyage and Jina from C#' (keeps #c-proof-boundary) with VoyageExample/JinaExample, the request facts their scripted handlers check, and C# batch limits (Voyage declared 1,000; Jina unknown, 2,048/1,000 local refusals) asserted by retrieval-batching.declared-and-unknown-ceilings. Hosted C# traffic is offline scripted evidence only."
     },
     {
       "source": "providers/tei.md",
       "scope": "mixed",
       "review": "pending",
       "evidence": [
+        "examples/csharp-sdk/TeiServersExample.cs",
+        "examples/csharp-sdk/RetrievalBatchingExample.cs",
         "src/python/anyinfer/providers/tei.py",
         "tests/test_tei.py",
         "tests/test_tei_cassettes.py",
-        "examples/csharp-sdk/TeiExample.cs",
-        "src/csharp/AnyInfer/Providers/TeiAdapter.cs"
+        "examples/csharp-sdk/Cases/TeiServersCases.cs",
+        "examples/csharp-sdk/Cases/RetrievalBatchingCases.cs",
+        "examples/csharp-sdk/Cases/RecipeHandlers.cs",
+        "src/csharp/AnyInfer/Providers/TeiAdapter.cs",
+        "src/csharp/AnyInfer.TeiProbe/Program.cs"
       ],
       "unsupported_native": [],
-      "notes": "Python setup code plus C#-specific claims (C# descriptor does not hydrate limits; C# exercised against TEI 1.9.4 on 2026-10-22). C# TeiExample is not shown here; reviewer may add a C# tab."
+      "notes": "Python setup plus 'Use TEI from C#': loopback instances and operation-filtered discovery (TeiServersExample) and an explicit verified batch ceiling (RetrievalBatchingExample:embed). Offline cases use scripted /info, /embed, /rerank; the same public calls were exercised live against TEI 1.9.4 CPU on 2026-10-22 (AnyInfer.TeiProbe)."
     },
     {
       "source": "providers/vertex.md",

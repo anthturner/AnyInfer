@@ -52,7 +52,7 @@ print(result.space.provider_id, result.space.model, result.space.dimensions)
 
 By default, embedding routes retry on the same resolved target only: no cross-provider
 or cross-model fallback. A chain that reaches a different `provider:model` is refused
-*before* any request is sent, with an actionable
+when the route gets there, *before* any request goes to that target, with an actionable
 [`ConfigError`](../reference/errors.md), because AnyInfer never guesses that two spaces
 are equivalent. A caller that genuinely wants vectors that may not be comparable passes
 `allow_incompatible_fallback=True`; the result then always carries a warning naming both

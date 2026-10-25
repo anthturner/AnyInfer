@@ -76,6 +76,12 @@ Settings describe one provider instance. Creating settings, loading configuratio
 constructing a client resolve no credential, build no adapter, and send nothing; the first
 operation that needs an instance resolves its credential and builds its adapter.
 
+
+Background: [what each SDK accepts in configuration](../reference/configuration.md#what-each-sdk-accepts),
+the C# [configuration](../reference/csharp-sdk.md#configuration) and
+[credential](../reference/csharp-sdk.md#credentials) semantics, and
+[credentials and redaction](../concepts/credentials.md#in-the-c-sdk).
+
 ### Create provider settings
 
 `SettingsExample.Create` accepts an optional credential value or reference. Pass an `env://`
@@ -270,6 +276,11 @@ Types: [`ProviderProxy`](/csharp/api/anyinfer.providerproxy/),
 
 ## Generate
 
+Background: [streams](../reference/csharp-sdk.md#streams) and
+[structured output](../reference/csharp-sdk.md#structured-output) in the C# reference, and how
+native exceptions differ from the Python error inventory in
+[native C# differences](../reference/errors.md#native-c-differences).
+
 ### Generate text
 
 `GenerationExample.RunAsync` shows buffered text generation. It takes explicit settings, target,
@@ -376,6 +387,9 @@ verifier runs.
   [configuration-file recipe](#load-a-configuration-file) shows every accepted block.
 
 ## Embed and rerank
+
+Background: [embedding and reranking in C#](../reference/csharp-sdk.md#retrieval) and the shared
+[embeddings concept](../concepts/embeddings.md#in-the-c-sdk).
 
 ### Embed and rerank text
 
@@ -603,6 +617,9 @@ Concept: [Proving a target works](../concepts/capabilities.md#proving-a-target-w
 
 ## Observe requests
 
+Background: [telemetry](../concepts/telemetry.md#in-the-c-sdk) and
+[run manifests](../concepts/run-manifests.md#in-the-c-sdk) in the C# SDK.
+
 ### Observe telemetry and manifests
 
 Telemetry is an in-memory, synchronous observer callback by default. The observer in this
@@ -673,6 +690,10 @@ the [observability guide](observability.md#in-process-observers). Types:
 [`IObserver`](/csharp/api/anyinfer.events.iobserver/).
 
 ## Account for spend and apply policy
+
+Background: [cost and spending](../concepts/cost.md#in-the-c-sdk),
+[context budgets](../concepts/budgeting.md#in-the-c-sdk), and
+[routing and pacing](../concepts/routing.md#in-the-c-sdk) in the C# SDK.
 
 ### Calculate explicit accounting facts
 
