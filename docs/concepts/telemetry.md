@@ -50,7 +50,7 @@ because a broken telemetry sink must never fail a generation.
 | Event | Emitted when |
 |---|---|
 | `ParameterDropped` | A provider accepts a parameter and discards it, or honors it only in part. |
-| `UsageEstimated` | A usage figure was derived rather than reported. |
+| `UsageEstimated` | The pre-dispatch context gate estimated the request's input tokens. It is emitted on every attempt while the gate is on, so it marks an estimate even when the provider later reports usage. |
 | `ProviderDiagnostic` | A provider reported something about its own runtime. |
 
 Anything AnyInfer drops or estimates is observable; a degraded request always leaves
@@ -137,7 +137,7 @@ your own. There is no OpenTelemetry bridge.
     - Prompt and response payloads are off by default, per observer, so one consumer's
       opt-in never leaks text to another.
     - Degradation is observable: `ParameterDropped` and `UsageEstimated` mean a dropped
-      parameter or a derived usage figure always leaves evidence.
+      parameter or an estimated token count always leaves evidence.
 
 ## See Also
 

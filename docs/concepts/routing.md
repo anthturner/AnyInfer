@@ -258,7 +258,10 @@ not inherited, as described above. When every target fails, the call raises
 
 Pacing uses the same [`RateLimits`](/csharp/api/anyinfer.ratelimits/) fields on
 `ProviderSettings` (`limits` in configuration), records `queued_ms` in `Timing.Phases`,
-and emits `RateLimitWaited` with the same three reasons;
+and emits `RateLimitWaited` with the same three reasons. Unlike Python, a C# instance with a
+concurrency limit records `queued_ms`, and a `concurrency` wait event, on every request — a
+near-zero value when nothing was contended — so test for a meaningful duration rather than
+for presence;
 [`AnyInfer.Routing.RateLimiter`](/csharp/api/anyinfer.routing.ratelimiter/) is the standalone
 limiter. No built-in C# provider declares a rate-limit header dialect, so on those providers
 `respect_headers` cannot read allowance headers: pacing follows the configured bounds only,
