@@ -2,7 +2,9 @@
 
 From `pip install` to a working Python result. Every Python example on this page is executed in
 CI against the fake providers, so none of it can quietly rot. The C# tab is a bounded prerelease
-proof example; its contributor commands are in the [C# SDK proof guide](csharp-sdk.md).
+proof example; its contributor commands are in the [C# SDK proof guide](csharp-sdk.md). For the
+full native path from a .NET 8 project to a first call, see the
+[C# quickstart](csharp-quickstart.md).
 
 ## Install
 

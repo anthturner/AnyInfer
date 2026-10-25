@@ -125,8 +125,9 @@ anyinfer serve --config anyinfer.json
 - The native .NET 8 C# SDK is not a release artifact or public NuGet package. It is an
   independent prerelease packaged locally as `0.1.0-proof`, with no runtime Python
   dependency. Build it from the checkout using the
-  [C# application setup](guides/csharp-sdk.md#use-in-a-net-application); see the
-  [C# reference](reference/csharp-sdk.md) and
+  [C# application setup](guides/csharp-sdk.md#use-in-a-net-application), which the
+  [C# installation](guides/csharp-installation.md) and [C# quickstart](guides/csharp-quickstart.md)
+  pages walk through; see the [C# reference](reference/csharp-sdk.md) and
   [migration map](guides/python-to-csharp.md) for its bounded capability surface.
 - Unzip the demo bundle and run the `anyinfer-demo` executable inside; `BUNDLE-INFO.txt`
   records the exact version. Bundles never embed `llama-server` binaries or model

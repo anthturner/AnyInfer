@@ -11,6 +11,8 @@ organization gateway, or a dedicated local server already solves your whole prob
 [why and when to use AnyInfer](../why-anyinfer.md) names the better-shaped tool.
 
 The [Python quickstart](quickstart.md) is the shortest path from Python installation to a result.
+For .NET, the [C# installation](csharp-installation.md) and [C# quickstart](csharp-quickstart.md)
+pages are the equivalent path through the native prerelease.
 
 ## Choose a Path
 
@@ -78,6 +80,7 @@ Start with [application setup](csharp-sdk.md#use-in-a-net-application) and the
 [C# reference](../reference/csharp-sdk.md). The [foundation](../concepts/foundation.md)
 keeps the capability map and current exclusions together.
 
+- [Install the C# SDK](csharp-installation.md) and make a first call with the [C# quickstart](csharp-quickstart.md)
 - [Generate text](csharp-sdk.md#generate-text) with the async core or [sync facade](csharp-sdk.md#use-the-synchronous-facade)
 - [Stream typed events](streaming.md), [validate structured output](structured-output.md), and [route fallback](fallback.md) using the C# tabs
 - [Run registered .NET tool handlers](tool-loop.md#c-sdk-proof)

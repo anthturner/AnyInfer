@@ -2,7 +2,8 @@
 
 This page covers the supported published Python SDK, its CLI, and the Python sidecar. For the
 independent native .NET 8 prerelease, use the
-[C# application setup](csharp-sdk.md#use-in-a-net-application). It is packaged locally as
+[C# application setup](csharp-sdk.md#use-in-a-net-application) and its
+[installation page](csharp-installation.md). It is packaged locally as
 `0.1.0-proof`, has no runtime Python dependency, and is not published to NuGet.
 
 ```bash
@@ -96,5 +97,6 @@ anyinfer doctor      # detected hardware and the recommended local tier
 - [Configuration](../reference/configuration.md): the file the Python SDK, CLI, and sidecar share.
 - [Providers](../providers/README.md): Python provider setup and quirks.
 - [C# application setup](csharp-sdk.md#use-in-a-net-application): native .NET prerelease setup.
+- [C# installation](csharp-installation.md): .NET 8 requirements and the project reference.
 
 </div>

@@ -15,15 +15,22 @@ the .NET default task scheduler.
 
 ## Start here
 
-Read this page in the order that matches the application task:
+If you are new to the C# SDK, start with these two pages:
 
-- [Use in a .NET application](#use-in-a-net-application) to reference the local prerelease.
+- [Install the C# SDK](csharp-installation.md): the .NET 8 requirements and the project reference
+  an application adds to a checkout of this repository.
+- [C# quickstart](csharp-quickstart.md): a first buffered call, cancellation and deadlines,
+  asynchronous and synchronous disposal, and an application test that needs no network or key.
+
+This page then indexes the native tasks, in the order an application usually needs them:
+
 - [Create provider settings](#create-provider-settings) for the destination and credential
-  boundary, then [Generate text](#generate-text) for the first call.
+  boundary, then [Generate text](#generate-text).
 - [Stream, validate, and route](#stream-validate-and-route) for the compiled streaming,
   structured-output, and fallback examples.
-- [Run the tool loop](tool-loop.md) for registered .NET tool handlers, or the
-  [C# reference](../reference/csharp-sdk.md) for the native API surface.
+- [Run the tool loop](tool-loop.md) for registered .NET tool handlers, the
+  [C# reference](../reference/csharp-sdk.md) for native behavior and limits, or the
+  [C# API reference](/csharp/api/) for every public type.
 
 ## Run the examples
 
@@ -42,24 +49,18 @@ a package, or write a canonical conformance report.
 
 ## Use in a .NET application
 
-The native SDK is a local prerelease package, not a public NuGet package. In an application that
-has a checkout of this repository, target .NET 8 and use the SDK selected by
-`src/csharp/global.json`, then
-add a project reference using placeholder paths for your application project and checkout:
+The native SDK is a local prerelease, not a public NuGet package. A .NET 8 application references
+`src/csharp/AnyInfer/AnyInfer.csproj` from a checkout of this repository:
+[installation](csharp-installation.md#add-a-project-reference) gives the requirements and the
+exact commands, and the [quickstart](csharp-quickstart.md) continues to a first call. The core SDK
+namespace is `AnyInfer`.
 
-```bash
-dotnet add "<your-app.csproj>" reference "<checkout>/src/csharp/AnyInfer/AnyInfer.csproj"
-```
-
-Restore the application after adding the reference. The existing offline runner in
-`examples/csharp-sdk/AnyInfer.Examples.csproj` remains the executable starting point for the
-source-linked examples below. The core SDK namespace is `AnyInfer`. Start with
-[provider settings](#create-provider-settings) for the endpoint and credential reference, then
-[generate text](#generate-text) with the target selected by your application.
-
-`SettingsExample` and `GenerationExample` are helper classes in the examples project, rather
-than SDK exports. Use the `ProviderSettings`, `AsyncClient`, and `GenerateAsync` calls shown
-inside them in your own application.
+`SettingsExample`, `GenerationExample`, and the other `*Example` classes on this page are helper
+classes in the examples project, rather than SDK exports; see
+[the library and the example helpers](csharp-installation.md#library-and-example-helpers). Use the
+`ProviderSettings`, `AsyncClient`, and `GenerateAsync` calls shown inside them in your own
+application, starting with [provider settings](#create-provider-settings) for the endpoint and
+credential reference.
 
 ## Create provider settings
 
@@ -168,7 +169,10 @@ The SDK does not promise memory-only storage or immediate file deletion.
 ## Generate text
 
 `GenerationExample.RunAsync` shows buffered text generation. It takes explicit settings, target,
-and cancellation token so application code can supply its own configuration boundary.
+and cancellation token so application code can supply its own configuration boundary. The
+[quickstart](csharp-quickstart.md#make-the-first-call) reads the result's text and usage, and
+covers [cancellation](csharp-quickstart.md#cancel-a-call-or-set-a-deadline) and
+[disposal](csharp-quickstart.md#dispose-the-client).
 
 ```csharp
 --8<-- "examples/csharp-sdk/GenerationExample.cs"

@@ -44,9 +44,10 @@ NuGet and does not claim full parity. See [the foundation](concepts/foundation.m
 
 Choose the [Python quickstart](guides/quickstart.md), [Python SDK guide](guides/python-sdk.md),
 or [Python reference](reference/api/README.md) for the supported SDK. For the native prerelease,
-start with the [C# SDK guide](guides/csharp-sdk.md), [C# reference](reference/csharp-sdk.md),
-or [Python-to-C# migration map](guides/python-to-csharp.md). The C# SDK is distinct from
-calling the Python sidecar over HTTP.
+start with the [C# installation](guides/csharp-installation.md) and
+[C# quickstart](guides/csharp-quickstart.md), then the [C# SDK guide](guides/csharp-sdk.md),
+[C# reference](reference/csharp-sdk.md), or [Python-to-C# migration map](guides/python-to-csharp.md).
+The C# SDK is distinct from calling the Python sidecar over HTTP.
 
 ## Install the Python SDK {#install}
 
