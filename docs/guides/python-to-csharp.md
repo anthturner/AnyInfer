@@ -2,23 +2,34 @@
 
 Python remains the supported published SDK. The native .NET 8 C# SDK is in development as
 a prerelease local package (`0.1.0-proof`) and does not claim full parity. See the [shared
-foundation](../concepts/foundation.md) for its current capabilities and limits.
+foundation](../concepts/foundation.md) for its current capabilities and limits. To set up a
+.NET project, follow [C# installation](csharp-installation.md) and then the
+[C# quickstart](csharp-quickstart.md); this page maps the Python API you already know onto
+the native one.
 
 | Python concept | C# SDK (development) |
 |---|---|
 | `AsyncClient` | `AsyncClient` |
 | `ProviderSettings.of(...)` | `ProviderSettings.Of(...)` |
-| `Target` string | `target` string passed to each async call |
-| `Route` and `Retry` | `Route` and `Retry` |
+| `Target` string | `target` string passed to each call |
+| `Route` and `Retry` | `Route` and `Retry`; C# `Retry` has no `retry_on` predicate |
+| `Route(context_window_targets=...)` | `new Route(targets, contextWindowTargets: ...)` |
 | `Repair(max_attempts=...)` | `Repair(MaxAttempts: ...)` |
 | JSON Schema mapping | `SchemaSpec` and typed `Generation.DeserializeStructured<T>()` |
+| Pydantic model as `schema=` | No equivalent; write a `SchemaSpec` and deserialize into a record |
 | `Text.text` | `Text.Value` |
 | `ImagePart`, `DocumentPart`, `AudioPart`, `VideoPart` | Same public names; C# properties use PascalCase, and byte inputs are defensively copied. |
 | `result.text` | `Generation.Text` |
+| `result.structured`, `result.structured_mechanism`, `result.repair_attempts` | `Generation.Structured`, `Generation.StructuredMechanism`, `Generation.RepairAttempts` |
+| `result.attempts` | `Generation.Attempts` of `AttemptRecord` (`Target`, `Outcome`, `Error`, `Timing`) |
 | `result.logprobs`, `result.citations`, provider tool-use counts | `Generation.Logprobs`, `Generation.Citations`, `Generation.ServerToolUses`; reasoning is a separate event. |
-| async stream | `AsyncStream` and `StreamEvent` |
+| `client.stream(...)` | `AsyncClient.StreamAsync(...)`, which sends nothing until enumerated, or `Client.Stream(...)`, which starts at once |
+| async stream and its events | `AsyncStream` and `StreamEvent` records: `TextDelta`, `ReasoningDelta`, `CitationDelta`, `ToolCallDelta`, `ServerToolDelta`, `UsageUpdate`, `TimingMark`, `AttemptFailed`, `StreamEnded` |
+| `stream.result` | `AsyncStream.Result` / `SyncStream.Result`, which throw `InvalidOperationException` until the stream completes successfully; or `CollectAsync()` / `Collect()` |
 | Python `Client` | .NET `Client` and `SyncStream` |
-| `AnyInferError` | typed .NET `Exception` subclasses |
+| `AnyInferError` and its subclasses | `AnyInferException` and its subclasses. Shared failures keep their Python names with `Exception` in place of `Error` (`AllTargetsFailedException`, `SchemaViolationException`, `ToolLoopException`, and so on); C# adds `SchemaReferenceException` and `SchemaEvaluationException` for native schema failures and has no `LocalRuntimeError` counterpart. |
+| `AllTargetsFailedError.attempts` | `AllTargetsFailedException.Attempts` |
+| `SchemaViolationError` (`raw_text`, `errors`, `partial`) | `SchemaViolationException.Issues`; no raw text or partial members |
 | `client.models(...)`, `client.health(...)` | `ModelsAsync` / `HealthAsync`, or `Models` / `Health` |
 | catalog and capability queries | `Catalog`, `Resolve(...)`, and `Capabilities(...)` |
 | `client.probe(...)` | `ProbeAsync(...)` or `Probe(...)`, returning `ProbeReport` |
@@ -27,13 +38,37 @@ foundation](../concepts/foundation.md) for its current capabilities and limits.
 | `ProviderSetupSpec` metadata | `ProviderSetupSpec`, `SetupField`, `HostShorthand`, and `AnyOf` |
 | explicit pricing, budgets, and ledger snapshots | `PricingCalculator`, `Budget(...)`, `SpendLedger`, and `SpendStore` |
 | request policy | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy`, and `ToolSpec` values |
+| `@ai.tool` or a plain function passed to `run_tools` | `Tool.From(delegate, name:, description:)`, or `new Tool(ToolSpec, callback)` for an explicit schema |
 | `client.run_tools(...)` / `async_client.run_tools(...)` | `Client.RunTools(...)` / `AsyncClient.RunToolsAsync(...)` |
+| `ToolLoopError` | `ToolLoopException` |
 | Provider proxy, TLS verification, and client certificate settings | `ProviderProxy`, `TlsVerification`, and `ClientCertificate` on `ProviderSettings` |
 
-Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
+Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each call, and
+the tool loop passes it on to a handler that declares a `CancellationToken` parameter.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
-client and stream lifetime. C# also has `Client`/`SyncStream` for synchronous callers, using the
-.NET default task scheduler and `using`; it does not reproduce Python's loop facade.
+client and stream lifetime, and leaving an `await foreach` early cancels the stream's request.
+C# also has `Client`/`SyncStream` for synchronous callers, using the .NET default task scheduler
+and `using`; it does not reproduce Python's loop facade. The task guides for
+[streaming](streaming.md), [structured output](structured-output.md),
+[fallback](fallback.md), and the [tool loop](tool-loop.md) show each Python recipe beside its
+native C# form.
+
+## Python-only features {#python-only-features}
+
+These Python SDK features have no C# counterpart in this prerelease; keep them in Python, the
+CLI, or the sidecar:
+
+- Pydantic models as schemas, the `@ai.tool` decorator, and `Retry(retry_on=...)` predicates.
+- MCP tool sources and the `mcp` configuration block.
+- Sessions, history reduction, and context reduction (`anyinfer.context`); C# has only the
+  standalone `ContextTuning` settings values.
+- Arena runs, evaluation, and benchmarks.
+- Local runtime lifecycle, including supervised llama.cpp.
+- Batch inference jobs (C# retrieval input batching is a different feature), OpenTelemetry
+  export, and keyring credentials.
+- The `anyinfer` CLI and the OpenAI-compatible sidecar.
+- Python's full provider breadth: the C# default registry has OpenAI-compatible, Cerebras,
+  Hyperbolic, and Nscale generation plus TEI, Voyage, and Jina embedding and reranking.
 
 ## Registered Cerebras generation
 
@@ -76,9 +111,19 @@ registrations. Broader SDK work remains open.
 ## Shared configuration
 
 `ConfigurationExample.RunAsync` accepts version 1 configuration JSON and creates a configured
-client. Version 1 actively supports `providers`, `default_route`, and `repair`; unsupported
-active policies are refused. Credential references remain references while configuration is read;
-resolution belongs to the selected provider's first use. The schema mechanism is a bounded proof
+client. The C# loader reads `providers`, `default_route`, `repair`, `cache`, and
+`operation_routes` (whose only keys are `embedding` and `rerank`). A provider entry accepts
+`id`, `adapter` (or its legacy spelling `provider_id`), `alias`, `enabled`, `base_url`,
+`api_key`, `api_version`, `headers`, `options`, `values`, `timeout_s`, `limits`, `proxy`,
+`verify`, and `client_cert`, plus the setup fields its provider declares. The loader refuses
+the `context`, `history`, `observers`, `arena`, `arenas`, and `mcp` blocks, which the C# SDK
+does not implement, with a `ConfigException`, as it does any other unknown key. It accepts and
+ignores `_comment` and the bundled demo's settings (`targets`, `system_prompt`, `theme`,
+`context_window_tokens`, and `ignore_runtime_hardware_constraints`), so one file can be
+shared. `default_route` loads as a plain target list with the default retry policy and health
+gate; `Dumps` refuses a route with custom retry, health-gate, or context-window settings,
+which version 1 cannot represent. Credential references remain references while configuration
+is read; resolution belongs to the selected provider's first use. The schema mechanism is a bounded proof
 subset, so port a schema only after checking its supported shape. The C# proof evaluates Draft 6,
 Draft 7, Draft 2019-09, and Draft 2020-12; Draft 3 and Draft 4 remain deferred. Native numeric
 and regular-expression behavior applies, with a timeout per regular-expression match. Registered

@@ -1,124 +1,222 @@
 # Run the Tool Loop
 
-The Python API shown below is `run_tools`. The C# prerelease SDK has a corresponding bounded
-loop with explicit `Tool` registration; it uses different public method names and delegate
-binding rules. Its offline example is source-linked and executed by the C# example runner.
+The tool loop runs the generate, call tools, feed results back cycle for you, with bounded
+rounds and normalized errors. Both SDKs provide it: Python's `run_tools` takes decorated or
+plain functions, and the C# prerelease SDK's `AsyncClient.RunToolsAsync` (and its
+synchronous facade `Client.RunTools`) takes explicitly registered `Tool` handlers. Python
+decorators and MCP tool sources are Python-only; each section below says which form it
+describes.
 
-## C# SDK (prerelease) {#c-sdk-proof}
+=== "Python"
 
-`Tool.From` builds a declaration and typed binder from a supported CLR delegate. Supply the
-provider-visible name and description explicitly when they should not come from the method.
-For signatures outside the supported binding boundary, construct `Tool` with an explicit
-`ToolSpec` and a tagged-JSON callback. Registering a `Tool` is caller authorization: the model
-cannot invoke a name that was not registered.
+    ```python
+    import anyinfer as ai
+    from pathlib import Path
+
+
+    @ai.tool
+    def read_file(path: str) -> str:
+        """Read a project file."""
+        return Path(path).read_text(encoding="utf-8")
+
+
+    @ai.tool
+    def list_files(directory: str = ".") -> list:
+        """List files in a directory."""
+        return [p.name for p in Path(directory).iterdir()]
+
+
+    result = client.run_tools(
+        "What does README.md say about installation?",
+        tools=[read_file, list_files],
+        target="anthropic:claude-sonnet-4-5",
+        max_rounds=8,
+    )
+    print(result.text)
+    ```
+
+=== "C# SDK (prerelease)"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/ToolLoopExample.cs"
+    ```
+
+Both return the final round's generation: the first round whose finish reason is not
+`tool_calls`. Its usage, timing, attempts, and manifest describe that final model round only,
+not a sum across the loop.
+
+## Register .NET Tool Handlers {#c-sdk-proof}
+
+In C#, a [`Tool`](/csharp/api/anyinfer.tool/) pairs a provider-visible
+[`ToolSpec`](/csharp/api/anyinfer.toolspec/) declaration with the handler that runs it.
+Registering a tool is caller authorization: the loop dispatches only names you registered, and
+a later tool with the same name replaces the earlier one in its position. There are two ways
+to build one.
+
+`Tool.From` binds a CLR delegate. The schema comes from the target method's parameters, the
+name from the method unless you pass `name:`, and the description from `description:` or the
+method's `[Description]` attribute. Parameters with default values are optional, and the
+generated schema sets `additionalProperties` to `false`. Pass a name for a lambda, whose method
+name is compiler-generated:
 
 ```csharp
---8<-- "examples/csharp-sdk/ToolLoopExample.cs"
+--8<-- "examples/csharp-sdk/ToolDeclarationExample.cs:delegate"
 ```
 
-`AsyncClient.RunToolsAsync` returns the final `Generation`; `Client.RunTools` is its synchronous
-facade. The default maximum is eight generation rounds. The final permitted round still
-dispatches its returned calls before exhaustion is reported, and a zero or negative limit
-exhausts without generating. Calls run sequentially in model order; a repeated call in a later
-round runs again. Ordinary handler exceptions become error-flagged tool results. Cancellation
-continues to the caller. The returned generation, usage, timing, and manifest describe only the
-final model round, not a sum across the loop. The built-in generic chat adapter uses the
-OpenAI-compatible tool-call dialect; custom adapters may provide the same typed event contract.
+When the model calls the tool, the binder converts the call's JSON arguments to the delegate's
+parameter types, supplies the loop's token to a `CancellationToken` parameter, awaits a
+returned `Task` or `ValueTask`, and renders the result for the model: `null` becomes empty
+text, a string is used as is, a JSON-shaped value (a `JsonValue`, number, Boolean, list, array,
+or string-keyed dictionary) becomes compact JSON, and anything else uses its `ToString()`.
 
-The C# delegate binder can inject one `CancellationToken` into a supported handler signature;
-the token is supplied by the loop. For explicit schemas or handlers outside that binding surface,
-construct `Tool` with `ToolSpec` and a tagged-JSON callback. The Python decorator, Python-only
-MCP integration, and subsequent Python recipes do not describe the native SDK surface.
+For a schema the binder cannot express, or a handler outside the supported signatures,
+construct the `Tool` from an explicit `ToolSpec` and a tagged-JSON callback. The callback
+receives the model's arguments as an `AnyInfer.Json.JsonObject` and the call's
+`CancellationToken`. The declared schema is sent to the model but is not checked against the
+arguments for you:
 
-## Python tool handlers
-
-`run_tools` runs the generate, call tools, feed results back loop for you, with bounded
-rounds and normalized errors:
-
-```python
-import anyinfer as ai
-from pathlib import Path
-
-
-@ai.tool
-def read_file(path: str) -> str:
-    """Read a project file."""
-    return Path(path).read_text(encoding="utf-8")
-
-
-@ai.tool
-def list_files(directory: str = ".") -> list:
-    """List files in a directory."""
-    return [p.name for p in Path(directory).iterdir()]
-
-
-result = client.run_tools(
-    "What does README.md say about installation?",
-    tools=[read_file, list_files],
-    target="anthropic:claude-sonnet-4-5",
-    max_rounds=8,
-)
-print(result.text)
+```csharp
+--8<-- "examples/csharp-sdk/ToolDeclarationExample.cs:explicit-spec"
 ```
 
-The decorator derives the JSON schema from your signature and the description from your
-docstring, so a tool is declared once rather than kept in sync with a hand-written schema.
+The loop is provider-neutral: it runs over the typed tool-call events any generation adapter
+reports. The built-in OpenAI-compatible chat adapter, which also serves the registered
+Cerebras, Hyperbolic, and Nscale presets, speaks the OpenAI-compatible tool-call dialect.
+
+## Python Tool Handlers {#python-tool-handlers}
+
+The Python `@ai.tool` decorator, shown at the top of this page, derives the JSON schema from
+your signature and the description from your docstring, so a tool is declared once rather than
+kept in sync with a hand-written schema. Plain functions work too:
+`run_tools(tools=[my_function])` wraps them automatically. The decorator is Python-only.
 
 ## Supported Parameter Types
 
-`str`, `int`, `float`, `bool`, `list`, `dict`, their parameterized forms (`list[str]`), and
-`Optional[T]`. Anything else raises `ToolLoopError` when the tool is declared, before a
-schema that misdescribes the tool ever reaches a model.
+=== "Python"
 
-Parameters with defaults are optional; the rest are required.
+    `str`, `int`, `float`, `bool`, `list`, `dict`, their parameterized forms (`list[str]`), and
+    `Optional[T]`. Anything else raises `ToolLoopError` when the tool is declared, before a
+    schema that misdescribes the tool ever reaches a model.
+
+    Parameters with defaults are optional; the rest are required.
+
+=== "C#"
+
+    `string`, `bool`, `int`, `long`, `BigInteger`, `double`, `JsonValue`, `JsonObject`,
+    `JsonArray`, and `object`; a nullable form of any of these; and a one-dimensional array,
+    `List<T>`, `IReadOnlyList<T>`, `Dictionary<string, T>`, or `IReadOnlyDictionary<string, T>`
+    of a supported type. One `CancellationToken` parameter receives the loop's token, and a final
+    `params` array always receives an empty array; neither appears in the schema. Any other
+    parameter type, a `ref`, `out`, or pointer parameter, a generic method, or an `async void`
+    method makes `Tool.From` throw `ToolLoopException` when the tool is declared.
+
+    Parameters with default values are optional; the rest are required. At call time, an
+    unknown or missing required argument, or a value of the wrong JSON type, throws
+    `ArgumentException` inside the handler, which reaches the model as an error result.
 
 ## Errors Reach the Model, Not You
 
 A tool that raises becomes an error-flagged result the model can react to:
 
-```python
-@ai.tool
-def fetch(url: str) -> str:
-    """Fetch a URL."""
-    return httpx2.get(url).text  # may raise
+=== "Python"
+
+    ```python
+    @ai.tool
+    def fetch(url: str) -> str:
+        """Fetch a URL."""
+        return httpx2.get(url).text  # may raise
+    ```
+
+    The model sees `ConnectError: connection refused` as a tool result and can apologize, try
+    a different URL, or give up — all ordinary conversation.
+
+=== "C#"
+
+    The stock tool above throws `KeyNotFoundException` for an unknown SKU. Any handler exception
+    other than `OperationCanceledException` is caught and returned to the model as an
+    error-flagged result whose text is the exception type name and message, here
+    `KeyNotFoundException: Unknown SKU XYZ-0000.`, and the loop continues with the next round.
+
+Only loop-level faults raise to you: an unknown tool, or an exhausted round budget. In C# both
+are a [`ToolLoopException`](/csharp/api/anyinfer.toolloopexception/), whose `Hint` names the
+remedy (for an unknown tool, the registered names):
+
+```csharp
+--8<-- "examples/csharp-sdk/ToolFailureExample.cs:loop-failure"
 ```
 
-The model sees `ConnectError: connection refused` as a tool result and can apologize, try a
-different URL, or give up — all ordinary conversation. Only loop-level faults raise to you:
-an unknown tool, or an exhausted round budget.
+## Cancel a Running Tool {#cancel-a-running-tool}
+
+In C#, the loop's cancellation token reaches the handler that is running, so a tool doing I/O
+can stop with the rest of the request. Declare a `CancellationToken` parameter and pass it on:
+
+```csharp
+--8<-- "examples/csharp-sdk/ToolCancellationExample.cs:handler"
+```
+
+Cancelling the token passed to `RunToolsAsync` while the handler waits makes the handler's
+operation throw; the loop does not turn `OperationCanceledException` into a tool result, starts
+no further round, and throws `OperationCanceledException` carrying your token. In Python,
+the loop follows ordinary task cancellation of the coroutine awaiting `run_tools`.
 
 ## The Round Bound
 
-`max_rounds` (default 8) bounds the loop, because a model that keeps calling tools would
-otherwise never terminate:
+`max_rounds` (C# `maxRounds`, default 8) bounds the loop, because a model that keeps calling
+tools would otherwise never terminate:
 
-```python
-try:
-    result = client.run_tools(prompt, tools=tools, target=target, max_rounds=4)
-except ai.ToolLoopError as error:
-    log.warning("%s (%s)", error.detail, error.hint)
-```
+=== "Python"
+
+    ```python
+    try:
+        result = client.run_tools(prompt, tools=tools, target=target, max_rounds=4)
+    except ai.ToolLoopError as error:
+        log.warning("%s (%s)", error.detail, error.hint)
+    ```
+
+=== "C#"
+
+    The `AnswerAsync` recipe above catches the C# form. A round counts one generation. The final
+    permitted round still dispatches the calls it returns, and then `ToolLoopException` reports
+    that the rounds ended with tool calls pending. A `maxRounds` below 1 throws
+    `ToolLoopException` before anything is generated.
 
 ## Execution Is Sequential
 
-v1 dispatches tool calls one at a time, in the order the model requested. Parallel
-execution is deferred: it raises cancellation and ordering questions that no current
-consumer needs answered.
+Both SDKs dispatch tool calls one at a time, in the order the model requested, and a repeated
+call in a later round runs again. Parallel execution is deferred: it raises cancellation and
+ordering questions that no current consumer needs answered.
 
 ## Naming and Overrides
 
-```python
-@ai.tool(name="search_docs", description="Search the documentation index.")
-def search(query: str, limit: int = 10) -> list: ...
-```
+=== "Python"
 
-Plain functions work too: `run_tools(tools=[my_function])` wraps them automatically.
+    ```python
+    @ai.tool(name="search_docs", description="Search the documentation index.")
+    def search(query: str, limit: int = 10) -> list: ...
+    ```
+
+=== "C#"
+
+    Pass `name:` and `description:` to `Tool.From`, or put a `[Description]` attribute on the
+    method, as `ToolDeclarationExample.Search` does above. An explicit `ToolSpec` states both
+    directly.
 
 ## Async
 
-```python
-result = await async_client.run_tools(prompt, tools=[read_file], target=target)
-```
+=== "Python"
+
+    ```python
+    result = await async_client.run_tools(prompt, tools=[read_file], target=target)
+    ```
+
+=== "C#"
+
+    `RunToolsAsync` is the native form. `Client.RunTools` is its synchronous facade, which
+    blocks until the loop ends:
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/SyncToolLoopExample.cs"
+    ```
 
 ## Safety
 
@@ -127,6 +225,11 @@ implementations as a security boundary: validate paths, bound sizes and duration
 not expose a tool that runs arbitrary commands unless that is genuinely your intent.
 
 ## Tools from an MCP Server
+
+!!! note "Python only"
+    MCP tool sources, the `mcp` configuration block, and the fake MCP server are part of the
+    Python SDK. The C# SDK has no MCP client, and its configuration loader refuses an `mcp`
+    block.
 
 Model Context Protocol servers distribute tools (filesystems, databases, internal APIs)
 behind one protocol, and AnyInfer can use one as a source of tools for the loop above:
@@ -215,13 +318,15 @@ toolset = await MCPToolset.connect(
 ```
 
 !!! tip "Key Takeaways"
-    - A tool is declared once: the schema comes from the signature, the description from
-      the docstring, and an unsupported parameter type fails at declaration rather than
+    - A tool is declared once: the schema comes from the Python signature or the C# delegate's
+      parameters, and an unsupported parameter type fails at declaration rather than
       misdescribing the tool to a model.
     - A raising tool becomes a result the model reacts to in conversation; only an unknown
-      tool or an exhausted `max_rounds` raises to your code.
-    - MCP servers plug in as tool sources with identical loop semantics, and configuration
-      entries stay inert until you connect them.
+      tool or an exhausted round budget raises to your code.
+    - In C#, the loop's cancellation token reaches the running handler, and cancellation is
+      never converted into a tool result.
+    - MCP servers (Python only) plug in as tool sources with identical loop semantics, and
+      configuration entries stay inert until you connect them.
     - Tool results are a prompt-injection surface and server annotations are unverified
       claims: narrow exposure with `allow_tools`/`deny_tools` and validate inside your
       tool implementations.
