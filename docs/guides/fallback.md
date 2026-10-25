@@ -30,10 +30,11 @@ semantics live in [routing](../concepts/routing.md).
 `RoutingExample.RunAsync` accepts a native [`Route`](/csharp/api/anyinfer.route/), passes the
 caller cancellation token to `GenerateAsync`, and returns the winning
 [`Generation`](/csharp/api/anyinfer.generation/); `Generation.Target` names the target that
-served it. A C# route's targets are `provider:model` strings in which the provider is a
-configured instance ID, a registered provider ID or alias, or a catalog alias, so two
-instances of one adapter (for example two OpenAI-compatible endpoints with the aliases
-`primary` and `backup`) can back up each other. Each recipe below shows the Python form and
+served it. A C# route's targets are `provider:model` strings, in which the provider is a
+configured instance ID or a registered provider ID or alias, or catalog aliases such as
+`medium`, which have no `provider:` prefix. Two instances of one adapter (for example two
+OpenAI-compatible endpoints with the aliases `primary` and `backup`) can therefore back up each
+other. Each recipe below shows the Python form and
 the native C# form, which the example runner executes offline. Model listing and health
 checks are separate explicit calls rather than route policy; see the
 [C# lifecycle example](csharp-sdk.md#list-models-and-check-health).
@@ -125,8 +126,10 @@ a stalled cursor.
 In C#, [`AllTargetsFailedException`](/csharp/api/anyinfer.alltargetsfailedexception/) is
 thrown only after every target has been tried or skipped; its `Attempts` lists each attempt
 in order. A failure that is not about target availability ends the call without trying the
-next target: a schema violation after the repair budget, a spend-policy refusal, a stream
-that breaks after emitting content, and cancellation.
+next target: a schema violation after the repair budget, a spend-policy refusal, a stream whose
+data becomes malformed or breaks the streaming protocol after it has emitted content
+(`StreamProtocolException`), and cancellation. A transport failure partway through a stream,
+such as a dropped connection, is still retried or falls back even after deltas were delivered.
 
 Since a chain only proves itself when things fail, the
 [test kit](testing-your-app.md) can script those failures offline: a provider that 503s

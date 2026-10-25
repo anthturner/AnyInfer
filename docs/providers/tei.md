@@ -35,7 +35,7 @@ docker run --rm -p 127.0.0.1:8081:80 \
   --revision 2cfc18c9415c912f9d8155881c133215df768a70
 ```
 
-Then point a client at it:
+Then point a Python client at it (the C# form is under [Use TEI from C#](#use-tei-from-c)):
 
 ```python
 import anyinfer as ai
@@ -47,7 +47,7 @@ result = client.embed(["What is deep learning?"], target="tei:BAAI/bge-small-en-
 Since the server holds one model, the model half of the
 [target](../concepts/targets.md) is advisory; `client.models("tei")` reports the real id
 and operation, discovered from `GET /info`. An embedder and a reranker are therefore two
-servers, configured as two instances:
+servers, configured in Python as two instances:
 
 ```python
 client = ai.Client([
@@ -90,8 +90,8 @@ ID and its original index. Usage stays unknown (`null`), never zero, so a `Spend
 these requests in `UnknownRequests`. The offline runner executes this recipe against scripted
 `/info`, `/embed`, and `/rerank` responses and checks the discovered targets, the unknown usage,
 the normalized `EmbeddingSpace`, the caller IDs, and that a reranker on the embedding port stops
-the recipe before any operation request. The same public calls, operation-filtered discovery
-followed by buffered embedding and reranking, were exercised against the pinned TEI 1.9.4 CPU
+the recipe before any operation request. The same public APIs (`ModelsAsync` with an operation,
+then buffered `EmbedAsync` and `RerankAsync`) were exercised against the pinned TEI 1.9.4 CPU
 deployment on 2026-10-22.
 
 ### Batch Against a Verified Server Limit
@@ -136,8 +136,9 @@ For the exact request/response fields this adapter depends on, see
 [contracts/tei.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/tei.md).
 Python traffic was recorded against the pinned TEI 1.9.4 image and model revisions on
 2026-10-22; the three sanitized cassettes replay in CI without a server. The older
-2026-08-24 TEI 1.8.3 evidence is retained in the contract as historical evidence.
-Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22.
+2026-08-24 TEI 1.8.3 evidence is retained in the contract as historical evidence. The C# public
+APIs for operation-filtered discovery and buffered embedding and reranking were exercised against
+the pinned TEI 1.9.4 CPU deployment on 2026-10-22.
 
 ## See Also
 

@@ -77,8 +77,11 @@ A C# stream holds its terminal result in three equivalent places once it complet
 successfully: the `StreamEnded` event's `Result`, the stream's `Result` property, and the
 return value of `CollectAsync` (`Collect` on a `SyncStream`), which drains the stream for you.
 Before successful completion, `Result` throws `InvalidOperationException`; it never returns a
-partial generation. A stream has a single consumer: enumerating it a second time throws
-`InvalidOperationException`.
+partial generation. A stream has a single consumer. Enumerating an `AsyncStream` a second time
+throws `InvalidOperationException`, unless the stream itself has been disposed, in which case the
+enumeration yields no events. A `SyncStream` is disposed when its `foreach` finishes, so enumerating
+it again throws `ObjectDisposedException`; a second enumeration while the first is still running
+throws `InvalidOperationException`.
 
 The two C# stream types start differently. `AsyncClient.StreamAsync` is lazy: nothing is sent
 until you start enumerating it. `Client.Stream` starts generating as soon as it is created and
@@ -139,8 +142,8 @@ Reasoning models emit a separate channel, excluded from the answer text:
 
 In C#, reasoning reaches the stream only from an adapter that reports it. The built-in
 OpenAI-compatible chat adapter, which also serves the registered Cerebras, Hyperbolic, and
-Nscale presets, does not emit `ReasoningDelta` or `CitationDelta` events; an
-application-owned adapter supplied through `AsyncClient.FromAdapters` can. The example runner
+Nscale presets, does not emit `ReasoningDelta`, `CitationDelta`, or `ServerToolDelta` events;
+an application-owned adapter supplied through `AsyncClient.FromAdapters` can. The example runner
 exercises this recipe with such an adapter.
 
 ## Measure Time to First Token
@@ -228,15 +231,24 @@ preceded it. It is never delivered as an event, and no `StreamEnded` follows it.
 
 In C#:
 
-- An argument or route problem is thrown when you create the stream: `StreamAsync` with no
-  target, route, or client default route throws `ConfigException` before anything is sent.
+- A missing route is thrown when you create the stream: `StreamAsync` with no target, route, or
+  client default route throws `ConfigException` before anything is sent. An invalid argument is
+  rejected there too.
+- Targets are resolved, and their providers built, while the stream is enumerated. An unknown
+  target or invalid provider configuration (`ConfigException`) or an unresolvable credential
+  (`CredentialException`) is therefore thrown by the enumeration, before any request reaches
+  that target.
 - `AllTargetsFailedException` is thrown after the last `AttemptFailed` event when every target
   failed; its `Attempts` lists each one.
 - `SchemaViolationException` (an exhausted [repair budget](structured-output.md)) and
   `SpendLimitException` (a [spend policy](csharp-sdk.md#apply-request-policy-explicitly)
   refusal) are thrown the same way.
-- A stream that breaks after it has already emitted content throws `StreamProtocolException`
-  instead of moving on to another target, because the text you have shown cannot be retracted.
+- A stream whose data becomes malformed or breaks the streaming protocol after it has already
+  emitted content throws `StreamProtocolException` instead of moving on to another target,
+  because the text you have shown cannot be retracted. A transport failure partway through the
+  body, such as a dropped connection, is still retried or falls back even after deltas were
+  delivered, so treat each `attempt_start` timing mark as a fresh start, as in
+  [Show Fallback as It Happens](#show-fallback-as-it-happens).
 - Cancellation throws `OperationCanceledException`.
 
 In every failure case `Result` throws `InvalidOperationException`.

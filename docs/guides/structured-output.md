@@ -86,7 +86,7 @@ On a generation requested without a schema, `DeserializeStructured<T>` throws
     --8<-- "examples/csharp-sdk/StructuredRecordExample.cs:failure"
     ```
 
-    `SchemaViolationException.Issues` names each failing rule, such as `maximum` or
+    `SchemaViolationException.Issues` names up to five failing rules, such as `maximum` or
     `required`. The C# exception does not carry the model's raw text or recovered partial
     members. An [observer](csharp-sdk.md#observe-telemetry-and-manifests) subscribed with
     `payloads: true` receives each answer that triggered a repair round trip as the
@@ -95,9 +95,10 @@ On a generation requested without a schema, `DeserializeStructured<T>` throws
 [Fallback](fallback.md) never fires here: the model answered, just in the wrong shape. Once
 the repair budget is spent, the call fails on that target even when its route lists others.
 
-## Pydantic Models Work
+## Pydantic Models Work in Python {#pydantic-models-work}
 
-No pydantic dependency is added; the model is duck-typed through `model_json_schema()`:
+The Python SDK accepts a Pydantic model as the schema. No pydantic dependency is added; the
+model is duck-typed through `model_json_schema()`:
 
 ```python
 from pydantic import BaseModel
@@ -142,7 +143,7 @@ thought you configured.
 
 The C# SDK validates with its own native evaluator. It accepts Draft 6, Draft 7, Draft 2019-09,
 and Draft 2020-12 schemas, and a schema without `$schema` is evaluated as Draft 2020-12; Draft 3
-and Draft 4 remain deferred. Regular expressions are .NET regular expressions with a bounded
+and Draft 4 are not supported. Regular expressions are .NET regular expressions with a bounded
 timeout per match, and `format` is an annotation, not an assertion. Schema input and generated
 values keep arbitrary-size integers, but numeric `const`, `enum`, and `uniqueItems` comparisons
 use .NET `decimal`, so a value outside that range, such as `1e70`, raises a controlled

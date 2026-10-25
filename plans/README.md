@@ -6,10 +6,12 @@ historical evidence, it links to the version-pinned source record.
 
 ## Current plans
 
-- [Complete the multi-SDK documentation](COMPLETE_SDK_DOCUMENTATION.md) starts at R0.A.
-  It retains generated C# API coverage, executable native recipes, the full language-scope
-  review, independent SDK snapshots, and Pages publication/recovery work. The completed
-  Docusaurus port, design polish, and first C# entrypoint plans have been retired.
+- [Complete the multi-SDK documentation](COMPLETE_SDK_DOCUMENTATION.md) has R0–R5
+  implemented on `feature/language-neutral-foundation`: generated C# API coverage, executable
+  native recipes and cookbook, the full language-scope review and the snapshot workflow. It
+  resumes at R6.A's final acceptance re-run; Pages publication and recovery (R6.B) await
+  separate authorization. The completed Docusaurus port, design polish, and first C#
+  entrypoint plans have been retired.
 - [Python-aligned AnyInfer C# SDK](ANYINFER_CSHARP_SDK.md) is the active parent plan,
   resumed for autonomous parity burn-down, beginning with
   [foundation and SDK alignment](SDK_FOUNDATION_ALIGNMENT.md).

@@ -1124,6 +1124,11 @@ must report a real conflict rather than silently changing a dependent public sig
   > NOTE: ALIGN.2 in [SDK/foundation alignment](SDK_FOUNDATION_ALIGNMENT.md) pulls forward
   > the stale overview/architecture correction and shared-foundation explanation. It does
   > not complete the compiled reference, full cookbook, platform qualification or this box.
+  > NOTE: The [documentation leaf](COMPLETE_SDK_DOCUMENTATION.md) has produced, on
+  > `feature/language-neutral-foundation`, the compiled `/csharp/api/` reference with a
+  > zero-finding comment-coverage gate, C# installation and quickstart pages, task recipes and
+  > a six-page native cookbook executed offline. This box stays open: the site is not
+  > published, and the parity inventory has not been reconciled with the published claims.
 - [ ] **SDK.12b** Qualify target frameworks, OS/runtime matrix, dependency licenses, package
   and symbols payload, source metadata and external consumers. Extend native CI deliberately
   for SDK support, preserving Python packaging and release behavior. Gate: full workspace,

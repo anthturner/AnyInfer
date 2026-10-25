@@ -11,7 +11,10 @@ batch ceilings, and truncation behavior.
 
 ## Setup
 
-=== "Voyage"
+The setup below is Python; the C# form is under
+[Use Voyage and Jina from C#](#c-proof-boundary).
+
+=== "Voyage (Python)"
 
     ```python
     import anyinfer as ai
@@ -23,7 +26,7 @@ batch ceilings, and truncation behavior.
     ranked = client.rerank(question, candidates, target="voyage:rerank-2.5", top_n=5)
     ```
 
-=== "Jina"
+=== "Jina (Python)"
 
     ```python
     import anyinfer as ai
@@ -36,6 +39,10 @@ batch ceilings, and truncation behavior.
     ```
 
 ## Provider Differences
+
+The table uses Python spellings. In C#, the same settings are `BatchPolicy.MaxItemsOverride`,
+`BatchPolicy.RerankCrossBatch`, the `dimensions` argument, and a `providerOptions` entry keyed by
+the provider instance ID (`voyage`, `jina`, or the alias you configured).
 
 | | Voyage AI | Jina AI |
 |---|---|---|
@@ -50,9 +57,9 @@ batch ceilings, and truncation behavior.
 Two behaviors are shared:
 
 - **Manual selection with empty discovery.** The supported SDK subset returns empty lists
-  from `client.models("voyage")` and `client.models("jina")`; Jina's documented model-listing
-  endpoint is not implemented by this bounded discovery surface. The verified model set ships in
-  each descriptor's [capabilities](../concepts/capabilities.md).
+  from `client.models("voyage")` and `client.models("jina")` (`ModelsAsync` in C#); Jina's
+  documented model-listing endpoint is not implemented by this bounded discovery surface. The
+  verified model set ships in each descriptor's [capabilities](../concepts/capabilities.md).
 - **Usage is `total_tokens` only.** Public normalized usage keeps the input and output
   breakdown unknown rather than inventing it. When raw retention is opted in, the raw payload
   preserves reported prompt or modality usage fields without promoting them into that normalized
@@ -78,7 +85,8 @@ live-verified from C#.
 --8<-- "examples/csharp-sdk/JinaExample.cs"
 ```
 
-The scripted handlers in these examples check the native request each adapter sends:
+The scripted handlers in these examples check the native request each adapter sends, and the
+example runner's assertions check the results that come back:
 
 - **Input intents.** `EmbeddingInputIntent.Query` and `Document` become Voyage's `input_type`
   `query` and `document`, and Jina's `task` `retrieval.query` and `retrieval.passage`.

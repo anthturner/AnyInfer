@@ -183,8 +183,8 @@ tools would otherwise never terminate:
 ## Execution Is Sequential
 
 Both SDKs dispatch tool calls one at a time, in the order the model requested, and a repeated
-call in a later round runs again. Parallel execution is deferred: it raises cancellation and
-ordering questions that no current consumer needs answered.
+call in a later round runs again. Calls are never run in parallel: each handler starts after the
+previous one returns, so a slow tool delays the rest of its round.
 
 ## Naming and Overrides
 

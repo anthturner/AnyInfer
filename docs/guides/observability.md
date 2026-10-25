@@ -49,7 +49,8 @@ broken telemetry sink must never fail a generation.
 
 ## Catch Silent Degradation
 
-Two events exist specifically to make otherwise-invisible problems visible:
+Two events exist specifically to make otherwise-invisible problems visible. A Python observer
+that watches for both:
 
 ```python
 class DegradationWatch:
@@ -185,13 +186,15 @@ You get one span per request with attempts as span events, plus
 `gen_ai.server.time_to_first_token`, using GenAI semantic-convention attribute names so
 standard tooling reads them.
 
-Every event in the contract crosses the bridge. Events carrying a `request_id` become span
-events on that request's span, while the three that belong to no single request
-(`ContextReduced`, `ServerLifecycle`, `DownloadProgress`) become standalone spans, since
-attaching them to an arbitrary in-flight request would misattribute the work. The full
-mapping is in [the OpenTelemetry bridge](../concepts/telemetry.md#the-opentelemetry-bridge);
-the bridge is a consumer of the event contract, so consuming events directly and exporting
-to OTel are both first-class, and you can do both.
+Every event type in the contract crosses the bridge. Events about one request become span
+events on that request's span. Events that belong to no single request become standalone spans,
+since attaching them to an arbitrary in-flight request would misattribute the work:
+`ArenaCompleted`, `RateLimitObserved`, `BatchSubmitted`, `BatchCompleted`, `CredentialRotated`,
+`ContextReduced`, `ServerLifecycle`, and the final `DownloadProgress` of a download (earlier
+progress events are not exported). A `ProviderDiagnostic` or `RateLimitWaited` with no matching
+request span, such as a wait during a model listing, becomes a standalone span too. The bridge is
+[a consumer of the event contract](../concepts/telemetry.md#the-opentelemetry-bridge), so
+consuming events directly and exporting to OTel are both first-class, and you can do both.
 
 ## Cost
 

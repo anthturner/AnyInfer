@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "require_reviewed": false,
+  "require_reviewed": true,
   "pages": [
     {
       "source": "agents/INTEGRATION.md",
@@ -924,7 +924,7 @@
     {
       "source": "guides/fallback.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/RoutingExample.cs",
         "examples/csharp-sdk/RouteFailureExample.cs",
@@ -938,7 +938,7 @@
         "custom retry predicate (Retry.retry_on); C# Retry has only MaxAttempts/BackoffBaseS/BackoffMaxS",
         "supervised local llama-cpp target as last-resort fallback (C# can only route to a caller-run OpenAI-compatible server)"
       ],
-      "notes": "Python and C# tabs for default route, attempts, total failure, context-window chain and retry; C# health-gate recipe; config default_route and operationRoutes scope. Asserted by route-failure.* cases and migration.config-v1-accepted-blocks."
+      "notes": "Python and C# tabs for default route, attempts, total failure, context-window chain and retry; C# health-gate recipe; config default_route and operationRoutes scope. Asserted by route-failure.* cases and migration.config-v1-accepted-blocks. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/fitting-context.md",
@@ -983,7 +983,7 @@
     {
       "source": "guides/observability.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/TelemetryExample.cs",
         "examples/csharp-sdk/TelemetrySinksExample.cs",
@@ -1001,7 +1001,7 @@
         "config-file `observers` block (C# config rejects it)",
         "logging.Logger-based LoggingObserver (C# LoggingObserver writes to a TraceSource whose default switch is off)"
       ],
-      "notes": "Python observers, sinks, and OTel, with C# tabs for in-process observers (TelemetryExample) and payload opt-in (TelemetrySinksExample:observe), a C# trace/JSONL sinks subsection, the never-emitted C# records, and a C# cost note. OTel and configuration-named sinks stated Python-only."
+      "notes": "Python observers, sinks, and OTel, with C# tabs for in-process observers (TelemetryExample) and payload opt-in (TelemetrySinksExample:observe), a C# trace/JSONL sinks subsection, the never-emitted C# records, and a C# cost note. OTel and configuration-named sinks stated Python-only. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/python-sdk.md",
@@ -1064,7 +1064,7 @@
     {
       "source": "guides/streaming.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/StreamingExample.cs",
         "examples/csharp-sdk/SyncStreamingExample.cs",
@@ -1080,12 +1080,12 @@
       "unsupported_native": [
         "ReasoningDelta/CitationDelta from built-in adapters: the C# OpenAI-compatible chat adapter (and Cerebras/Hyperbolic/Nscale presets) emits neither; only application-owned adapters via AsyncClient.FromAdapters can"
       ],
-      "notes": "Python and C# tabs for early exit, reasoning, TTFT and fallback; C# sections for buffered vs streamed, Result/StreamEnded/CollectAsync, every StreamEvent record, failure paths, and SyncStream. Asserted by stream-events.* and stream-early-exit.* cases."
+      "notes": "Python and C# tabs for early exit, reasoning, TTFT and fallback; C# sections for buffered vs streamed, Result/StreamEnded/CollectAsync, every StreamEvent record, failure paths, and SyncStream. Asserted by stream-events.* and stream-early-exit.* cases. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/structured-output.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/StructuredOutputExample.cs",
         "examples/csharp-sdk/StructuredRecordExample.cs",
@@ -1098,7 +1098,7 @@
         "Pydantic model schema input (Python-only by design)",
         "SchemaViolationError raw_text / partial members (C# SchemaViolationException exposes only Issues; repair inputs visible as RepairAttempted.RawText to a payload observer)"
       ],
-      "notes": "AnswerResult name fixed. C# recipes for record deserialization, SchemaViolationException handling with no route fallback, mechanism/repair count, and native limits linked to the C# reference. Asserted by structured-record.* cases."
+      "notes": "AnswerResult name fixed. C# recipes for record deserialization, SchemaViolationException handling with no route fallback, mechanism/repair count, and native limits linked to the C# reference. Asserted by structured-record.* cases. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/testing-your-app.md",
@@ -1120,7 +1120,7 @@
     {
       "source": "guides/tool-loop.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/ToolLoopExample.cs",
         "examples/csharp-sdk/ToolDeclarationExample.cs",
@@ -1138,7 +1138,7 @@
         "MCP tool sources (MCPToolset, mcp config block, fake MCP server)",
         "@ai.tool decorator (C# uses Tool.From or explicit ToolSpec)"
       ],
-      "notes": "Python/C# tabs for the loop, parameter types, error results, round bound, naming and async; C# sections for Tool.From binding and rendering, explicit ToolSpec, handler cancellation, ToolLoopException paths. MCP labeled Python only. Asserted by tool-declaration.*, tool-failure.*, tool-cancellation.*, tool-loop.sync-facade."
+      "notes": "Python/C# tabs for the loop, parameter types, error results, round bound, naming and async; C# sections for Tool.From binding and rendering, explicit ToolSpec, handler cancellation, ToolLoopException paths. MCP labeled Python only. Asserted by tool-declaration.*, tool-failure.*, tool-cancellation.*, tool-loop.sync-facade. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "guides/vector-store.md",
@@ -1419,7 +1419,7 @@
     {
       "source": "providers/retrieval.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/VoyageExample.cs",
         "examples/csharp-sdk/JinaExample.cs",
@@ -1433,12 +1433,12 @@
         "src/csharp/AnyInfer/Providers/ProviderRegistry.cs"
       ],
       "unsupported_native": [],
-      "notes": "Python Voyage/Jina tabs plus 'Use Voyage and Jina from C#' (keeps #c-proof-boundary) with VoyageExample/JinaExample, the request facts their scripted handlers check, and C# batch limits (Voyage declared 1,000; Jina unknown, 2,048/1,000 local refusals) asserted by retrieval-batching.declared-and-unknown-ceilings. Hosted C# traffic is offline scripted evidence only."
+      "notes": "Python Voyage/Jina tabs plus 'Use Voyage and Jina from C#' (keeps #c-proof-boundary) with VoyageExample/JinaExample, the request facts their scripted handlers check, and C# batch limits (Voyage declared 1,000; Jina unknown, 2,048/1,000 local refusals) asserted by retrieval-batching.declared-and-unknown-ceilings. Hosted C# traffic is offline scripted evidence only. Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "providers/tei.md",
       "scope": "mixed",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/TeiServersExample.cs",
         "examples/csharp-sdk/RetrievalBatchingExample.cs",
@@ -1452,7 +1452,7 @@
         "src/csharp/AnyInfer.TeiProbe/Program.cs"
       ],
       "unsupported_native": [],
-      "notes": "Python setup plus 'Use TEI from C#': loopback instances and operation-filtered discovery (TeiServersExample) and an explicit verified batch ceiling (RetrievalBatchingExample:embed). Offline cases use scripted /info, /embed, /rerank; the same public calls were exercised live against TEI 1.9.4 CPU on 2026-10-22 (AnyInfer.TeiProbe)."
+      "notes": "Python setup plus 'Use TEI from C#': loopback instances and operation-filtered discovery (TeiServersExample) and an explicit verified batch ceiling (RetrievalBatchingExample:embed). Offline cases use scripted /info, /embed, /rerank; the same public calls were exercised live against TEI 1.9.4 CPU on 2026-10-22 (AnyInfer.TeiProbe). Independent review 2026-10-25: findings corrected."
     },
     {
       "source": "providers/vertex.md",

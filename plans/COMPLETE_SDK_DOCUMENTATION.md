@@ -4,9 +4,10 @@
 `DESIGN.md` first.** Each phase ends in a test gate. Record departures beside the
 affected box as `> NOTE:` entries and reconcile this checklist after every work wave.
 
-Status: **in progress**. A later 2026-10-25 request authorized implementing this plan on
-`feature/language-neutral-foundation` (committing and pushing to that branch) and adapting the
-site to the user-supplied brand kit v2. Publication (R6.B) remains separately unauthorized.
+Status: **in progress; resume at R6.A's final re-run, then R6.B when authorized**. A
+2026-10-25 request authorized implementing this plan on `feature/language-neutral-foundation`
+(committing and pushing to that branch) and adapting the site to the user-supplied brand kit v2.
+R0–R5 are implemented on that branch. Publication (R6.B) remains separately unauthorized.
 
 ## Starting point and settled decisions
 
@@ -162,7 +163,7 @@ plan cannot implement them by describing them.
   > The inventory found what CS1591 never reports: undocumented positional record parameters
   > and implicit constructors. Native tests: `AnyInfer.Tests/DocumentationInventoryTests.cs`.
 
-- [ ] **R1.B — Complete XML comments and retain the package boundary.** Enable
+- [x] **R1.B — Complete XML comments and retain the package boundary.** Enable
   `GenerateDocumentationFile` for `src/csharp/AnyInfer/AnyInfer.csproj` only. Author
   meaningful summaries, parameter/return/exception documentation, lifetime/cancellation
   semantics, and supported limits for the real public native API. Work in disjoint
@@ -177,10 +178,18 @@ plan cannot implement them by describing them.
   while DocFX, its assemblies/config/cache and rendered site remain build-only.
   **Test gate:** native build, documentation coverage, targeted namespace tests and
   package-content/consumer checks pass with no unexplained missing-doc diagnostics.
+  > NOTE: `GenerateDocumentationFile` is set on `AnyInfer.csproj` only; CS1591 is not
+  > suppressed and the Release build stays warning-free. `scripts/check_csharp_docs.py --build`
+  > (a `workspace.py` C# step) checks every inventory symbol, including positional record
+  > parameters and implicit constructors, for summaries, parameters, type parameters, returns,
+  > `TODO`/`FIXME`-style placeholders, bare-name summaries, `ADR-n` identifiers, crefs to
+  > non-public or unknown symbols and unearned `inheritdoc`; it reports zero findings over 1,654
+  > symbols (243 types). `check_csharp_package.py` requires `lib/net8.0/AnyInfer.xml` in the
+  > package and rejects DocFX config, cache or site files in it.
 
 ### R2 — Render and integrate the complete C# reference
 
-- [ ] **R2.A — Build the reference adapter.** Add
+- [x] **R2.A — Build the reference adapter.** Add
   `scripts/generate_csharp_reference.py` with a structured result containing generated
   pages, original source paths, and canonical symbol-to-URL/fragment maps. Do not feed
   C# names through the Python `render_symbol()` function. Keep the authored semantic
@@ -197,8 +206,12 @@ plan cannot implement them by describing them.
   containing horizontal scrolling; do not leak workstation paths into source links.
   **Test gate:** fixture and real extraction/render tests, including escaping/generics,
   overload anchors, XML links, collisions and independent R1 coverage, pass.
+  > NOTE: Renders 243 type pages plus `/csharp/api/`. Synthesized record members referenced
+  > by crefs render as code rather than links; constructed generic references link to their
+  > definition. Absolute DocFX source paths (DocFX writes them when it finds no Git metadata,
+  > as in a linked worktree) are made repository-relative; paths outside the checkout fail.
 
-- [ ] **R2.B — Integrate staging, preview, exports and publication builds.** Extend
+- [x] **R2.B — Integrate staging, preview, exports and publication builds.** Extend
   `scripts/prepare_docs.py::prepare()` and `scripts/docs_common.py` to merge generated
   C# pages with authored pages, accounting for them in the manifest and stale-file
   cleanup. Generated pages belong to the `csharp` docs plugin and its independent
@@ -222,10 +235,15 @@ plan cannot implement them by describing them.
   `tests/test_workspace.py`. **Test gate:** strict production build plus cold/warm
   generation, source-change preview, static artifact, search/export and negative tests
   all pass; generated type pages appear in C# navigation and Pagefind results.
+  > NOTE: Navigation names the generated section with the `generated:csharp-api` marker,
+  > expanded by `website/plugins/sidebars.ts` into namespace categories. The C# API export
+  > exceeds one 800,000-byte section, so `export_docs.py` bundles it by namespace (one file
+  > per namespace, falling back to one per page only for a namespace over the budget). CI and
+  > the Pages workflow restore the pinned .NET SDK and DocFX before the docs build.
 
 ### R3 — Complete the C# learning path and executable recipes
 
-- [ ] **R3.A — Finish native installation and first call.** Add focused authored
+- [x] **R3.A — Finish native installation and first call.** Add focused authored
   `docs/guides/csharp-installation.md` and `docs/guides/csharp-quickstart.md`, register
   exact `/csharp/installation/` and `/csharp/quickstart/` routes in the existing metadata
   system, and add them to C# navigation. Preserve `/csharp/` as the SDK overview and
@@ -240,8 +258,11 @@ plan cannot implement them by describing them.
   Python quickstart and migration map, preserving prior Python tab/fragment behavior.
   **Test gate:** a fresh temporary consumer follows the written steps, all new source
   examples run offline, snippet/link checks and desktop/mobile entrypoint tests pass.
+  > NOTE: `tests/test_csharp_quickstart.py` follows the written steps in a temporary
+  > consumer. The installation page documents both the project reference and the checked local
+  > package, and that the package ships `AnyInfer.xml`.
 
-- [ ] **R3.B — Complete the core task guides.** Audit and extend existing shared
+- [x] **R3.B — Complete the core task guides.** Audit and extend existing shared
   `docs/guides/{streaming,structured-output,fallback,tool-loop}.md`, plus
   `docs/guides/{csharp-sdk,python-to-csharp}.md`, with equivalent task-oriented native
   instructions where implemented. Cover buffered/streamed results and error/early-exit
@@ -254,8 +275,11 @@ plan cannot implement them by describing them.
   Keep unsupported Pydantic/MCP/Python decorator behavior explicitly Python-specific.
   **Test gate:** every added recipe compiles and executes an asserted offline path,
   including representative failure/cancellation, and the language tabs/links render.
+  > NOTE: Example cases are discoverable `[ExampleCase("name")]` methods under
+  > `examples/csharp-sdk/Cases/`, run by `ExampleCases.RunAllAsync()` from `Program.cs`; the
+  > runner executes 103 cases offline.
 
-- [ ] **R3.C — Complete retrieval, configuration and operational SDK recipes.** Add
+- [x] **R3.C — Complete retrieval, configuration and operational SDK recipes.** Add
   native recipes for rich requests, embedding/reranking, configuration/credentials/TLS,
   pure metadata vs discovery/health/probes, observers/manifests, explicit pricing/budgets,
   ledger ownership, and request policies to the relevant existing guides or C# pages.
@@ -270,8 +294,11 @@ plan cannot implement them by describing them.
   reduction/history pipelines, batch jobs, OpenTelemetry, keyring or MCP as native C#.
   **Test gate:** exact snippets run offline with substantive assertions; configuration
   and connection examples retain their documented no-network/inert boundaries.
+  > NOTE: Recipes live in `docs/guides/csharp-sdk.md` (grouped by task), observability,
+  > retrieval and TEI pages. TEI's buffered C# calls have the 2026-10-22 TEI 1.9.4 live probe;
+  > Voyage, Jina, Cerebras, Hyperbolic and Nscale are offline scripted evidence only.
 
-- [ ] **R3.D — Add a coherent native cookbook.** Add source-linked, complete programs
+- [x] **R3.D — Add a coherent native cookbook.** Add source-linked, complete programs
   and authored pages at `docs/examples/csharp-{generation,streaming,tools,retrieval,
   observability,policies}.md`, using `/csharp/examples/<topic>/` routes. Combine the
   existing verified primitives into realistic native journeys without reimplementing
@@ -285,10 +312,13 @@ plan cannot implement them by describing them.
   in the R0 ledger only after its recipe has executed. **Test gate:** full native
   example runner and independent snippet-to-runner controls pass; no orphan recipe or
   duplicate authored C# code is accepted.
+  > NOTE: An independent review narrowed claims to what each case asserts and extended three
+  > cases (every round's tool schemas, both release IDs across both targets, a payload-free
+  > rendering); each page has an optional hosted setup labelled as verified offline only.
 
 ### R4 — Review every remaining page for language scope and accuracy
 
-- [ ] **R4.A — Review concepts and reference semantics.** Work through every R0 row,
+- [x] **R4.A — Review concepts and reference semantics.** Work through every R0 row,
   including `docs/concepts/{foundation,targets,events,routing,structured-output,
   capabilities,multimodal-inputs,embeddings,credentials,telemetry,run-manifests,
   budgeting,cost,context-reduction,local,sessions}.md` and
@@ -302,8 +332,10 @@ plan cannot implement them by describing them.
   Preserve every existing route/fragment when a heading changes. **Test gate:** all
   concept/reference rows are reviewed with source evidence, mirrored claims agree,
   legacy anchors pass, and an independent claim review has no unresolved findings.
+  > NOTE: Reviewed against source with ledger evidence. Code defects found while reviewing
+  > (not documentation, so not fixed here) were reported separately for follow-up.
 
-- [ ] **R4.B — Review all other public and contributor surfaces.** Complete the R0
+- [x] **R4.B — Review all other public and contributor surfaces.** Complete the R0
   inventory across root `README.md`, `docs/{index,README,why-anyinfer}.md`, all remaining
   guides/examples/providers/sidecar pages, contributor setup/releasing/testing/architecture,
   `src/csharp/README.md`, and homepage/navbar/footer/search/404 components under
@@ -316,10 +348,13 @@ plan cannot implement them by describing them.
   sidecar/operator instructions useful rather than forcing fictitious C# counterparts.
   **Test gate:** all published/authored rows and repository-only entrypoints are reviewed;
   generated-index, agent/shim, example, link and source-documentation gates pass.
+  > NOTE: Three independent read-only reviews covered the 23 pages still pending (entry
+  > pages, mixed task and provider guides, the cookbook); their findings were corrected and
+  > every ledger row is now `reviewed`, with `require_reviewed: true`.
 
 ### R5 — Make independent SDK versioning operational
 
-- [ ] **R5.A — Implement the real snapshot workflow without inventing history.**
+- [x] **R5.A — Implement the real snapshot workflow without inventing history.**
   Extend `scripts/build_docs.py` with `snapshot --sdk python|csharp --version VERSION`,
   validating the actual outgoing SDK metadata and fully prepared reference/symbol maps
   before invoking the corresponding Docusaurus docs-plugin snapshot. Use SDK-prefixed
@@ -332,6 +367,10 @@ plan cannot implement them by describing them.
   Do not create production snapshots until an actual SDK release calls for them.
   **Test gate:** independent snapshot/restore fixtures, archived links, version selector,
   generated-reference identity, local search and section exports pass for each SDK.
+  > NOTE: `scripts/docs_versions.py` implements `snapshot`/`remove-snapshot` with fixture
+  > tests in `tests/test_docs_versions.py`; no production archive exists. A real C#
+  > `0.1.0-proof` snapshot rehearsal in a scratch worktree failed on absolute DocFX source
+  > paths (fixed in R2.A); the full rehearsal build has not been re-run since.
 
 ### R6 — Final acceptance, public cutover and recovery
 
@@ -352,6 +391,25 @@ plan cannot implement them by describing them.
   any unrelated full-gate failure rather than declaring the entire suite green.
   **Test gate:** documentation-specific gates and artifact/browser acceptance all pass;
   full-gate outcomes and independent content/coverage review are explicitly recorded.
+  > NOTE: Full `workspace.py check` at `d2a3577`: 25 of 28 steps passed, including docs-check,
+  > docs-build and all 15 C# steps. Lint and two docs-control import failures were fixed after
+  > that run. Unrelated, and reproduced on the plan's starting commit `136b3f8`: nine serve
+  > streaming tests and the `serve invariants (ADR-009)` conformance step fail with the unpinned
+  > Starlette 1.10.0 in this environment, plus one portable-driver fixture test. Demo-app tests
+  > (229) pass once the container has `libEGL`. `npm run typecheck` passes; browser acceptance
+  > passed 12 of 12 against that build after one test fix. The C# accounting fixture clock was
+  > fixed so the parity step no longer spins on Linux. Remaining: re-run the full gate and
+  > browser acceptance at the final revision before checking this box.
+  > Left for the next session, in order: (1) re-run `workspace.py check` and browser
+  > acceptance at the final revision; (2) re-run the R5.A snapshot rehearsal in a scratch
+  > worktree (snapshot C# `0.1.0-proof`, production build, then inspect the version menu,
+  > archived routes and search; create no production archive); (3) fix three review findings
+  > left open: `docs/reference/errors.md`'s TransportError card says a retry cannot duplicate
+  > output already seen, but a mid-stream transport failure is retried after deltas went out;
+  > `docs/providers/retrieval.md`'s Dimensionality row shows "—" for Voyage although both SDKs
+  > send `output_dimension`; and `maintenance/changes/tei-1-9-4.json` still calls the native
+  > live probe pending while the docs cite the 2026-10-22 C# run, so confirm the run and
+  > reconcile one of them.
 
 - [ ] **R6.B — Publish through the existing branch process and prove recovery.** This
   carries forward the migration's unexecuted publication/recovery work. When separately
