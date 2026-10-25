@@ -1,0 +1,21 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../src/csharp/AnyInfer",
+          "files": [
+            "AnyInfer.csproj"
+          ]
+        }
+      ],
+      "dest": ".cache/csharp-reference/metadata",
+      "outputFormat": "mref",
+      "namespaceLayout": "flattened",
+      "memberLayout": "samePage",
+      "enumSortOrder": "declaringOrder",
+      "includePrivateMembers": false,
+      "disableGitFeatures": true
+    }
+  ]
+}

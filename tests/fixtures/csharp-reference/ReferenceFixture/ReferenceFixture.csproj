@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Build-only DocFX extraction fixture for the generated C# reference renderer. It is not
+       part of AnyInfer.sln, is never packed, and exists to exercise declaration shapes the
+       real assembly may not currently expose. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ReferenceFixture</RootNamespace>
+  </PropertyGroup>
+</Project>

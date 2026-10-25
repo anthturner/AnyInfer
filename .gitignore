@@ -53,3 +53,7 @@ src/csharp/**/obj/
 src/csharp/**/TestResults/
 examples/csharp-sdk/bin/
 examples/csharp-sdk/obj/
+
+# DocFX extraction fixture build output.
+tests/fixtures/csharp-reference/**/bin/
+tests/fixtures/csharp-reference/**/obj/

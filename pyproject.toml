@@ -75,6 +75,8 @@ dev = [
   "mypy>=1.11",
   "import-linter>=2.0",
   "griffe2md==1.5.0",
+  # Build-only: reads DocFX metadata for the generated C# API reference; never a runtime dependency.
+  "PyYAML==6.0.3",
   "PySide6>=6.6",
   "markdown>=3.6",
   # Test-only: lets the OTel bridge tests assert against real exported spans rather than

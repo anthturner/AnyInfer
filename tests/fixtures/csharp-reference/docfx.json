@@ -1,0 +1,19 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "ReferenceFixture",
+          "files": ["ReferenceFixture.csproj"]
+        }
+      ],
+      "dest": "../../../website/.cache/csharp-reference/fixture-metadata",
+      "outputFormat": "mref",
+      "namespaceLayout": "flattened",
+      "memberLayout": "samePage",
+      "enumSortOrder": "declaringOrder",
+      "includePrivateMembers": false,
+      "disableGitFeatures": true
+    }
+  ]
+}

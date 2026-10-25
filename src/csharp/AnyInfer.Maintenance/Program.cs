@@ -10,6 +10,13 @@ if (PublicApiArguments.IsRequested(args))
     return;
 }
 
+if (DocumentationInventoryArguments.IsRequested(args))
+{
+    var inventoryArguments = DocumentationInventoryArguments.Parse(args);
+    await DocumentationInventory.WriteAsync(inventoryArguments.Output, inventoryArguments.Assembly);
+    return;
+}
+
 var arguments = Arguments.Parse(args);
 using var contextDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(arguments.Context));
 var context = Context.Validate(contextDocument.RootElement);

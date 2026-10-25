@@ -1,3 +1,5 @@
 # Build-only Python API extraction dependencies. Keep these out of the SDK package.
 griffe2md==1.5.0
 Markdown==3.10.3
+# Reads DocFX managed-reference metadata for the generated C# API reference.
+PyYAML==6.0.3
