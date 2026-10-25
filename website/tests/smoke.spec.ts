@@ -123,7 +123,9 @@ test.describe('the static documentation artifact', () => {
 
   test('teaches a first call in each SDK from executed source', async ({page}) => {
     await page.goto('/python/quickstart/#your-first-call');
-    await expect(page.locator('.theme-doc-markdown pre').first()).toContainText('import anyinfer');
+    const python = page.locator('.theme-doc-markdown pre').filter({hasText: 'import anyinfer'}).first();
+    await expect(python).toBeVisible();
+    await expect(python).toContainText('generate(');
     await page.goto('/csharp/quickstart/');
     const article = page.locator('.theme-doc-markdown');
     await expect(article.getByRole('heading', {level: 1})).toBeVisible();
