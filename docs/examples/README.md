@@ -1,13 +1,12 @@
 # Examples
 
-Small, complete Python programs, not fragments. Each one is a pattern the library was designed
-around. The shape of every Python example is exercised in CI against the in-process fake
-providers (`tests/test_docs_examples.py`); whether a program runs offline as written, and
+Small, complete programs, not fragments. Each one is a pattern the library was designed around.
+The [Python cookbook](#python-cookbook) programs are exercised in CI against the in-process fake
+providers (`tests/test_docs_examples.py`); the [C# cookbook](#c-cookbook) programs are executed
+and asserted by the offline example runner. Whether a program runs offline as written, and
 against what, is stated on each page.
 
-For native .NET, use the [C# SDK guide](../guides/csharp-sdk.md) and its source-linked,
-offline-compiled runner in `examples/csharp-sdk/AnyInfer.Examples.csproj`. Those C# examples are
-separate from this Python cookbook.
+## Python Cookbook
 
 | Example | What it shows |
 |---|---|
@@ -16,6 +15,24 @@ separate from this Python cookbook.
 | [Distill a corpus](distill-a-corpus.md) | Map/reduce over material that will never fit, with cost preflight and a deterministic reducer |
 | [Regression-test a fallback chain](golden-manifest.md) | A golden run manifest that asserts inference behavior instead of model prose |
 | [Semantic search over a small corpus](semantic-search.md) | Embedding a corpus, index/query space safety, and reranking, with your own in-memory similarity math |
+
+## C# Cookbook
+
+Complete native .NET programs for the C# prerelease SDK. Each page includes source that the offline
+example runner (`examples/csharp-sdk/AnyInfer.Examples.csproj`) executes and asserts against
+scripted HTTP responses; running against hosted providers is optional on every page. Start with
+[installation](../guides/csharp-installation.md) and the [C# quickstart](../guides/csharp-quickstart.md).
+
+| Example | What it shows |
+|---|---|
+| [Summarize with configured fallback](csharp-generation.md) | Version 1 JSON configuration, a two-target route with retry and the health gate, schema-validated output deserialized into a record, and the attempt trail |
+| [Stream to a console with cancellation](csharp-streaming.md) | Rendering text deltas, Ctrl+C and deadline cancellation, restarting after a mid-stream failure, and the synchronous stream |
+| [Run a tool-calling assistant](csharp-tools.md) | Two typed `Tool.From` handlers, the round budget, handler errors returned to the model, and cancellation reaching a running handler |
+| [Search a corpus with embeddings and reranking](csharp-retrieval.md) | Batched embedding under caller-owned IDs, embedding-space checks, and reranking with TEI, Voyage, or Jina |
+| [Build an audit trail from telemetry and manifests](csharp-observability.md) | A typed observer, a JSONL sink, payload opt-in, and partial, terminal, validated, and rendered run manifests |
+| [Meter spend across tenants](csharp-policies.md) | Explicit prices and context windows, spend ceilings, a caller-owned ledger and store, pacing, context-window fallback, and unknown cost |
+
+## More
 
 Comparing targets without spending anything is a guide rather than an example; see
 [compare targets without spending](../guides/comparing-targets.md).

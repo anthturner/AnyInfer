@@ -195,6 +195,28 @@
       },
       {
         "Semantic Search over a Small Corpus": "examples/semantic-search.md"
+      },
+      {
+        "C# Cookbook": [
+          {
+            "Summarize with Configured Fallback": "examples/csharp-generation.md"
+          },
+          {
+            "Stream to a Console with Cancellation": "examples/csharp-streaming.md"
+          },
+          {
+            "Run a Tool-Calling Assistant": "examples/csharp-tools.md"
+          },
+          {
+            "Search a Corpus with Embeddings and Reranking": "examples/csharp-retrieval.md"
+          },
+          {
+            "Build an Audit Trail from Telemetry and Manifests": "examples/csharp-observability.md"
+          },
+          {
+            "Meter Spend Across Tenants": "examples/csharp-policies.md"
+          }
+        ]
       }
     ]
   },
