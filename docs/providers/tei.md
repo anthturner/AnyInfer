@@ -65,13 +65,56 @@ The two tested deployments used `BAAI/bge-small-en-v1.5` at revision
 for reranking. `GET /info` reported TEI 1.9.4 for both processes. These are tested
 pins, not required choices for other deployments.
 
+## Use TEI from C#
+
+The C# SDK (prerelease) has a built-in `tei` descriptor for buffered embedding and reranking.
+Configure each server process as its own instance, matching the loopback ports above:
+
+```csharp
+--8<-- "examples/csharp-sdk/TeiServersExample.cs:servers"
+```
+
+### Discover the Served Models
+
+As in Python, the model half of a target is advisory. `ModelsAsync` reads `GET /info` and,
+given an operation, returns the served model only when the process embeds or reranks
+respectively, so a server started with the other kind of model is filtered out before any
+operation request:
+
+```csharp
+--8<-- "examples/csharp-sdk/TeiServersExample.cs:discover"
+```
+
+`topN` is applied client-side, after sorting by score, and each ranked item keeps your document
+ID and its original index. Usage stays unknown (`null`), never zero, so a `SpendLedger` counts
+these requests in `UnknownRequests`. The offline runner executes this recipe against scripted
+`/info`, `/embed`, and `/rerank` responses and checks the discovered targets, the unknown usage,
+the normalized `EmbeddingSpace`, the caller IDs, and that a reranker on the embedding port stops
+the recipe before any operation request. The same public calls, operation-filtered discovery
+followed by buffered embedding and reranking, were exercised against the pinned TEI 1.9.4 CPU
+deployment on 2026-10-22.
+
+### Batch Against a Verified Server Limit
+
+The C# descriptor does not hydrate the limits `/info` reports: the offline case's `/info`
+declares `max_client_batch_size` 2, and three inputs still go in one request. When you have
+verified a server's limit, pass it explicitly:
+
+```csharp
+--8<-- "examples/csharp-sdk/RetrievalBatchingExample.cs:embed"
+```
+
+See [batch large retrieval requests](../guides/csharp-sdk.md#batch-large-retrieval-requests) for
+the batch-failure and rerank rules, and the [C# retrieval recipes](../guides/csharp-sdk.md#embed-and-rerank)
+for raw payload retention, manifests, operation routes, and `EmbeddingSpace` checks.
+
 ## Notes
 
 - **Vectors are unit-normalized by default**: the server's documented `normalize: true`
   default is left in force and reported on `result.space.normalized`; a
   `provider_options={"tei": {"normalize": False}}` override is reported as sent.
 - **Unknown usage**: TEI's response body carries no token counts, so usage accounting
-  fields remain unknown (`None` in Python), never zero. The observed `x-compute-tokens`
+  fields remain unknown (`None` in Python, `null` in C#), never zero. The observed `x-compute-tokens`
   header is not in the published API contract and is not used for accounting.
 - **`top_n` is applied client-side**: the endpoint has no native parameter; the
   adapter sorts by score and truncates, and the contract snapshot records that.
@@ -80,8 +123,9 @@ pins, not required choices for other deployments.
   Supply a verified `BatchPolicy(max_items_override=...)` when you need client-side
   batching against a known server ceiling.
 - A server configured with `--api-key` / `API_KEY` expects a Bearer token. In Python,
-  `api_key="env://TEI_API_KEY"` is the client-side credential convention; it is separate
-  from the server's `API_KEY` environment variable.
+  `api_key="env://TEI_API_KEY"` is the client-side credential convention, and in C# the
+  same reference is passed as `apiKey`; it is separate from the server's `API_KEY`
+  environment variable.
 - Omitted or null request `truncate` inherits the server's `auto_truncate` setting. In the
   tested deployment that setting was true; an explicit `truncate: false` returned 422 for
   an over-length input. See the current [wire contract](https://github.com/anthturner/AnyInfer/blob/main/contracts/tei.md) for details.
@@ -103,5 +147,6 @@ Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 
   shape.
 - [Embeddings and reranking](../concepts/embeddings.md): the normalized operations and
   batching rules.
+- [C# SDK guide](../guides/csharp-sdk.md#embed-and-rerank): the native retrieval recipes.
 
 </div>
