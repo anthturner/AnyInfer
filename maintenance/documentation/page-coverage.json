@@ -561,7 +561,7 @@
     {
       "source": "examples/csharp-generation.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/CookbookGenerationExample.cs",
         "examples/csharp-sdk/Cases/CookbookGenerationCases.cs",
@@ -569,12 +569,12 @@
         "tests/test_csharp_docs_examples.py"
       ],
       "unsupported_native": [],
-      "notes": "Config-driven cerebras to local openai-compat route; hosted Cerebras verified offline only; version 1 config has no retry block."
+      "notes": "Config-driven cerebras to local openai-compat route; hosted Cerebras verified offline only; version 1 config has no retry block. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/csharp-observability.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/CookbookObservabilityExample.cs",
         "examples/csharp-sdk/Cases/CookbookObservabilityCases.cs",
@@ -584,12 +584,12 @@
       "unsupported_native": [
         "OpenTelemetry bridge (anyinfer.otel)"
       ],
-      "notes": "IObserver and JSONL sink, payload opt-in, partial/terminal manifest, embedded-schema validation, digest, render."
+      "notes": "IObserver and JSONL sink, payload opt-in, partial/terminal manifest, embedded-schema validation, digest, render. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/csharp-policies.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/CookbookPoliciesExample.cs",
         "examples/csharp-sdk/Cases/CookbookPoliciesCases.cs",
@@ -597,24 +597,24 @@
         "tests/test_csharp_docs_examples.py"
       ],
       "unsupported_native": [],
-      "notes": "Override pricing and windows, SpendPolicy, caller ledger and SpendStore, RateLimits queued_ms, context-window fallback, CachePolicy, unknown cost."
+      "notes": "Override pricing and windows, SpendPolicy, caller ledger and SpendStore, RateLimits queued_ms, context-window fallback, CachePolicy, unknown cost. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/csharp-retrieval.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/CookbookRetrievalExample.cs",
         "examples/csharp-sdk/Cases/CookbookRetrievalCases.cs",
         "tests/test_csharp_docs_examples.py"
       ],
       "unsupported_native": [],
-      "notes": "TEI/Voyage/Jina deployments; TEI live evidence date restated from the repository; Voyage and Jina offline only."
+      "notes": "TEI/Voyage/Jina deployments; TEI live evidence date restated from the repository; Voyage and Jina offline only. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/csharp-streaming.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/CookbookStreamingExample.cs",
         "examples/csharp-sdk/Cases/CookbookStreamingCases.cs",
@@ -622,12 +622,12 @@
         "tests/test_csharp_docs_examples.py"
       ],
       "unsupported_native": [],
-      "notes": "Async and sync renderer; Ctrl+C shares the deadline token, only the deadline path is executed."
+      "notes": "Async and sync renderer; Ctrl+C shares the deadline token, only the deadline path is executed. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/csharp-tools.md",
       "scope": "csharp",
-      "review": "pending",
+      "review": "reviewed",
       "evidence": [
         "examples/csharp-sdk/CookbookToolsExample.cs",
         "examples/csharp-sdk/Cases/CookbookToolsCases.cs",
@@ -638,7 +638,7 @@
         "@ai.tool decorator",
         "MCP tool sources"
       ],
-      "notes": "Tool.From local functions, ledger totals across rounds; the built-in chat adapter sends error results as text without a flag."
+      "notes": "Tool.From local functions, ledger totals across rounds; the built-in chat adapter sends error results as text without a flag. Independent review 2026-10-25: claims narrowed or assertions extended to match the runner; hosted setup labelled as offline-verified."
     },
     {
       "source": "examples/distill-a-corpus.md",

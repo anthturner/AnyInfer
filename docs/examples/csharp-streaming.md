@@ -14,9 +14,8 @@ SDK's; the renderer only decides what to show.
   [Install the C# SDK](../guides/csharp-installation.md), and the first call from the
   [C# quickstart](../guides/csharp-quickstart.md). The C# SDK is a locally packaged
   `0.1.0-proof` prerelease, not a NuGet package.
-- Nothing else to run it offline. To stream from a real endpoint, pass `ProviderSettings` for it,
-  for example a self-hosted OpenAI-compatible server or the built-in Cerebras, Hyperbolic, or
-  Nscale descriptors with an `env://` credential reference.
+- Nothing else to run it offline. Streaming from a real endpoint is optional; see
+  [Hosted setup](#hosted-setup-optional).
 
 ## The Program
 
@@ -48,17 +47,20 @@ SDK's; the renderer only decides what to show.
   separately.
 - **The synchronous variant.** `Client.Stream` returns a `SyncStream` that starts its generation as
   soon as it is created and buffers events for one consumer. Enumerate it once, dispose it with
-  `using`, and pass the cancellation token when you create it; cancelling the token makes the next
-  wait throw `OperationCanceledException`.
+  `using`, and pass the cancellation token when you create it; after the token is cancelled, the
+  enumeration delivers any events already buffered and then throws `OperationCanceledException`.
 
 ## Offline Run
 
 The example runner streams scripted server-sent events through each path and asserts the outcome.
-The cases are in `examples/csharp-sdk/Cases/CookbookStreamingCases.cs`; from `src/csharp`, run:
+The cases are in [`Cases/CookbookStreamingCases.cs`](../../examples/csharp-sdk/Cases/CookbookStreamingCases.cs); from `src/csharp`, run:
 
 ```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
+
+The runner executes every example case, not only this page's, and prints
+`example case <name>: ok` for each one that passes.
 
 The `cookbook.streaming.*` cases check that:
 
@@ -72,11 +74,17 @@ The `cookbook.streaming.*` cases check that:
   receives no request, and the outcome is `Cancelled` with the partial text;
 - a malformed record after visible text ends the answer as `Broken` with
   `StreamProtocolException`, and the backup receives no request;
-- the synchronous variant streams the same answer and stops when its token is cancelled;
+- the synchronous variant streams an answer and stops when its token is cancelled;
 - every transport given to the client is disposed once when the client is disposed, including a
   target's transport that was never used.
 
 The Ctrl+C handler shares the deadline's token; the runner exercises the deadline path.
+
+## Hosted Setup (Optional)
+
+To stream from a real endpoint, pass `ProviderSettings` for it, for example a self-hosted
+OpenAI-compatible server or the built-in Cerebras, Hyperbolic, or Nscale descriptors with an
+`env://` credential reference. This program is verified offline against scripted responses only.
 
 ## Before Production
 

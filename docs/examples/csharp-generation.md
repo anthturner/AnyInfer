@@ -3,8 +3,9 @@
 A small release-notes summarizer service in native C#. It reads version 1 JSON configuration,
 builds one `AsyncClient` from it, and summarizes each release note into an application record
 through a two-target route: a hosted Cerebras model first, a self-hosted OpenAI-compatible server
-second. Every outcome carries the routing trail and the reported usage of the call that won, so an
-operator can see which provider answered and why.
+second. Each summary carries the routing trail and the reported usage of the call that won, and a
+release whose route is exhausted carries the trail of every attempt, so an operator can see which
+provider answered and why.
 
 The program calls the SDK for everything that is policy: the route's order, same-target retry,
 the health gate, schema enforcement, validation and repair all happen inside `GenerateAsync`. The
@@ -59,20 +60,23 @@ application code only chooses inputs and reports results.
 
 The example runner executes this program with the shipped configuration read through
 `AnyInferConfig.Load`, after giving each configured instance a scripted HTTP handler, and asserts
-what the program observed. The cases are in `examples/csharp-sdk/Cases/CookbookGenerationCases.cs`;
+what the program observed. The cases are in [`Cases/CookbookGenerationCases.cs`](../../examples/csharp-sdk/Cases/CookbookGenerationCases.cs);
 from `src/csharp`, run:
 
 ```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
+The runner executes every example case, not only this page's, and prints
+`example case <name>: ok` for each one that passes.
+
 The `cookbook.generation.*` cases check that:
 
 - the primary is retried once on HTTP 503 and then abandoned, the local server's first answer fails
   validation and is repaired, and the second release skips the unhealthy primary;
 - the `env://CEREBRAS_API_KEY` reference reached only the hosted endpoint as a Bearer header, the
-  keyless local server received no `Authorization` header, and the release ID never left the
-  process;
+  keyless local server received no `Authorization` header, and neither release ID appears in any
+  request to either target;
 - an exhausted route is reported per release, and the second release fails without another
   request because both targets are marked unhealthy;
 - an exhausted repair budget is reported as `schema_violation` with no request to the second

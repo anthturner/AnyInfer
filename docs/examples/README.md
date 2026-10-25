@@ -2,9 +2,10 @@
 
 Small, complete programs, not fragments. Each one is a pattern the library was designed around.
 The [Python cookbook](#python-cookbook) programs are exercised in CI against the in-process fake
-providers (`tests/test_docs_examples.py`); the [C# cookbook](#c-cookbook) programs are executed
-and asserted by the offline example runner. Whether a program runs offline as written, and
-against what, is stated on each page.
+providers (`tests/test_docs_examples.py`); the [C# cookbook](#c-cookbook) programs are static
+classes whose methods the offline example runner calls and asserts, so they drop into an existing
+.NET application rather than running as their own `Main`. Whether a program runs offline as
+written, and against what, is stated on each page.
 
 ## Python Cookbook
 

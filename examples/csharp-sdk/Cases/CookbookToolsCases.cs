@@ -26,17 +26,20 @@ internal static class CookbookToolsCases
             && reply.Totals is { Requests: 3, InputTokens: 100, OutputTokens: 41, UnknownRequests: 3 },
             "The assistant did not run both tools in order or did not total every round.");
 
-        // Every round declares both tools with their generated schemas.
-        var first = handler.Requests[0].Json();
-        var tools = first.GetProperty("tools").EnumerateArray().Select(static tool => tool.GetProperty("function")).ToArray();
+        // Every round declares both tools with the same generated schemas, none exposing the cancellation token.
+        var rounds = handler.Requests.Select(static request => request.Json().GetProperty("tools").EnumerateArray()
+            .Select(static tool => tool.GetProperty("function")).ToArray()).ToArray();
+        var tools = rounds[0];
         var quote = tools[1].GetProperty("parameters");
-        ExampleSupport.Require(tools.Select(static tool => tool.GetProperty("name").GetString()).SequenceEqual(["lookup_order", "quote_refund"])
+        ExampleSupport.Require(rounds.Length == 3
+            && rounds.All(round => round.Select(static tool => tool.GetRawText()).SequenceEqual(tools.Select(static tool => tool.GetRawText())))
+            && tools.All(static tool => !tool.GetProperty("parameters").GetProperty("properties").TryGetProperty("token", out _))
+            && tools.Select(static tool => tool.GetProperty("name").GetString()).SequenceEqual(["lookup_order", "quote_refund"])
             && tools[0].GetProperty("parameters").GetProperty("properties").GetProperty("orderId").GetProperty("type").GetString() == "string"
             && quote.GetProperty("properties").GetProperty("units").GetProperty("type").GetString() == "integer"
             && quote.GetProperty("properties").GetProperty("includeShipping").GetProperty("type").GetString() == "boolean"
             && quote.GetProperty("required").EnumerateArray().Select(static name => name.GetString()).SequenceEqual(["orderId", "units"])
-            && !quote.GetProperty("additionalProperties").GetBoolean()
-            && !quote.GetProperty("properties").TryGetProperty("token", out _),
+            && !quote.GetProperty("additionalProperties").GetBoolean(),
             "The typed handler signatures did not become the declared tool schemas.");
 
         // The second round carries both results; the failed lookup is returned to the model as text.

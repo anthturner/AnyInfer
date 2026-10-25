@@ -57,11 +57,14 @@ memory.
 
 The example runner answers TEI-, Voyage-, and Jina-shaped requests from a deterministic offline
 server whose vectors count a few vocabulary concepts, so the expected ranking is exact. The cases
-are in `examples/csharp-sdk/Cases/CookbookRetrievalCases.cs`; from `src/csharp`, run:
+are in [`Cases/CookbookRetrievalCases.cs`](../../examples/csharp-sdk/Cases/CookbookRetrievalCases.cs); from `src/csharp`, run:
 
 ```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
+
+The runner executes every example case, not only this page's, and prints
+`example case <name>: ok` for each one that passes.
 
 The `cookbook.retrieval.*` cases check that:
 
@@ -88,8 +91,9 @@ The `cookbook.retrieval.*` cases check that:
 ## Before Production
 
 - Persist the index together with its `EmbeddingSpace`, and rebuild it when the space changes.
-- Set `maxBatchInputs` from your deployment's documented or tested limit, and choose
-  `maxConcurrency` for the provider's rate limits.
+- Set the program's `maxBatchInputs` (which becomes the `BatchPolicy` `maxItemsOverride`) from
+  your deployment's documented or tested limit, and choose `maxConcurrency` for the provider's
+  rate limits.
 - Replace the linear scan with a vector store once the corpus no longer fits comfortably in
   memory; keep the space check and the caller-owned IDs.
 - Ask for more shortlist candidates than results, so the reranker has something to reorder.

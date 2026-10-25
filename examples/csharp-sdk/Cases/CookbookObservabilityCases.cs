@@ -59,6 +59,7 @@ internal static class CookbookObservabilityCases
         ExampleSupport.Require(RunManifest.FromJson(trail.ArchivedJson).ToJson() == trail.ArchivedJson
             && !trail.ArchivedJson.Contains(Ticket, StringComparison.Ordinal)
             && trail.Rendered.StartsWith($"run {requestId} - complete", StringComparison.Ordinal)
+            && !trail.Rendered.Contains(Ticket, StringComparison.Ordinal)
             && trail.Rendered.Contains("cost        unknown (no trusted pricing)", StringComparison.Ordinal)
             && trail.Generation.Structured is Json.JsonObject structured
             && structured.TryGetValue("queue", out var queue) && queue is Json.JsonString { Value: "shipping" },

@@ -7,8 +7,8 @@ an accounting file across runs, paces a hosted gateway client-side, sends inputs
 the small model to a larger one, and keeps self-hosted work whose cost cannot be known out of the
 "free" column.
 
-None of these decisions are made by the application at request time: the program states policy as
-client and request inputs, and reads the results.
+No policy is enforced by application code: the program states policy as client and request
+inputs, and reads the results.
 
 ## Before You Start
 
@@ -16,8 +16,8 @@ client and request inputs, and reads the results.
   [Install the C# SDK](../guides/csharp-installation.md), and the first call from the
   [C# quickstart](../guides/csharp-quickstart.md). The C# SDK is a locally packaged
   `0.1.0-proof` prerelease, not a NuGet package.
-- Nothing else to run it offline. Against real servers, an OpenAI-compatible gateway serving the
-  two priced models and, optionally, a self-hosted OpenAI-compatible server.
+- Nothing else to run it offline. Running it against real servers is optional; see
+  [Hosted setup](#hosted-setup-optional).
 
 ## The Program
 
@@ -64,13 +64,16 @@ client and request inputs, and reads the results.
 
 The example runner answers the gateway and the self-hosted server with scripted responses that
 report token usage, and asserts the money. The cases are in
-`examples/csharp-sdk/Cases/CookbookPoliciesCases.cs`; from `src/csharp`, run:
+[`Cases/CookbookPoliciesCases.cs`](../../examples/csharp-sdk/Cases/CookbookPoliciesCases.cs); from `src/csharp`, run:
 
 ```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
-The `cookbook.policies.*` cases check that, with a $0.05 run budget:
+The runner executes every example case, not only this page's, and prints
+`example case <name>: ok` for each one that passes.
+
+The `cookbook.policies.metered-batch` case runs the batch with a $0.05 run budget and checks that:
 
 - a short job is served by `gateway:small` and costs $0.00039 (1,200 input tokens at $0.20 per
   million and 250 output tokens at $0.60 per million);
@@ -81,11 +84,23 @@ The `cookbook.policies.*` cases check that, with a $0.05 run budget:
 - a second long document is refused before dispatch because $0.02651 already spent plus its
   estimate would pass $0.05, so the gateway receives exactly two requests;
 - the ledger's totals by target and by tenant, the persisted `2026-10` bucket, and the printed
-  report all agree;
+  report all agree.
+
+With a $1 run budget, the other `cookbook.policies.*` cases check that:
+
 - a later run adds its spend to the same bucket in the version 1 store file, and a document whose
   estimate on the large model is above the $0.04 per-request ceiling is refused before dispatch;
 - with `refuseUnknownCost`, the self-hosted job is refused before dispatch with no estimate, and
   the server receives nothing.
+
+## Hosted Setup (Optional)
+
+`Providers` names a placeholder gateway, `https://llm-gateway.example/v1`, with models `small` and
+`large`, and a self-hosted server at `http://127.0.0.1:8000/v1`. To run against real servers,
+replace them with your own `ProviderSettings`, export the gateway key the settings reference
+(`LLM_GATEWAY_KEY` here), and replace `Facts` with the prices and context windows of the models you
+actually call. The self-hosted server must be running whenever a job is self-hosted. This program
+is verified offline against scripted responses only.
 
 ## Before Production
 
@@ -96,6 +111,10 @@ The `cookbook.policies.*` cases check that, with a $0.05 run budget:
 - Keep one writer per accounting file, or coordinate writers yourself; the store is not a
   multi-process ledger.
 - Decide whether unknown cost is acceptable for each deployment, and set `onUnknown` accordingly.
+- The program catches only `SpendLimitException`. Any other failure, such as
+  `AllTargetsFailedException`, leaves `RunAsync` before the run's ledger is added to the store, so
+  catch provider failures per job, or accumulate in a `finally` block, when a partial run's spend
+  must be recorded.
 - Set `RateLimits` from the provider's published limits; with `respectHeaders` the limiter can also
   wait on provider allowance headers where the descriptor declares them.
 

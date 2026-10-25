@@ -12,8 +12,8 @@ none of it contains the ticket text.
   [Install the C# SDK](../guides/csharp-installation.md), and the first call from the
   [C# quickstart](../guides/csharp-quickstart.md). The C# SDK is a locally packaged
   `0.1.0-proof` prerelease, not a NuGet package.
-- Nothing else to run it offline. Against a real endpoint, pass `ProviderSettings` and a route
-  for it; the audit trail does not depend on the provider.
+- Nothing else to run it offline. Running it against a real endpoint is optional; see
+  [Hosted setup](#hosted-setup-optional).
 
 ## The Program
 
@@ -33,12 +33,15 @@ none of it contains the ticket text.
   `payloads: true` opts in one observer; the others, and the manifest, stay payload-free.
   Manifest payload capture is a separate client setting, `manifestPayloads`.
 - **One request, one ID.** Every event of the call carries the same request ID as its manifest.
-  For a primary that fails and a backup that answers, the observer sees `RequestStarted`, then
+  The runner's route turns same-target retries off (`new Retry(MaxAttempts: 1)`), so for a primary
+  that fails and a backup that answers, the observer sees `RequestStarted`, then
   `TargetResolved`, `AttemptStarted`, and `UsageEstimated` for the primary, `FallbackTriggered`
   with a credential-safe `ErrorInfo`, the same three events for the backup, then `FirstToken`,
-  `AttemptCompleted`, and `RequestCompleted`. `UsageEstimated` is the context gate's pre-dispatch
-  input estimate, which runs by default; the usage in `RequestCompleted` is what the provider
-  reported.
+  `AttemptCompleted`, and `RequestCompleted`. Under the default `Retry`, a retryable failure such
+  as HTTP 503 is first retried on the primary, which adds `RetryScheduled` and a second
+  `AttemptStarted` and `UsageEstimated` before `FallbackTriggered`. `UsageEstimated` is the context
+  gate's pre-dispatch input estimate, which runs by default on every attempt; the usage in
+  `RequestCompleted` is what the provider reported.
 - **Partial, then terminal.** With manifest capture on, `stream.Manifest` is available before the
   stream is consumed and is marked incomplete, with no attempts and no resolved target. After
   completion, `Generation.Manifest` holds the committed manifest: requested and resolved route, each
@@ -56,16 +59,19 @@ none of it contains the ticket text.
 
 The example runner sends the triage call through a primary that answers HTTP 503 and a backup that
 streams the triage object, then asserts the trail. The cases are in
-`examples/csharp-sdk/Cases/CookbookObservabilityCases.cs`; from `src/csharp`, run:
+[`Cases/CookbookObservabilityCases.cs`](../../examples/csharp-sdk/Cases/CookbookObservabilityCases.cs); from `src/csharp`, run:
 
 ```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
+The runner executes every example case, not only this page's, and prints
+`example case <name>: ok` for each one that passes.
+
 The `cookbook.observability.*` cases check that:
 
-- the observer receives the eleven-event fallback sequence above, all with the manifest's request
-  ID, with `PromptText` and `ResponseText` absent and the ticket label present as metadata;
+- with retries off, the observer receives the eleven-event fallback sequence above, all with the
+  manifest's request ID, with `PromptText` and `ResponseText` absent and the ticket label present as metadata;
 - the partial manifest is incomplete, the terminal manifest is the generation's, records the
   abandoned primary and the successful backup, the schema name and digest, prompt-based
   enforcement, and reported usage with unknown cost;
@@ -77,6 +83,13 @@ The `cookbook.observability.*` cases check that:
   and the manifest do not;
 - when both targets fail, the program throws `AllTargetsFailedException` and the JSONL file still
   ends with `RequestFailed`.
+
+## Hosted Setup (Optional)
+
+The audit trail does not depend on the provider. To run the program against a real endpoint,
+pass `ProviderSettings` for it, with any credential as an `env://` reference, and a route that
+names its targets; keep the default `Retry` unless you want the retry-free sequence above. This
+program is verified offline against scripted responses only.
 
 ## What Is Not Native
 

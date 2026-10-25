@@ -66,8 +66,9 @@ internal static class CookbookGenerationCases
         ExampleSupport.Require(repair.Length == 4
             && repair[2].GetProperty("role").GetString() == "assistant"
             && repair[2].GetProperty("content").GetString()!.Contains("\"unknown\"", StringComparison.Ordinal)
-            && local.Requests.All(static request => !request.Body.Contains("r-101", StringComparison.Ordinal)
-                && request.Json().GetProperty("max_tokens").GetInt32() == 400),
+            && local.Requests.All(static request => request.Json().GetProperty("max_tokens").GetInt32() == 400)
+            && cerebras.Requests.Concat(local.Requests).All(static request =>
+                !request.Body.Contains("r-101", StringComparison.Ordinal) && !request.Body.Contains("r-102", StringComparison.Ordinal)),
             "The repair round trip or request options were not what the program asked for; metadata must stay local.");
         ExampleSupport.Require(output.ToString().Contains(
                 "r-101: [low] Faster cold starts (via local:qwen3-8b, prompt, 1 repair(s), 175 tokens)", StringComparison.Ordinal)

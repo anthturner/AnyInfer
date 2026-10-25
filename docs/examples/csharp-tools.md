@@ -13,8 +13,8 @@ the conversation.
   [Install the C# SDK](../guides/csharp-installation.md), and the first call from the
   [C# quickstart](../guides/csharp-quickstart.md). The C# SDK is a locally packaged
   `0.1.0-proof` prerelease, not a NuGet package.
-- Nothing else to run it offline. Against a real model, use a target whose endpoint accepts
-  OpenAI-style tool calls; the built-in chat adapter speaks that dialect.
+- Nothing else to run it offline. Running it against a real model is optional; see
+  [Hosted setup](#hosted-setup-optional).
 
 ## The Program
 
@@ -47,16 +47,19 @@ the conversation.
 ## Offline Run
 
 The example runner scripts the model's tool calls and asserts what the handlers and the model saw.
-The cases are in `examples/csharp-sdk/Cases/CookbookToolsCases.cs`; from `src/csharp`, run:
+The cases are in [`Cases/CookbookToolsCases.cs`](../../examples/csharp-sdk/Cases/CookbookToolsCases.cs); from `src/csharp`, run:
 
 ```bash
 dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
+The runner executes every example case, not only this page's, and prints
+`example case <name>: ok` for each one that passes.
+
 The `cookbook.tools.*` cases check that:
 
-- both tools are declared on every round with the generated parameter schemas, and the token
-  parameter is absent;
+- all three rounds declare both tools with the same generated parameter schemas, and neither
+  schema exposes the handlers' cancellation token;
 - two lookups in one round run in order, the unknown order's `KeyNotFoundException` reaches the
   model as `KeyNotFoundException: Order Z-999 does not exist.`, the refund quote binds `units` and
   `includeShipping`, and the ledger totals three rounds;
@@ -67,6 +70,12 @@ The `cookbook.tools.*` cases check that:
 - cancelling the caller's token while a handler waits on the order store cancels that wait and
   surfaces as `OperationCanceledException` carrying the caller's token;
 - the client disposes its transport once.
+
+## Hosted Setup (Optional)
+
+Use a target whose endpoint accepts OpenAI-style tool calls; the built-in chat adapter speaks that
+dialect. Pass `ProviderSettings` for it with any credential as an `env://` reference. This program
+is verified offline against scripted responses only.
 
 ## Before Production
 
