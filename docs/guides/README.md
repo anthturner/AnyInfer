@@ -62,7 +62,10 @@ process can embed the SDK and expose the frontend.
 In order to evaluate everything offline first, the [reference application](demo-app.md)
 runs against in-process fakes with no credentials.
 
-## Python Tasks
+## Tasks {#python-tasks}
+
+The first four guides give Python and native C# recipes side by side; the rest describe
+Python SDK features.
 
 - [Stream typed events](streaming.md)
 - [Enforce a JSON schema](structured-output.md)
@@ -76,13 +79,13 @@ runs against in-process fakes with no credentials.
 
 ## Native C# SDK (Prerelease) {#c-sdk-development}
 
-Start with [application setup](csharp-sdk.md#use-in-a-net-application) and the
-[C# reference](../reference/csharp-sdk.md). The [foundation](../concepts/foundation.md)
+Start with [installation](csharp-installation.md), the [quickstart](csharp-quickstart.md),
+and the [C# reference](../reference/csharp-sdk.md). The [foundation](../concepts/foundation.md)
 keeps the capability map and current exclusions together.
 
 - [Install the C# SDK](csharp-installation.md) and make a first call with the [C# quickstart](csharp-quickstart.md)
 - [Generate text](csharp-sdk.md#generate-text) with the async core or [sync facade](csharp-sdk.md#use-the-synchronous-facade)
-- [Stream typed events](streaming.md), [validate structured output](structured-output.md), and [route fallback](fallback.md) using the C# tabs
+- [Stream typed events](streaming.md), [validate structured output](structured-output.md), and [route fallback](fallback.md) with the native recipes in each guide
 - [Run registered .NET tool handlers](tool-loop.md#c-sdk-proof)
 - [Embed and rerank text](csharp-sdk.md#embed-and-rerank-text)
 - [Move from Python to C#](python-to-csharp.md)

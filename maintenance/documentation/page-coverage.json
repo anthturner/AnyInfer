@@ -499,7 +499,7 @@
       "unsupported_native": [
         "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)"
       ],
-      "notes": "Path-chooser with a Python SDK / C# SDK / sidecar / CLI comparison table and separate Python and C# task lists; C# rows must stay in sync with concepts/foundation.md and guides/csharp-sdk.md."
+      "notes": "Index of integration paths; the Tasks list marks the four guides with Python and C# recipes; native section starts at installation and quickstart."
     },
     {
       "source": "guides/cli.md",
@@ -667,14 +667,18 @@
       "review": "pending",
       "evidence": [
         "examples/csharp-sdk/RoutingExample.cs",
+        "examples/csharp-sdk/RouteFailureExample.cs",
+        "examples/csharp-sdk/Cases/RouteFailureCases.cs",
+        "examples/csharp-sdk/Cases/MigrationCases.cs",
+        "examples/csharp-sdk/Cases/GuideScripts.cs",
         "examples/csharp-sdk/Program.cs",
         "tests/test_docs_examples.py"
       ],
       "unsupported_native": [
         "custom retry predicate (Retry.retry_on); C# Retry has only MaxAttempts/BackoffBaseS/BackoffMaxS",
-        "local llama-cpp target as last-resort fallback"
+        "supervised local llama-cpp target as last-resort fallback (C# can only route to a caller-run OpenAI-compatible server)"
       ],
-      "notes": "Python and C# tabs for the basic route; default-route, context_window_targets, retry tuning and health gating recipes are Python-only although C# Route has HealthGate/HealthTtlS/ContextWindowTargets."
+      "notes": "Python and C# tabs for default route, attempts, total failure, context-window chain and retry; C# health-gate recipe; config default_route and operationRoutes scope. Asserted by route-failure.* cases and migration.config-v1-accepted-blocks."
     },
     {
       "source": "guides/fitting-context.md",
@@ -757,13 +761,17 @@
         "examples/csharp-sdk/ManifestExample.cs",
         "examples/csharp-sdk/AccountingExample.cs",
         "examples/csharp-sdk/RequestPolicyExample.cs",
-        "examples/csharp-sdk/Program.cs"
+        "examples/csharp-sdk/Cases/MigrationCases.cs",
+        "examples/csharp-sdk/Program.cs",
+        "src/csharp/AnyInfer/Config/AnyInferConfig.cs"
       ],
       "unsupported_native": [
         "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
-        "history compaction (compact_history / HistoryPolicy)"
+        "history compaction (compact_history / HistoryPolicy)",
+        "sessions, arena runs, evaluation/benchmarks, local runtime lifecycle, batch inference jobs, OpenTelemetry, keyring, MCP, CLI and sidecar",
+        "Pydantic schema input, @ai.tool decorator, Retry.retry_on"
       ],
-      "notes": "Python-to-C# mapping table names Python APIs beside C# ones (both sides need checking); all executable content is C#. Line 79 says v1 config 'actively supports providers, default_route, and repair', but C# also parses cache, operation_routes, and connection/limits keys."
+      "notes": "Links csharp-installation.md and csharp-quickstart.md. Mapping table extended; Python-only features listed. Config statement corrected; asserted by migration.* cases."
     },
     {
       "source": "guides/quickstart.md",
@@ -787,11 +795,19 @@
       "evidence": [
         "examples/csharp-sdk/StreamingExample.cs",
         "examples/csharp-sdk/SyncStreamingExample.cs",
+        "examples/csharp-sdk/GenerationExample.cs",
+        "examples/csharp-sdk/StreamEventsExample.cs",
+        "examples/csharp-sdk/StreamEarlyExitExample.cs",
+        "examples/csharp-sdk/Cases/StreamEventsCases.cs",
+        "examples/csharp-sdk/Cases/StreamEarlyExitCases.cs",
+        "examples/csharp-sdk/Cases/GuideScripts.cs",
         "examples/csharp-sdk/Program.cs",
         "tests/test_docs_examples.py"
       ],
-      "unsupported_native": [],
-      "notes": "Python and C# tabs for the basic stream; later recipes (early-exit cancel, ReasoningDelta, TimingMark TTFT, AttemptFailed) are Python-only although C# exposes the same StreamEvent records."
+      "unsupported_native": [
+        "ReasoningDelta/CitationDelta from built-in adapters: the C# OpenAI-compatible chat adapter (and Cerebras/Hyperbolic/Nscale presets) emits neither; only application-owned adapters via AsyncClient.FromAdapters can"
+      ],
+      "notes": "Python and C# tabs for early exit, reasoning, TTFT and fallback; C# sections for buffered vs streamed, Result/StreamEnded/CollectAsync, every StreamEvent record, failure paths, and SyncStream. Asserted by stream-events.* and stream-early-exit.* cases."
     },
     {
       "source": "guides/structured-output.md",
@@ -799,13 +815,17 @@
       "review": "pending",
       "evidence": [
         "examples/csharp-sdk/StructuredOutputExample.cs",
+        "examples/csharp-sdk/StructuredRecordExample.cs",
+        "examples/csharp-sdk/Cases/StructuredRecordCases.cs",
+        "examples/csharp-sdk/Cases/GuideScripts.cs",
         "examples/csharp-sdk/Program.cs",
         "tests/test_schema.py"
       ],
       "unsupported_native": [
-        "SchemaViolationError raw_text / partial / missing_required inspection (C# SchemaViolationException exposes only Issues)"
+        "Pydantic model schema input (Python-only by design)",
+        "SchemaViolationError raw_text / partial members (C# SchemaViolationException exposes only Issues; repair inputs visible as RepairAttempted.RawText to a payload observer)"
       ],
-      "notes": "Python and C# tabs; remaining recipes are Python (Pydantic input is Python-only, not a native gap). Line 39 says the example deserializes into an `Answer` record, but the source record is `AnswerResult`."
+      "notes": "AnswerResult name fixed. C# recipes for record deserialization, SchemaViolationException handling with no route fallback, mechanism/repair count, and native limits linked to the C# reference. Asserted by structured-record.* cases."
     },
     {
       "source": "guides/testing-your-app.md",
@@ -828,15 +848,22 @@
       "review": "pending",
       "evidence": [
         "examples/csharp-sdk/ToolLoopExample.cs",
+        "examples/csharp-sdk/ToolDeclarationExample.cs",
+        "examples/csharp-sdk/ToolFailureExample.cs",
+        "examples/csharp-sdk/ToolCancellationExample.cs",
+        "examples/csharp-sdk/SyncToolLoopExample.cs",
+        "examples/csharp-sdk/Cases/ToolLoopGuideCases.cs",
+        "examples/csharp-sdk/Cases/GuideScripts.cs",
         "examples/csharp-sdk/Program.cs",
         "tests/test_docs_examples.py",
         "tests/test_tool_loop.py",
         "tests/mcp/test_toolset.py"
       ],
       "unsupported_native": [
-        "MCP tool sources (MCPToolset, mcp config block, fake MCP server)"
+        "MCP tool sources (MCPToolset, mcp config block, fake MCP server)",
+        "@ai.tool decorator (C# uses Tool.From or explicit ToolSpec)"
       ],
-      "notes": "C# section (Tool.From, RunToolsAsync, 8-round default verified in AsyncClient.cs) then Python run_tools, @ai.tool, and MCP; the page states MCP is Python-only."
+      "notes": "Python/C# tabs for the loop, parameter types, error results, round bound, naming and async; C# sections for Tool.From binding and rendering, explicit ToolSpec, handler cancellation, ToolLoopException paths. MCP labeled Python only. Asserted by tool-declaration.*, tool-failure.*, tool-cancellation.*, tool-loop.sync-facade."
     },
     {
       "source": "guides/vector-store.md",

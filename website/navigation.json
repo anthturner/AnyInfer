@@ -46,7 +46,7 @@
         ]
       },
       {
-        "Python Tasks": [
+        "Tasks": [
           {
             "Stream Typed Events": "guides/streaming.md"
           },
