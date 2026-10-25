@@ -26,6 +26,12 @@
             "C# SDK (prerelease)": "guides/csharp-sdk.md"
           },
           {
+            "Install the C# SDK (prerelease)": "guides/csharp-installation.md"
+          },
+          {
+            "C# Quickstart (prerelease)": "guides/csharp-quickstart.md"
+          },
+          {
             "Move from Python to C# SDK (prerelease)": "guides/python-to-csharp.md"
           },
           {

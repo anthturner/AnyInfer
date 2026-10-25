@@ -562,6 +562,47 @@
       "notes": "Python add-ons and anyinfer.local attestation; no C# content or statement of scope."
     },
     {
+      "source": "guides/csharp-installation.md",
+      "scope": "csharp",
+      "review": "pending",
+      "evidence": [
+        "tests/test_csharp_quickstart.py",
+        "scripts/check_csharp_package.py",
+        "tests/test_csharp_packaging.py",
+        "src/csharp/AnyInfer/AnyInfer.csproj",
+        "src/csharp/global.json",
+        "src/csharp/Directory.Build.props",
+        "examples/csharp-sdk/AnyInfer.Examples.csproj",
+        "examples/csharp-sdk/Cases/ExampleCase.cs"
+      ],
+      "unsupported_native": [
+        "public NuGet package (local 0.1.0-proof only)",
+        "CLI, OpenAI-compatible sidecar and demo app (Python distribution)",
+        "local runtime management",
+        "fake-provider test kit (offline tests use a scripted HttpMessageHandler)"
+      ],
+      "notes": "Requirements, project-reference steps executed verbatim by tests/test_csharp_quickstart.py, library vs AnyInfer.Examples helper source, and the local package exactly as scripts/check_csharp_package.py verifies it."
+    },
+    {
+      "source": "guides/csharp-quickstart.md",
+      "scope": "csharp",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/QuickstartExample.cs",
+        "examples/csharp-sdk/QuickstartTestingExample.cs",
+        "examples/csharp-sdk/Cases/QuickstartCases.cs",
+        "tests/test_csharp_quickstart.py",
+        "src/csharp/AnyInfer/AsyncClient.cs",
+        "src/csharp/AnyInfer/Client.cs",
+        "src/csharp/AnyInfer/Providers/OpenAIChatAdapter.cs"
+      ],
+      "unsupported_native": [
+        "dedicated Ollama and LM Studio descriptors (C# uses the OpenAI-compatible /v1 layer)",
+        "starting or supervising a local server"
+      ],
+      "notes": "Snippets are regions of files asserted by the quickstart.* runner cases; the offline and loopback steps run in a fresh consumer in tests/test_csharp_quickstart.py against a stand-in server, not a live Ollama or LM Studio."
+    },
+    {
       "source": "guides/csharp-sdk.md",
       "scope": "csharp",
       "review": "pending",
@@ -594,7 +635,7 @@
         "history compaction (compact_history / HistoryPolicy)",
         "generic OpenAI-compatible retrieval (stated unimplemented)"
       ],
-      "notes": "Canonical C# guide; all 21 snippets are compiled and asserted by examples/csharp-sdk/Program.cs, run in the workspace csharp phase. Its Scope section must agree with reference/csharp-sdk.md and concepts/foundation.md."
+      "notes": "C# overview and task index; Start here and Use in a .NET application point to the installation and quickstart pages; headings and anchors kept."
     },
     {
       "source": "guides/custom-providers.md",
@@ -824,7 +865,7 @@
         "offline scripted-provider test kit and pytest fixtures (ScriptedProvider, anyinfer_* fixtures, cassettes)",
         "no-dispatch target comparison (compare()) and the compare_diff portability/regression tool"
       ],
-      "notes": "Python sync/async tabs plus a C# GenerationExample tab; the 'What Makes This Different' bullets are explicitly scoped to the Python runtime. Python tab code (anthropic target) is not executed by any test."
+      "notes": "Native prerelease sentence starts with C# installation and quickstart; README.md mirrors it."
     },
     {
       "source": "providers/README.md",

@@ -26,8 +26,9 @@ It is not published to NuGet and does not claim full parity. See the
 
 Choose the [Python SDK guide](https://anyinfer.dev/python/) and
 [Python reference](https://anyinfer.dev/python/api/) for the supported published SDK.
-For the native prerelease, use the [C# SDK guide](https://anyinfer.dev/csharp/),
-[C# reference](https://anyinfer.dev/csharp/reference/), and
+For the native prerelease, start with the [C# installation](https://anyinfer.dev/csharp/installation/)
+and [C# quickstart](https://anyinfer.dev/csharp/quickstart/), then use the
+[C# SDK guide](https://anyinfer.dev/csharp/), [C# reference](https://anyinfer.dev/csharp/reference/), and
 [Python-to-C# migration map](https://anyinfer.dev/csharp/migrating-from-python/).
 
 The following examples use the Python SDK.
@@ -185,7 +186,7 @@ python workspace.py demo     # launch the demo app
 [Contributing](https://anyinfer.dev/contributing/).
 
 The native C# SDK has separate
-[application setup](https://anyinfer.dev/csharp/#use-in-a-net-application),
+[installation](https://anyinfer.dev/csharp/installation/),
 [reference](https://anyinfer.dev/csharp/reference/), and
 [migration](https://anyinfer.dev/csharp/migrating-from-python/) documentation. It is locally
 packaged as `0.1.0-proof`, has no runtime Python dependency, and is not published to NuGet;
