@@ -288,6 +288,15 @@ jobs:
           cache-dependency-path: website/package-lock.json
       - run: npm --prefix website ci
       - run: uv pip install --require-hashes -r website/requirements.lock
+      # The generated C# API reference is extracted by the DocFX version pinned in
+      # .config/dotnet-tools.json, under the SDK src/csharp/global.json selects. Restoring the
+      # tool is an explicit step; the docs build itself never downloads an executable.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: src/csharp/global.json
+      - name: restore pinned documentation tools
+        working-directory: src/csharp
+        run: dotnet tool restore
 
       - name: site build (strict)
         run: python workspace.py check --only=docs-build

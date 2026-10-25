@@ -60,6 +60,9 @@ class Article(HTMLParser):
                 self.skip, self.skip_depth = tag, 1
             elif tag in {"p", "div", "li", "tr", "br", "pre", "h1", "h2", "h3", "h4", "h5", "h6"}:
                 self.chunks.append("\n")
+            elif tag in {"td", "th"}:
+                # Keep table cells apart in exported text instead of running them together.
+                self.chunks.append(" ")
 
     def handle_endtag(self, tag: str) -> None:
         """Retain paragraph boundaries without keeping page chrome."""
@@ -93,9 +96,11 @@ class Article(HTMLParser):
 
     def text(self) -> str:
         """Return text with stable paragraph boundaries."""
-        return re.sub(r"\n{3,}", "\n\n", "\n".join(
-            line.strip() for line in "".join(self.chunks).splitlines()
-        )).strip()
+        return re.sub(
+            r"\n{3,}",
+            "\n\n",
+            "\n".join(line.strip() for line in "".join(self.chunks).splitlines()),
+        ).strip()
 
 
 def page_file(site: Path, url: str) -> Path:
@@ -179,7 +184,7 @@ def export_site(site: Path, manifest: dict) -> None:
     ]
     full = [f"# AnyInfer — full documentation\n\n{version_line}\n"]
     for section, entries in sections.items():
-        slug = re.sub(r"[^a-z0-9]+", "-", section.lower()).strip("-")
+        slug = re.sub(r"[^a-z0-9]+", "-", section.lower().replace("c#", "csharp")).strip("-")
         header = f"# AnyInfer — {section}\n\n{version_line}\n"
         chunks = [
             f"\n---\n\n# {page['title']}\n\nSource: {ORIGIN}{page['url']}\n\n{body}\n"
@@ -235,7 +240,7 @@ def export_site(site: Path, manifest: dict) -> None:
             f'<p>This page moved to <a href="{safe}">{safe}</a>.</p>'
             f"<script>const target={script_target};"
             'location.replace(target+(target.includes("#")?"":location.hash));</script>'
-            '</body></html>'
+            "</body></html>"
         )
         output = page_file(site, source)
         output.parent.mkdir(parents=True, exist_ok=True)

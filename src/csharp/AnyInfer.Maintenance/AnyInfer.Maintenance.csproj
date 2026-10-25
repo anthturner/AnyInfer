@@ -10,4 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="../AnyInfer/AnyInfer.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AnyInfer.Tests" />
+  </ItemGroup>
 </Project>

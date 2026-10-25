@@ -6,7 +6,9 @@ under
 [SDK reference](api/README.md).
 
 The listed C# types are in the `AnyInfer` namespace unless otherwise noted. The C# `Text.Value`
-property corresponds to Python `Text.text`.
+property corresponds to Python `Text.text`. Every public type, constructor, overload, property
+and operator has a generated page in the [C# API reference](/csharp/api/); this page explains
+the behavior and limits those signatures do not show.
 
 | Surface | Purpose |
 |---|---|

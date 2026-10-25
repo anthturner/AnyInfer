@@ -1,0 +1,1607 @@
+{
+  "schema_version": 1,
+  "require_reviewed": false,
+  "pages": [
+    {
+      "source": "agents/INTEGRATION.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_agent_instructions.py",
+        "src/python/anyinfer/_agents_md.py",
+        "src/python/anyinfer/testing/scripted.py"
+      ],
+      "unsupported_native": [
+        "offline scripted-provider test kit used by Step 5 (no C# equivalent)"
+      ],
+      "notes": "Canonical agent procedure behind three shims; every step is Python (CLI, call shapes, test kit) although it never scopes itself to Python integrations. Reviewer should decide whether a .NET path or explicit Python scope is needed."
+    },
+    {
+      "source": "concepts/README.md",
+      "scope": "shared",
+      "review": "pending",
+      "evidence": [],
+      "unsupported_native": [],
+      "notes": "Concept index; its 19 entries match the published concepts set. The foundation bullet uses a stray table-style `|` inside a list item."
+    },
+    {
+      "source": "concepts/arena.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_arena.py"
+      ],
+      "unsupported_native": [
+        "arena runs (ArenaPolicy)"
+      ],
+      "notes": "Python client, CLI and sidecar arena; C# has none (C# config rejects arena/arenas)."
+    },
+    {
+      "source": "concepts/budgeting.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_budget.py",
+        "tests/test_tokenizers.py",
+        "tests/test_remote_tokenizers.py"
+      ],
+      "unsupported_native": [
+        "exact token estimators (TiktokenEstimator, AnthropicCountTokensEstimator, LlamaServerTokenizeEstimator); C# has only HeuristicTokenEstimator/ITokenEstimator"
+      ],
+      "notes": "Budget calculator, tri-state fits and context gate are shared with C# (Budget, contextGate); tokenizers and examples are Python."
+    },
+    {
+      "source": "concepts/caching.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_cache_planning.py",
+        "tests/test_cache_placement.py"
+      ],
+      "unsupported_native": [
+        "prompt-cache placement on built-in providers (no built-in C# descriptor declares a cache mechanism)"
+      ],
+      "notes": "CachePolicy and Generation.CacheMechanism exist in C#, but the named explicit/implicit providers (Anthropic, OpenAI, DeepSeek) and the sidecar are Python."
+    },
+    {
+      "source": "concepts/capabilities.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_probes.py",
+        "tests/test_verify.py",
+        "tests/test_diagnostics.py"
+      ],
+      "unsupported_native": [
+        "verify() one-request target proof (C# offers only ProbeAsync/Probe)",
+        "runtime diagnostics (client.diagnostics)"
+      ],
+      "notes": "Provenance, overrides and probe() are shared (C# Capabilities(), capabilityOverrides, ProbeAsync record:); examples are Python only."
+    },
+    {
+      "source": "concepts/catalog.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_local_catalog.py",
+        "tests/test_model_store.py",
+        "tests/test_local_downloads.py"
+      ],
+      "unsupported_native": [
+        "local_catalog() hardware-fit classification",
+        "model acquisition, locate_model, and pull_model"
+      ],
+      "notes": "C# Catalog shares aliases, model rows, Overlay and WithAliasTarget; fit classification and acquisition are Python-only."
+    },
+    {
+      "source": "concepts/context-reduction.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/context/test_select.py",
+        "tests/context/test_distill.py",
+        "tests/context/test_history.py",
+        "tests/test_history_policy.py"
+      ],
+      "unsupported_native": [
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
+        "history compaction (compact_history / HistoryPolicy)",
+        "semantic_ranker"
+      ],
+      "notes": "Python anyinfer.context; C# exposes only the ContextTuning settings record. The page does not say reduction is Python-only."
+    },
+    {
+      "source": "concepts/cost.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_spend_ledger.py",
+        "tests/test_pricing.py"
+      ],
+      "unsupported_native": [
+        "fetch_pricing() refresh of the maintained pricing table"
+      ],
+      "notes": "Tri-state cost, SpendLedger/SpendPolicy/SpendStore are shared with C# equivalents; examples are Python only."
+    },
+    {
+      "source": "concepts/credentials.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_credentials.py",
+        "tests/test_credential_rotation.py",
+        "tests/test_errors_and_redaction.py"
+      ],
+      "unsupported_native": [
+        "credential:// OS keyring references (C# KeyringResolver always throws)",
+        "credential rotation (credential_ttl_s)"
+      ],
+      "notes": "env:// references, redaction and custom resolvers (ResolverChain.Add) are shared; keyring, entry-point stores and rotation are Python."
+    },
+    {
+      "source": "concepts/embeddings.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_embeddings_reranking.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Behavior is shared (C# EmbedAsync/RerankAsync with expectedSpace, allowIncompatibleFallback, BatchPolicy, EmbeddingSpace); examples are Python against ollama, which C# lacks."
+    },
+    {
+      "source": "concepts/events.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_events_ordering.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Ordering guarantees are shared and C# has the same StreamEvent records (GenerationEvent.cs); examples are Python only, and the event table omits CitationDelta/ServerToolDelta that both SDKs expose."
+    },
+    {
+      "source": "concepts/foundation.md",
+      "scope": "csharp",
+      "review": "pending",
+      "evidence": [
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs"
+      ],
+      "unsupported_native": [
+        "context reduction",
+        "history reduction",
+        "local runtime lifecycle",
+        "sessions",
+        "arena runs",
+        "evaluation and benchmarks",
+        "batch inference jobs",
+        "MCP",
+        "OpenTelemetry",
+        "keyring integration",
+        "full Python provider breadth"
+      ],
+      "notes": "Shared-foundation architecture plus the canonical C# capability map and exclusion list ('seven descriptors, ten operation bindings' matches ProviderRegistry.CreateDefault). Lines 46-47 and 49-50 split `[text]` and `(url)` across a newline, so those two links will not render."
+    },
+    {
+      "source": "concepts/local.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_local_hardware.py",
+        "tests/test_local_server.py",
+        "tests/test_benchmark.py",
+        "tests/test_local_discovery.py"
+      ],
+      "unsupported_native": [
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)",
+        "local discovery and tier recommendation",
+        "benchmark() measurement"
+      ],
+      "notes": "Python local subsystem; C# has no local runtime lifecycle."
+    },
+    {
+      "source": "concepts/multimodal-inputs.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/RichGenerationExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_multimodal.py",
+        "tests/test_video_input.py"
+      ],
+      "unsupported_native": [
+        "video input and document URLs through the built-in C# OpenAI-compatible adapter (refused before HTTP)"
+      ],
+      "notes": "Python examples plus a 'C# SDK proof' section (20/50 MiB defaults match Models.cs). Section label 'proof' differs from the 'prerelease' wording used elsewhere."
+    },
+    {
+      "source": "concepts/routing.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_routing.py",
+        "tests/test_rate_limits.py"
+      ],
+      "unsupported_native": [
+        "custom retry predicate (Retry.retry_on); C# Retry has only MaxAttempts/BackoffBaseS/BackoffMaxS",
+        "content_policy_targets content-filter redirect chain (C# Route has no such chain)"
+      ],
+      "notes": "Route/Retry/health gating/context_window_targets/RateLimits are shared with C#, shown only in Python."
+    },
+    {
+      "source": "concepts/run-manifests.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_manifest.py",
+        "src/python/anyinfer/manifest.py"
+      ],
+      "unsupported_native": [
+        "golden-manifest pytest helper"
+      ],
+      "notes": "C# provides RunManifest/ManifestUtilities (schema, digest, JSON, rendering); examples use Python manifest_json_schema()."
+    },
+    {
+      "source": "concepts/sessions.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_sessions.py",
+        "src/python/anyinfer/session.py"
+      ],
+      "unsupported_native": [
+        "provider sessions (client.session, reuse reporting)"
+      ],
+      "notes": "Python session handles over copilot/llama-cpp/ollama; C# has no sessions and none of those providers."
+    },
+    {
+      "source": "concepts/structured-output.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_schema.py",
+        "tests/test_schema_partial.py"
+      ],
+      "unsupported_native": [
+        "SchemaViolationError raw_text / partial / missing_required inspection (C# SchemaViolationException exposes only Issues)"
+      ],
+      "notes": "Mechanism ladder, projection and repair are shared; Python-only examples (Pydantic duck typing is Python-only). C# validates Draft 6+ only."
+    },
+    {
+      "source": "concepts/targets.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_registry_and_catalog.py",
+        "tests/test_openai_roundtrip.py"
+      ],
+      "unsupported_native": [
+        "verify() one-request target proof (C# offers only ProbeAsync/Probe)"
+      ],
+      "notes": "Behavior is shared (C# Resolve, first-colon split, alias order, Catalog.Overlay/FromMapping) but every example is Python."
+    },
+    {
+      "source": "concepts/telemetry.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_observers.py",
+        "tests/test_otel_bridge.py"
+      ],
+      "unsupported_native": [
+        "OpenTelemetry bridge (anyinfer.otel)"
+      ],
+      "notes": "Typed observer contract and payload opt-in are shared with C# IObserver/Subscribe; examples are Python."
+    },
+    {
+      "source": "contributing/README.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "tests/test_workspace.py",
+        "workspace.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python contributor setup and gates plus a `csharp` phase row; that row omits the generated-preset check and the check_csharp_* / check_sdk_api_parity scripts the phase actually runs (tests/test_workspace.py)."
+    },
+    {
+      "source": "contributing/architecture.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "pyproject.toml",
+        "tests/test_openai_roundtrip.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Load-bearing rules are Python-specific (httpx2, llama-cpp-python, background event-loop facade) beside an 'Independent C# SDK' section."
+    },
+    {
+      "source": "contributing/automation.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_agent_instructions.py",
+        "scripts/check_pricing_drift.py",
+        "scripts/check_contract_drift.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Agent shims and scheduled checks; the Workstream Boundaries table lists only Python workstreams, omitting the Native C# SDK and Shared foundation workstreams that AGENTS.md defines."
+    },
+    {
+      "source": "contributing/branding.md",
+      "scope": "shared",
+      "review": "pending",
+      "evidence": [
+        "tests/test_branding.py",
+        "scripts/render_social_card.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Repository brand assets; the demo-package mirror rule is Python-demo-specific."
+    },
+    {
+      "source": "contributing/changelog.md",
+      "scope": "shared",
+      "review": "pending",
+      "evidence": [
+        "scripts/validate_changelog.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Changelog process; it does not say whether C# prerelease changes earn CHANGELOG entries."
+    },
+    {
+      "source": "contributing/conformance.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_conformance.py",
+        "src/python/anyinfer/testing/conformance.py",
+        "src/python/anyinfer/testing/recording.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python conformance suite and cassette recording."
+    },
+    {
+      "source": "contributing/csharp-proof.md",
+      "scope": "csharp",
+      "review": "pending",
+      "evidence": [
+        "scripts/check_csharp_package.py",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_workspace.py",
+        "tests/test_csharp_packaging.py"
+      ],
+      "unsupported_native": [],
+      "notes": "C# development workflow. The phase description (lines 24-26) omits the preset-table check and eight Python checker scripts the workspace csharp phase runs, and the documented `dotnet test` omits the phase's `-m:1`."
+    },
+    {
+      "source": "contributing/releasing.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        ".github/workflows/release.yml",
+        ".github/workflows/ci.yml"
+      ],
+      "unsupported_native": [],
+      "notes": "Branch/release process for Python artifacts plus a statement that the C# CI lane retains but never publishes local NuGet artifacts."
+    },
+    {
+      "source": "contributing/testing.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "tests/test_workspace.py",
+        "src/python/anyinfer/testing/fakes.py",
+        "tests/test_local_server.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python testing guide with a paragraph describing the C# phase of workspace check (same omission as contributing/README.md)."
+    },
+    {
+      "source": "contributing/writing-an-adapter.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/base.py",
+        "src/python/anyinfer/providers/http.py",
+        "src/python/anyinfer/registry.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python adapter contract; the C# IProviderAdapter/AdapterEvent contract is not described on any published page."
+    },
+    {
+      "source": "downloads.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        ".github/workflows/release.yml"
+      ],
+      "unsupported_native": [],
+      "notes": "Python wheel, demo, and sidecar bundles; C# is a status pointer. 'Previous Releases' says notes are generated from pull requests, contradicting contributing/releasing.md and contributing/changelog.md."
+    },
+    {
+      "source": "examples/README.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python cookbook index; points .NET readers to the C# guide. Last paragraph links comparing-targets with stale text 'Will my request survive a target change?' (page title is 'Compare Targets Without Spending')."
+    },
+    {
+      "source": "examples/distill-a-corpus.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/context/test_distill.py"
+      ],
+      "unsupported_native": [
+        "distill map/reduce (context.distill / distill_sync)"
+      ],
+      "notes": "Python context.distill cookbook; requires a live Anthropic provider as written."
+    },
+    {
+      "source": "examples/golden-manifest.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [
+        "golden-manifest pytest helper and scripted provider"
+      ],
+      "notes": "Executed by test_example_golden_manifest_shape (golden name documented_fallback, not the page's fallback-and-repair); the title mentions repair but the example requests none."
+    },
+    {
+      "source": "examples/local-tool-agent.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python @ai.tool loop against Ollama; C# has its own tool loop (ToolLoopExample) but no native ollama provider."
+    },
+    {
+      "source": "examples/semantic-search.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python offline fake (FakeEmbeddingRerankProvider); C# supports embed/rerank and EmbeddingSpace.CompatibleWith but has no equivalent fake."
+    },
+    {
+      "source": "examples/summarize-with-fallback.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Schema + route + repair is expressible in C#, but anthropic/openai/ollama providers used here are not native C# registrations."
+    },
+    {
+      "source": "guides/README.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/serve/app.py"
+      ],
+      "unsupported_native": [
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)"
+      ],
+      "notes": "Path-chooser with a Python SDK / C# SDK / sidecar / CLI comparison table and separate Python and C# task lists; C# rows must stay in sync with concepts/foundation.md and guides/csharp-sdk.md."
+    },
+    {
+      "source": "guides/cli.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/cli.py",
+        "tests/test_cli_run.py",
+        "tests/test_cli_init.py",
+        "tests/test_cli_embed_rerank.py",
+        "tests/test_cli_context.py",
+        "tests/test_verify.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python CLI operator surface (init/run/embed/rerank/verify/context); not a native journey."
+    },
+    {
+      "source": "guides/coding-agents.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_cli_agents_md.py",
+        "tests/test_agent_instructions.py",
+        "tests/test_docs_examples.py",
+        "src/python/anyinfer/_agents_md.py",
+        "scripts/export_docs.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python `anyinfer agents-md` CLI and integration skill; llms.txt export is site-wide. No C# coding-agent guidance exists."
+    },
+    {
+      "source": "guides/comparing-targets.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_compare.py",
+        "tests/test_compare_diff.py"
+      ],
+      "unsupported_native": [
+        "no-dispatch target comparison (compare()) and the compare_diff portability/regression tool"
+      ],
+      "notes": "Python compare()/compare_diff, CLI and sidecar compare route; no C# equivalent and the page does not say so."
+    },
+    {
+      "source": "guides/confidentiality-tiers.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer-confidential/tests/test_sealed_template.py",
+        "src/python/anyinfer-confidential/tests/test_relay.py",
+        "tests/test_confidential_execution_adapter.py",
+        "tests/test_local_attestation.py",
+        "tests/test_local_provenance.py"
+      ],
+      "unsupported_native": [
+        "Tier 1-2 sealed templates and Relay (Python add-on packages)",
+        "Tier 3-4 attested local execution and model provenance (depend on the local runtime)"
+      ],
+      "notes": "Python add-ons and anyinfer.local attestation; no C# content or statement of scope."
+    },
+    {
+      "source": "guides/csharp-sdk.md",
+      "scope": "csharp",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/SettingsExample.cs",
+        "examples/csharp-sdk/CerebrasExample.cs",
+        "examples/csharp-sdk/HyperbolicExample.cs",
+        "examples/csharp-sdk/NscaleExample.cs",
+        "examples/csharp-sdk/ConnectionExample.cs",
+        "examples/csharp-sdk/GenerationExample.cs",
+        "examples/csharp-sdk/RichGenerationExample.cs",
+        "examples/csharp-sdk/SyncGenerationExample.cs",
+        "examples/csharp-sdk/SyncStreamingExample.cs",
+        "examples/csharp-sdk/TeiExample.cs",
+        "examples/csharp-sdk/VoyageExample.cs",
+        "examples/csharp-sdk/JinaExample.cs",
+        "examples/csharp-sdk/RetrievalExample.cs",
+        "examples/csharp-sdk/CatalogExample.cs",
+        "examples/csharp-sdk/AccountingExample.cs",
+        "examples/csharp-sdk/LifecycleExample.cs",
+        "examples/csharp-sdk/ProbeExample.cs",
+        "examples/csharp-sdk/TelemetryExample.cs",
+        "examples/csharp-sdk/ManifestExample.cs",
+        "examples/csharp-sdk/SetupExample.cs",
+        "examples/csharp-sdk/RequestPolicyExample.cs",
+        "examples/csharp-sdk/Program.cs"
+      ],
+      "unsupported_native": [
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
+        "history compaction (compact_history / HistoryPolicy)",
+        "generic OpenAI-compatible retrieval (stated unimplemented)"
+      ],
+      "notes": "Canonical C# guide; all 21 snippets are compiled and asserted by examples/csharp-sdk/Program.cs, run in the workspace csharp phase. Its Scope section must agree with reference/csharp-sdk.md and concepts/foundation.md."
+    },
+    {
+      "source": "guides/custom-providers.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_provider_template.py",
+        "tests/test_plugin_discovery.py",
+        "tests/test_cli_conform.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python entry-point provider packages and `anyinfer conform`. C# custom adapters exist (IProviderAdapter + ProviderRegistration) but are documented only in src/csharp/README.md; reviewer should add a C# pointer or mark this Python-only."
+    },
+    {
+      "source": "guides/demo-app.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/demo_app/test_demo_app.py",
+        "tests/demo_app/test_sdk_help.py",
+        "src/python/anyinfer_demo/engine.py"
+      ],
+      "unsupported_native": [],
+      "notes": "PySide6 demo application; Python reference integrator, not a native journey."
+    },
+    {
+      "source": "guides/fallback.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/RoutingExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [
+        "custom retry predicate (Retry.retry_on); C# Retry has only MaxAttempts/BackoffBaseS/BackoffMaxS",
+        "local llama-cpp target as last-resort fallback"
+      ],
+      "notes": "Python and C# tabs for the basic route; default-route, context_window_targets, retry tuning and health gating recipes are Python-only although C# Route has HealthGate/HealthTtlS/ContextWindowTargets."
+    },
+    {
+      "source": "guides/fitting-context.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/context/test_select.py"
+      ],
+      "unsupported_native": [
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
+        "history compaction (compact_history / HistoryPolicy)"
+      ],
+      "notes": "Python anyinfer.context walkthrough; only the budget() step has a C# equivalent (AsyncClient.Budget). Page does not say it is Python-only."
+    },
+    {
+      "source": "guides/installation.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "pyproject.toml"
+      ],
+      "unsupported_native": [],
+      "notes": "Python packaging: extras, add-on packages, requirements; C# appears only as a pointer to the .NET application setup. Python install surface, not a native gap."
+    },
+    {
+      "source": "guides/local-inference.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/test_local_models_api.py",
+        "tests/test_local_runtimes.py"
+      ],
+      "unsupported_native": [
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)",
+        "native `ollama:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python local subsystem walkthrough plus CLI models/runtime commands; C# documents that it does not manage a local runtime."
+    },
+    {
+      "source": "guides/observability.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_observers.py",
+        "tests/test_event_sinks.py",
+        "tests/test_otel_bridge.py"
+      ],
+      "unsupported_native": [
+        "OpenTelemetry bridge (anyinfer.otel)",
+        "config-file `observers` block (C# config rejects it)"
+      ],
+      "notes": "Python observers, sinks, and OTel. C# has IObserver, LoggingObserver, JsonlObserver and payload opt-in, but no recipe here."
+    },
+    {
+      "source": "guides/python-sdk.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_batches.py",
+        "tests/test_citations.py",
+        "tests/test_server_tools.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python SDK integration guide. Batch jobs (submit_batch/batch_status/fetch_batch) have no C# equivalent; sampling, logprobs, citations and server-tool results map to C# Generation fields."
+    },
+    {
+      "source": "guides/python-to-csharp.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/ConfigurationExample.cs",
+        "examples/csharp-sdk/ConnectionExample.cs",
+        "examples/csharp-sdk/CatalogExample.cs",
+        "examples/csharp-sdk/LifecycleExample.cs",
+        "examples/csharp-sdk/ProbeExample.cs",
+        "examples/csharp-sdk/SetupExample.cs",
+        "examples/csharp-sdk/TelemetryExample.cs",
+        "examples/csharp-sdk/ManifestExample.cs",
+        "examples/csharp-sdk/AccountingExample.cs",
+        "examples/csharp-sdk/RequestPolicyExample.cs",
+        "examples/csharp-sdk/Program.cs"
+      ],
+      "unsupported_native": [
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
+        "history compaction (compact_history / HistoryPolicy)"
+      ],
+      "notes": "Python-to-C# mapping table names Python APIs beside C# ones (both sides need checking); all executable content is C#. Line 79 says v1 config 'actively supports providers, default_route, and repair', but C# also parses cache, operation_routes, and connection/limits keys."
+    },
+    {
+      "source": "guides/quickstart.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/GenerationExample.cs",
+        "examples/csharp-sdk/SyncGenerationExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)"
+      ],
+      "notes": "Only 'Your First Call' has C# tabs; streaming, aliases, structured output, fallback, and embed/rerank sections are Python-only although C# implements those journeys (with openai-compat-family targets, not anthropic/ollama)."
+    },
+    {
+      "source": "guides/streaming.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/StreamingExample.cs",
+        "examples/csharp-sdk/SyncStreamingExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python and C# tabs for the basic stream; later recipes (early-exit cancel, ReasoningDelta, TimingMark TTFT, AttemptFailed) are Python-only although C# exposes the same StreamEvent records."
+    },
+    {
+      "source": "guides/structured-output.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/StructuredOutputExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_schema.py"
+      ],
+      "unsupported_native": [
+        "SchemaViolationError raw_text / partial / missing_required inspection (C# SchemaViolationException exposes only Issues)"
+      ],
+      "notes": "Python and C# tabs; remaining recipes are Python (Pydantic input is Python-only, not a native gap). Line 39 says the example deserializes into an `Answer` record, but the source record is `AnswerResult`."
+    },
+    {
+      "source": "guides/testing-your-app.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py",
+        "tests/testing/test_scripted.py",
+        "src/python/anyinfer/testing/plugin.py"
+      ],
+      "unsupported_native": [
+        "offline scripted-provider test kit and pytest fixtures (ScriptedProvider, anyinfer_* fixtures, cassettes)",
+        "golden run-manifest fixture (anyinfer_golden_manifest)"
+      ],
+      "notes": "Python test kit and pytest plugin; C# has no public testing kit (C# examples use hand-written scripted HttpMessageHandlers)."
+    },
+    {
+      "source": "guides/tool-loop.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/ToolLoopExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "tests/test_docs_examples.py",
+        "tests/test_tool_loop.py",
+        "tests/mcp/test_toolset.py"
+      ],
+      "unsupported_native": [
+        "MCP tool sources (MCPToolset, mcp config block, fake MCP server)"
+      ],
+      "notes": "C# section (Tool.From, RunToolsAsync, 8-round default verified in AsyncClient.cs) then Python run_tools, @ai.tool, and MCP; the page states MCP is Python-only."
+    },
+    {
+      "source": "guides/vector-store.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer-store/tests/test_store.py",
+        "src/python/anyinfer-store/tests/test_rerank.py"
+      ],
+      "unsupported_native": [
+        "anyinfer-store embedded vector store (VectorStore, query_and_rerank)"
+      ],
+      "notes": "Python add-on distribution over embed()/rerank(); C# EmbeddingResult/EmbeddingSpace exist but there is no native store."
+    },
+    {
+      "source": "index.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/GenerationExample.cs",
+        "examples/csharp-sdk/Program.cs"
+      ],
+      "unsupported_native": [
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)",
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
+        "offline scripted-provider test kit and pytest fixtures (ScriptedProvider, anyinfer_* fixtures, cassettes)",
+        "no-dispatch target comparison (compare()) and the compare_diff portability/regression tool"
+      ],
+      "notes": "Python sync/async tabs plus a C# GenerationExample tab; the 'What Makes This Different' bullets are explicitly scoped to the Python runtime. Python tab code (anthropic target) is not executed by any test."
+    },
+    {
+      "source": "providers/README.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Explicitly the Python inventory; C# subset is a pointer to foundation and the C# guide."
+    },
+    {
+      "source": "providers/all.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_provider_index.py",
+        "tests/test_docs_examples.py"
+      ],
+      "unsupported_native": [
+        "provider breadth: only openai-compat, cerebras, hyperbolic, nscale, tei, voyage and jina are native C# registrations"
+      ],
+      "notes": "Generated from the Python registry and verified by a test; the page itself does not say it is the Python inventory."
+    },
+    {
+      "source": "providers/anthropic.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/anthropic.py",
+        "tests/test_hosted_adapters.py"
+      ],
+      "unsupported_native": [
+        "native `anthropic:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/azure-foundry.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/azure_foundry.py",
+        "tests/test_hosted_adapters.py"
+      ],
+      "unsupported_native": [
+        "native `azure-foundry:` provider (not registered in the C# default registry); Entra auth"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/bedrock.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/bedrock.py",
+        "tests/test_bedrock_vertex.py"
+      ],
+      "unsupported_native": [
+        "native `bedrock:` provider (not registered in the C# default registry); SigV4 Converse"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/cohere.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/cohere.py",
+        "tests/test_cohere_embeddings.py",
+        "tests/test_cohere_cassettes.py",
+        "tests/test_cohere_lmstudio.py"
+      ],
+      "unsupported_native": [
+        "native `cohere:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page. Says citations are 'not yet surfaced as typed results', which may be stale given typed Citation results elsewhere."
+    },
+    {
+      "source": "providers/copilot.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/copilot.py",
+        "tests/test_copilot.py"
+      ],
+      "unsupported_native": [
+        "native `copilot:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page (github-copilot-sdk extra)."
+    },
+    {
+      "source": "providers/deepseek.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/deepseek.py",
+        "tests/test_deepseek_xai.py"
+      ],
+      "unsupported_native": [
+        "native `deepseek:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/gemini.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/gemini.py",
+        "tests/test_gemini.py",
+        "tests/test_gemini_embeddings.py"
+      ],
+      "unsupported_native": [
+        "native `gemini:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page; mentions content_policy_targets, which C# Route lacks."
+    },
+    {
+      "source": "providers/llama-cpp.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/llama_cpp.py",
+        "tests/test_llama_cpp.py",
+        "tests/test_local_server.py"
+      ],
+      "unsupported_native": [
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)"
+      ],
+      "notes": "Python supervised adapter; the page embeds a `:::` marker that renders Python generated reference (LlamaCppOptions)."
+    },
+    {
+      "source": "providers/lm-studio.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/lm_studio.py",
+        "tests/test_cohere_lmstudio.py"
+      ],
+      "unsupported_native": [
+        "native `lm-studio:` provider (not registered in the C# default registry); native discovery and residency"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/m365-copilot.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/m365_copilot.py",
+        "tests/test_hosted_adapters.py"
+      ],
+      "unsupported_native": [
+        "native `m365-copilot:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/nebius.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/nebius.py",
+        "tests/test_nebius.py"
+      ],
+      "unsupported_native": [
+        "native `nebius:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/ollama.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/ollama.py",
+        "tests/test_ollama.py",
+        "tests/test_ollama_embeddings.py"
+      ],
+      "unsupported_native": [
+        "native `ollama:` provider (not registered in the C# default registry); grammar schemas, keep_alive sessions, GPU-spill diagnostics"
+      ],
+      "notes": "Python dedicated adapter page; examples executed in part by test_ollama_provider_options_pass_through."
+    },
+    {
+      "source": "providers/openai-compat.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/openai_compat.py",
+        "tests/test_openai_compat.py"
+      ],
+      "unsupported_native": [],
+      "notes": "This is the primary C# generation descriptor, yet the page has no C# content; C# openai-compat is chat-only (no retrieval) and 'servers that ignore stream' handling is unverified for C#."
+    },
+    {
+      "source": "providers/openai.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/openai.py",
+        "tests/test_hosted_adapters.py"
+      ],
+      "unsupported_native": [
+        "native `openai:` provider (not registered in the C# default registry); Responses API"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/openrouter.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/openrouter.py",
+        "tests/test_hosted_adapters.py"
+      ],
+      "unsupported_native": [
+        "native `openrouter:` provider (not registered in the C# default registry); discovered pricing"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/presets.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/presets.py",
+        "tests/test_presets.py",
+        "tests/test_openai_compat_embeddings.py"
+      ],
+      "unsupported_native": [
+        "presets other than Cerebras, Hyperbolic and Nscale (inert rows in the C# registry)",
+        "preset embeddings (Together, Fireworks, DeepInfra, Mistral)"
+      ],
+      "notes": "Python preset registry; C# embeds the generated preset table but selects only three reviewed generation presets."
+    },
+    {
+      "source": "providers/retrieval.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "examples/csharp-sdk/VoyageExample.cs",
+        "examples/csharp-sdk/JinaExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "src/python/anyinfer/providers/voyage.py",
+        "src/python/anyinfer/providers/jina.py",
+        "tests/test_voyage.py",
+        "tests/test_jina.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python Voyage/Jina tabs plus a 'C# proof boundary' section with both C# snippets; hosted traffic for C# is offline-only evidence."
+    },
+    {
+      "source": "providers/tei.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/tei.py",
+        "tests/test_tei.py",
+        "tests/test_tei_cassettes.py",
+        "examples/csharp-sdk/TeiExample.cs",
+        "src/csharp/AnyInfer/Providers/TeiAdapter.cs"
+      ],
+      "unsupported_native": [],
+      "notes": "Python setup code plus C#-specific claims (C# descriptor does not hydrate limits; C# exercised against TEI 1.9.4 on 2026-10-22). C# TeiExample is not shown here; reviewer may add a C# tab."
+    },
+    {
+      "source": "providers/vertex.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/vertex.py",
+        "tests/test_bedrock_vertex.py",
+        "tests/test_cloud_auth.py"
+      ],
+      "unsupported_native": [
+        "native `vertex:` provider (not registered in the C# default registry); GCP OAuth"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "providers/xai.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/providers/xai.py",
+        "tests/test_deepseek_xai.py"
+      ],
+      "unsupported_native": [
+        "native `xai:` provider (not registered in the C# default registry)"
+      ],
+      "notes": "Python dedicated adapter page."
+    },
+    {
+      "source": "reference/README.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [],
+      "unsupported_native": [],
+      "notes": "Reference landing page listing both the Python and C# references; API stability commitments and module map are Python-only."
+    },
+    {
+      "source": "reference/api/README.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "tests/test_python_reference.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Index of the Python generated reference."
+    },
+    {
+      "source": "reference/api/capabilities.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/capabilities"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/client.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/_client"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/compare-diff.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/evaluate/compare_diff.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/confidential.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer-confidential/src/anyinfer_confidential",
+        "src/python/anyinfer-shared/src/anyinfer_shared"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page. Generated from the anyinfer-confidential and anyinfer-shared distributions."
+    },
+    {
+      "source": "reference/api/configuration.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/config",
+        "src/python/anyinfer/plugins.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/context.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/context"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page. Generated from anyinfer.context; its ContextTuning table overlaps the C# ContextTuning record documented in reference/csharp-sdk.md."
+    },
+    {
+      "source": "reference/api/embeddings.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/types"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/errors.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/errors.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/local.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/local"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page. Generated from anyinfer.local; the intro repeats the 'model catalog' and 'run a model locally' links twice."
+    },
+    {
+      "source": "reference/api/registry.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/registry.py",
+        "src/python/anyinfer/catalog",
+        "src/python/anyinfer/credentials"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/requests.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/types",
+        "src/python/anyinfer/schema"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/results.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/types"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/routing.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/routing"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/serve.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/serve"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/telemetry.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/events",
+        "src/python/anyinfer/redaction.py",
+        "src/python/anyinfer/otel.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/testing.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer/testing"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page (`:::` markers rendered from docstrings by the Griffe renderer)."
+    },
+    {
+      "source": "reference/api/vector-store.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "scripts/generate_python_reference.py",
+        "src/python/anyinfer-store/src/anyinfer_store"
+      ],
+      "unsupported_native": [],
+      "notes": "Python generated API page. Generated from the separate anyinfer-store distribution."
+    },
+    {
+      "source": "reference/configuration.md",
+      "scope": "mixed",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/config",
+        "tests/test_config.py",
+        "tests/test_provider_redirects.py"
+      ],
+      "unsupported_native": [
+        "`context`, `history`, `observers`, `arena`/`arenas`, and `mcp` configuration blocks (C# AnyInferConfig rejects them as not implemented)"
+      ],
+      "notes": "Shared JSON v1 format shown through Python APIs, CLI, and sidecar, plus one C#-specific redirect/handler statement; C# parses providers/default_route/repair/cache/operation_routes/limits/proxy/verify/client_cert but the page never says which blocks C# accepts."
+    },
+    {
+      "source": "reference/conformance-matrix.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "tests/test_conformance.py",
+        "src/python/anyinfer/testing/conformance.py",
+        "workspace.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Generated Python adapter matrix; C# conformance (src/csharp/AnyInfer.Conformance) has no rows here."
+    },
+    {
+      "source": "reference/csharp-sdk.md",
+      "scope": "csharp",
+      "review": "pending",
+      "evidence": [
+        "src/csharp/AnyInfer/Context/ContextTuning.cs",
+        "src/csharp/AnyInfer/Providers/ProviderDescriptor.cs",
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs",
+        "src/csharp/AnyInfer.Tests/ContextTuningTests.cs",
+        "src/csharp/AnyInfer.Tests/ModelInventoryTests.cs"
+      ],
+      "unsupported_native": [
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings",
+        "history compaction (compact_history / HistoryPolicy)",
+        "batch inference jobs",
+        "generic OpenAI-compatible retrieval",
+        "arena results"
+      ],
+      "notes": "Hand-written semantic reference (no generated C# API yet). Lines 63-64 name only the `context` config block as unsupported, but C# also rejects history/observers/arena/arenas/mcp."
+    },
+    {
+      "source": "reference/errors.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/errors.py",
+        "tests/test_errors_and_redaction.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python error catalog (18 classes, count verified). C# uses …Exception names (Errors.cs) with extra SchemaReference/SchemaEvaluation types and has no catalog page."
+    },
+    {
+      "source": "reference/glossary.md",
+      "scope": "shared",
+      "review": "pending",
+      "evidence": [],
+      "unsupported_native": [],
+      "notes": "Language-neutral vocabulary; a few entries name Python-only surfaces (Extra, Posture, Cassette, Sidecar, `openai_compat`, WireRequest)."
+    },
+    {
+      "source": "serve/README.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/serve/app.py",
+        "src/python/anyinfer/serve/openai_codec.py",
+        "src/python/anyinfer/serve/responses_codec.py",
+        "src/python/anyinfer/serve/embeddings_codec.py",
+        "tests/test_serve_app.py",
+        "tests/test_serve_responses.py",
+        "tests/test_serve_embeddings.py",
+        "tests/test_openai_roundtrip.py",
+        "tests/test_sidecar_context.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python sidecar surface (OpenAI wire codec, anyinfer_* extensions); not a native journey and distinct from the C# SDK."
+    },
+    {
+      "source": "serve/running-as-a-service.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/serve/service.py",
+        "tests/test_serve_service.py",
+        "tests/test_cli_serve_service.py"
+      ],
+      "unsupported_native": [],
+      "notes": "Python sidecar service installation (systemd/launchd/scheduled task); not a native journey."
+    },
+    {
+      "source": "why-anyinfer.md",
+      "scope": "python",
+      "review": "pending",
+      "evidence": [
+        "src/python/anyinfer/testing/scripted.py"
+      ],
+      "unsupported_native": [
+        "offline scripted-provider test kit and pytest fixtures (ScriptedProvider, anyinfer_* fixtures, cassettes)",
+        "managed local llama.cpp runtime (model acquisition, hardware-fit tuning, llama-server supervision)",
+        "context reduction (anyinfer.context select/plan/distill); C# has only standalone ContextTuning settings"
+      ],
+      "notes": "Positioning page with Python-only code and CLI; never mentions C#, so the five differentiators read as product-wide even though C# lacks the test kit, managed local runtime, and reduction. Counts (106 providers, 20 snapshots) need re-verification."
+    }
+  ],
+  "repository_only": [
+    {
+      "path": ".agents/skills/anyinfer-integration/SKILL.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/agents/INTEGRATION.md"
+      ],
+      "notes": "Codex skill shim; points at docs/agents/INTEGRATION.md and checked by tests/test_agent_instructions.py."
+    },
+    {
+      "path": ".claude/skills/anyinfer-integration/SKILL.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/agents/INTEGRATION.md"
+      ],
+      "notes": "Claude Code skill shim over the canonical integration procedure; copied into user projects per guides/coding-agents.md."
+    },
+    {
+      "path": ".github/prompts/anyinfer-integration.prompt.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/agents/INTEGRATION.md"
+      ],
+      "notes": "Copilot prompt shim over the canonical integration procedure."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [],
+      "notes": "Canonical change record linked from reference/README.md; contains no C# entries."
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/contributing/README.md"
+      ],
+      "notes": "Short pointer to the published contributor guide; omits the .NET SDK prerequisite the full `workspace check` gate needs."
+    },
+    {
+      "path": "README.md",
+      "scope": "mixed",
+      "review": "pending",
+      "mirrors": [
+        "docs/index.md",
+        "docs/guides/installation.md",
+        "docs/providers/README.md",
+        "docs/guides/README.md"
+      ],
+      "notes": "Repository landing page; unlike docs/index.md it has no C# code tab. Its extras list omits attest, tokenizers and mcp from installation.md."
+    },
+    {
+      "path": "SECURITY.md",
+      "scope": "shared",
+      "review": "pending",
+      "mirrors": [],
+      "notes": "Vulnerability policy referenced from contributing/README.md via the GitHub security-policy URL."
+    },
+    {
+      "path": "contracts/README.md",
+      "scope": "shared",
+      "review": "pending",
+      "mirrors": [],
+      "notes": "Provider contract snapshot index linked from why-anyinfer.md and contributing pages; snapshots back both SDKs' adapters."
+    },
+    {
+      "path": "docs/README.md",
+      "scope": "mixed",
+      "review": "pending",
+      "mirrors": [
+        "docs/index.md"
+      ],
+      "notes": "In-repo table of contents excluded from build_pages. Lines 48-49 send readers to python-to-csharp.md for the C# v1 config subset, which understates it."
+    },
+    {
+      "path": "fixtures/compare-diff/README.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/guides/comparing-targets.md"
+      ],
+      "notes": "Reader-facing fixture starter; its anchor #turning-comparisons-into-a-regression-test-or-a-portability-report does not exist on the guide."
+    },
+    {
+      "path": "specification/README.md",
+      "scope": "shared",
+      "review": "pending",
+      "mirrors": [],
+      "notes": "Language-neutral profile index linked from concepts/foundation.md."
+    },
+    {
+      "path": "src/csharp/README.md",
+      "scope": "csharp",
+      "review": "pending",
+      "mirrors": [
+        "docs/guides/csharp-sdk.md",
+        "docs/reference/csharp-sdk.md",
+        "docs/concepts/foundation.md"
+      ],
+      "notes": "Packed into the NuGet package (AnyInfer.csproj PackageReadmeFile, lines 10 and 24); the only place C# custom adapters are documented. Does not mention the Cerebras/Hyperbolic/Nscale registrations."
+    },
+    {
+      "path": "src/python/anyinfer-confidential/README.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/guides/confidentiality-tiers.md",
+        "docs/reference/api/confidential.md"
+      ],
+      "notes": "Add-on package README restating Tier 1-2 and Relay deployment rules."
+    },
+    {
+      "path": "src/python/anyinfer-shared/README.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/reference/api/confidential.md"
+      ],
+      "notes": "Add-on package README for ConfidentialityReport."
+    },
+    {
+      "path": "src/python/anyinfer-store/README.md",
+      "scope": "python",
+      "review": "pending",
+      "mirrors": [
+        "docs/guides/vector-store.md",
+        "docs/reference/api/vector-store.md"
+      ],
+      "notes": "Add-on package README restating the vector-store scale boundary and basic usage."
+    }
+  ],
+  "exclusions": [
+    {
+      "path": "AGENTS.md",
+      "reason": "Contributor-agent instruction set for working in this repository; not reader-facing product documentation."
+    },
+    {
+      "path": "CLAUDE.md",
+      "reason": "Discovery shim that points coding agents at AGENTS.md; carries no product documentation."
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "reason": "Discovery shim that points coding agents at AGENTS.md; carries no product documentation."
+    },
+    {
+      "path": "DESIGN.md",
+      "reason": "Internal architecture record with decision identifiers; summarized for readers by the published architecture and concept pages."
+    },
+    {
+      "path": "plans",
+      "reason": "Internal implementation plans; no published page may link to them."
+    },
+    {
+      "path": "tests/fixtures",
+      "reason": "Test fixture READMEs describe fixtures to contributors running tests, not SDK behavior."
+    }
+  ]
+}

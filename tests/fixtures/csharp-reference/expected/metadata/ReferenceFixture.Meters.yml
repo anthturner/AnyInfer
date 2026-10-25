@@ -1,0 +1,562 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Meters
+  commentId: T:ReferenceFixture.Meters
+  id: Meters
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.Meters.#ctor(System.Double)
+  - ReferenceFixture.Meters.Value
+  - ReferenceFixture.Meters.op_Addition(ReferenceFixture.Meters,ReferenceFixture.Meters)
+  - ReferenceFixture.Meters.op_Explicit(ReferenceFixture.Meters)~System.Double
+  - ReferenceFixture.Meters.op_Implicit(System.Double)~ReferenceFixture.Meters
+  langs:
+  - csharp
+  - vb
+  name: Meters
+  nameWithType: Meters
+  fullName: ReferenceFixture.Meters
+  type: Struct
+  source:
+    id: Meters
+    path: ReferenceFixture/Shapes.cs
+    startLine: 62
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A value with operators and conversions.
+  remarks: 'Its positional <code>Value</code> parameter is deliberately undocumented: the compiler reports no
+
+    warning for that gap, so it is a negative control for the documentation checker.'
+  example: []
+  syntax:
+    content: 'public readonly record struct Meters : IEquatable<Meters>'
+    content.vb: Public Structure Meters Implements IEquatable(Of Meters)
+  implements:
+  - System.IEquatable{ReferenceFixture.Meters}
+  inheritedMembers:
+  - System.ValueType.Equals(System.Object)
+  - System.ValueType.GetHashCode
+  - System.ValueType.ToString
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+- uid: ReferenceFixture.Meters.#ctor(System.Double)
+  commentId: M:ReferenceFixture.Meters.#ctor(System.Double)
+  id: '#ctor(System.Double)'
+  parent: ReferenceFixture.Meters
+  langs:
+  - csharp
+  - vb
+  name: Meters(double)
+  nameWithType: Meters.Meters(double)
+  fullName: ReferenceFixture.Meters.Meters(double)
+  type: Constructor
+  source:
+    id: .ctor
+    path: ReferenceFixture/Shapes.cs
+    startLine: 62
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A value with operators and conversions.
+  remarks: 'Its positional <code>Value</code> parameter is deliberately undocumented: the compiler reports no
+
+    warning for that gap, so it is a negative control for the documentation checker.'
+  example: []
+  syntax:
+    content: public Meters(double Value)
+    parameters:
+    - id: Value
+      type: System.Double
+    content.vb: Public Sub New(Value As Double)
+  overload: ReferenceFixture.Meters.#ctor*
+  nameWithType.vb: Meters.New(Double)
+  fullName.vb: ReferenceFixture.Meters.New(Double)
+  name.vb: New(Double)
+- uid: ReferenceFixture.Meters.Value
+  commentId: P:ReferenceFixture.Meters.Value
+  id: Value
+  parent: ReferenceFixture.Meters
+  langs:
+  - csharp
+  - vb
+  name: Value
+  nameWithType: Meters.Value
+  fullName: ReferenceFixture.Meters.Value
+  type: Property
+  source:
+    id: Value
+    path: ReferenceFixture/Shapes.cs
+    startLine: 62
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  syntax:
+    content: public double Value { get; init; }
+    parameters: []
+    return:
+      type: System.Double
+    content.vb: Public Property Value As Double
+  overload: ReferenceFixture.Meters.Value*
+- uid: ReferenceFixture.Meters.op_Addition(ReferenceFixture.Meters,ReferenceFixture.Meters)
+  commentId: M:ReferenceFixture.Meters.op_Addition(ReferenceFixture.Meters,ReferenceFixture.Meters)
+  id: op_Addition(ReferenceFixture.Meters,ReferenceFixture.Meters)
+  parent: ReferenceFixture.Meters
+  langs:
+  - csharp
+  - vb
+  name: operator +(Meters, Meters)
+  nameWithType: Meters.operator +(Meters, Meters)
+  fullName: ReferenceFixture.Meters.operator +(ReferenceFixture.Meters, ReferenceFixture.Meters)
+  type: Operator
+  source:
+    id: op_Addition
+    path: ReferenceFixture/Shapes.cs
+    startLine: 68
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Adds two lengths.
+  example: []
+  syntax:
+    content: public static Meters operator +(Meters left, Meters right)
+    parameters:
+    - id: left
+      type: ReferenceFixture.Meters
+      description: The left operand.
+    - id: right
+      type: ReferenceFixture.Meters
+      description: The right operand.
+    return:
+      type: ReferenceFixture.Meters
+      description: The sum.
+    content.vb: Public Shared Operator +(left As Meters, right As Meters) As Meters
+  overload: ReferenceFixture.Meters.op_Addition*
+  nameWithType.vb: Meters.+(Meters, Meters)
+  fullName.vb: ReferenceFixture.Meters.+(ReferenceFixture.Meters, ReferenceFixture.Meters)
+  name.vb: +(Meters, Meters)
+- uid: ReferenceFixture.Meters.op_Implicit(System.Double)~ReferenceFixture.Meters
+  commentId: M:ReferenceFixture.Meters.op_Implicit(System.Double)~ReferenceFixture.Meters
+  id: op_Implicit(System.Double)~ReferenceFixture.Meters
+  parent: ReferenceFixture.Meters
+  langs:
+  - csharp
+  - vb
+  name: implicit operator Meters(double)
+  nameWithType: Meters.implicit operator Meters(double)
+  fullName: ReferenceFixture.Meters.implicit operator ReferenceFixture.Meters(double)
+  type: Operator
+  source:
+    id: op_Implicit
+    path: ReferenceFixture/Shapes.cs
+    startLine: 73
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Converts a raw number.
+  example: []
+  syntax:
+    content: public static implicit operator Meters(double value)
+    parameters:
+    - id: value
+      type: System.Double
+      description: The raw value.
+    return:
+      type: ReferenceFixture.Meters
+      description: A length of <code class="paramref">value</code> meters.
+    content.vb: Public Shared Widening Operator CType(value As Double) As Meters
+  overload: ReferenceFixture.Meters.op_Implicit*
+  nameWithType.vb: Meters.CType(Double)
+  fullName.vb: ReferenceFixture.Meters.CType(Double)
+  name.vb: CType(Double)
+- uid: ReferenceFixture.Meters.op_Explicit(ReferenceFixture.Meters)~System.Double
+  commentId: M:ReferenceFixture.Meters.op_Explicit(ReferenceFixture.Meters)~System.Double
+  id: op_Explicit(ReferenceFixture.Meters)~System.Double
+  parent: ReferenceFixture.Meters
+  langs:
+  - csharp
+  - vb
+  name: explicit operator double(Meters)
+  nameWithType: Meters.explicit operator double(Meters)
+  fullName: ReferenceFixture.Meters.explicit operator double(ReferenceFixture.Meters)
+  type: Operator
+  source:
+    id: op_Explicit
+    path: ReferenceFixture/Shapes.cs
+    startLine: 78
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Reads the raw number.
+  example: []
+  syntax:
+    content: public static explicit operator double(Meters value)
+    parameters:
+    - id: value
+      type: ReferenceFixture.Meters
+      description: The length.
+    return:
+      type: System.Double
+      description: The number of meters.
+    content.vb: Public Shared Narrowing Operator CType(value As Meters) As Double
+  overload: ReferenceFixture.Meters.op_Explicit*
+  nameWithType.vb: Meters.CType(Meters)
+  fullName.vb: ReferenceFixture.Meters.CType(ReferenceFixture.Meters)
+  name.vb: CType(Meters)
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: System.IEquatable{ReferenceFixture.Meters}
+  commentId: T:System.IEquatable{ReferenceFixture.Meters}
+  parent: System
+  definition: System.IEquatable`1
+  href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  name: IEquatable<Meters>
+  nameWithType: IEquatable<Meters>
+  fullName: System.IEquatable<ReferenceFixture.Meters>
+  nameWithType.vb: IEquatable(Of Meters)
+  fullName.vb: System.IEquatable(Of ReferenceFixture.Meters)
+  name.vb: IEquatable(Of Meters)
+  spec.csharp:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: <
+  - uid: ReferenceFixture.Meters
+    name: Meters
+    href: ReferenceFixture.Meters.html
+  - name: '>'
+  spec.vb:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: ReferenceFixture.Meters
+    name: Meters
+    href: ReferenceFixture.Meters.html
+  - name: )
+- uid: System.ValueType.Equals(System.Object)
+  commentId: M:System.ValueType.Equals(System.Object)
+  parent: System.ValueType
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.valuetype.equals
+  name: Equals(object)
+  nameWithType: ValueType.Equals(object)
+  fullName: System.ValueType.Equals(object)
+  nameWithType.vb: ValueType.Equals(Object)
+  fullName.vb: System.ValueType.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.valuetype.equals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.valuetype.equals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.ValueType.GetHashCode
+  commentId: M:System.ValueType.GetHashCode
+  parent: System.ValueType
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.valuetype.gethashcode
+  name: GetHashCode()
+  nameWithType: ValueType.GetHashCode()
+  fullName: System.ValueType.GetHashCode()
+  spec.csharp:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.valuetype.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.valuetype.gethashcode
+  - name: (
+  - name: )
+- uid: System.ValueType.ToString
+  commentId: M:System.ValueType.ToString
+  parent: System.ValueType
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.valuetype.tostring
+  name: ToString()
+  nameWithType: ValueType.ToString()
+  fullName: System.ValueType.ToString()
+  spec.csharp:
+  - uid: System.ValueType.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.valuetype.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.ValueType.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.valuetype.tostring
+  - name: (
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.IEquatable`1
+  commentId: T:System.IEquatable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  name: IEquatable<T>
+  nameWithType: IEquatable<T>
+  fullName: System.IEquatable<T>
+  nameWithType.vb: IEquatable(Of T)
+  fullName.vb: System.IEquatable(Of T)
+  name.vb: IEquatable(Of T)
+  spec.csharp:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.ValueType
+  commentId: T:System.ValueType
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.valuetype
+  name: ValueType
+  nameWithType: ValueType
+  fullName: System.ValueType
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: ReferenceFixture.Meters.#ctor*
+  commentId: Overload:ReferenceFixture.Meters.#ctor
+  href: ReferenceFixture.Meters.html#ReferenceFixture_Meters__ctor_System_Double_
+  name: Meters
+  nameWithType: Meters.Meters
+  fullName: ReferenceFixture.Meters.Meters
+  nameWithType.vb: Meters.New
+  fullName.vb: ReferenceFixture.Meters.New
+  name.vb: New
+- uid: System.Double
+  commentId: T:System.Double
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.double
+  name: double
+  nameWithType: double
+  fullName: double
+  nameWithType.vb: Double
+  fullName.vb: Double
+  name.vb: Double
+- uid: ReferenceFixture.Meters.Value*
+  commentId: Overload:ReferenceFixture.Meters.Value
+  href: ReferenceFixture.Meters.html#ReferenceFixture_Meters_Value
+  name: Value
+  nameWithType: Meters.Value
+  fullName: ReferenceFixture.Meters.Value
+- uid: ReferenceFixture.Meters.op_Addition*
+  commentId: Overload:ReferenceFixture.Meters.op_Addition
+  href: ReferenceFixture.Meters.html#ReferenceFixture_Meters_op_Addition_ReferenceFixture_Meters_ReferenceFixture_Meters_
+  name: operator +
+  nameWithType: Meters.operator +
+  fullName: ReferenceFixture.Meters.operator +
+  nameWithType.vb: Meters.+
+  fullName.vb: ReferenceFixture.Meters.+
+  name.vb: +
+  spec.csharp:
+  - name: operator
+  - name: ' '
+  - uid: ReferenceFixture.Meters.op_Addition*
+    name: +
+    href: ReferenceFixture.Meters.html#ReferenceFixture_Meters_op_Addition_ReferenceFixture_Meters_ReferenceFixture_Meters_
+- uid: ReferenceFixture.Meters
+  commentId: T:ReferenceFixture.Meters
+  parent: ReferenceFixture
+  href: ReferenceFixture.Meters.html
+  name: Meters
+  nameWithType: Meters
+  fullName: ReferenceFixture.Meters
+- uid: ReferenceFixture.Meters.op_Implicit*
+  commentId: Overload:ReferenceFixture.Meters.op_Implicit
+  name: implicit operator
+  nameWithType: Meters.implicit operator
+  fullName: ReferenceFixture.Meters.implicit operator
+  nameWithType.vb: Meters.CType
+  fullName.vb: ReferenceFixture.Meters.CType
+  name.vb: CType
+  spec.csharp:
+  - name: implicit
+  - name: ' '
+  - name: operator
+- uid: ReferenceFixture.Meters.op_Explicit*
+  commentId: Overload:ReferenceFixture.Meters.op_Explicit
+  name: explicit operator
+  nameWithType: Meters.explicit operator
+  fullName: ReferenceFixture.Meters.explicit operator
+  nameWithType.vb: Meters.CType
+  fullName.vb: ReferenceFixture.Meters.CType
+  name.vb: CType
+  spec.csharp:
+  - name: explicit
+  - name: ' '
+  - name: operator

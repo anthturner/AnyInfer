@@ -135,6 +135,12 @@ public static class Signatures
         CancellationToken fifth = default,
         Box<Pair<int, string>>? sixth = null) => first ?? new Dictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>?>>>();
 
+    /// <summary>Accepts a nested type of a constructed generic type.</summary>
+    /// <param name="nested">The nested value.</param>
+    /// <param name="depth">A nested enum of the same construction.</param>
+    /// <returns>The numeric depth.</returns>
+    public static int Depth(Box<int>.Nested nested, Box<string>.Nested.Depth depth) => nested is null ? 0 : (int)depth;
+
     /// <summary>Extends a string.</summary>
     /// <param name="value">The receiver.</param>
     /// <returns>The value repeated.</returns>

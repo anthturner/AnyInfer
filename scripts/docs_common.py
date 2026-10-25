@@ -33,6 +33,8 @@ _C_SHARP_SOURCES = frozenset(
 _PYTHON_ROOTS = frozenset(
     {"guides/python-sdk.md", "guides/quickstart.md", "guides/installation.md"}
 )
+GENERATED_PREFIX = "generated:"
+"""Navigation targets with this prefix name a generated section, not an authored source."""
 
 
 def load_navigation(path: Path) -> list[object]:
@@ -51,6 +53,8 @@ def build_pages(docs_dir: Path, navigation: list[object]) -> list[Page]:
     def visit(value: object, section: str) -> None:
         nonlocal order
         if isinstance(value, str):
+            if value.startswith(GENERATED_PREFIX):
+                return
             titles.setdefault(value, (_source_title(docs_dir / value), section, order))
             order += 1
             return
@@ -60,6 +64,8 @@ def build_pages(docs_dir: Path, navigation: list[object]) -> list[Page]:
             if not isinstance(title, str):
                 raise ValueError(f"navigation title must be text, got {title!r}")
             child_section = title if section == "" else section
+            if isinstance(child, str) and child.startswith(GENERATED_PREFIX):
+                continue
             if isinstance(child, str):
                 titles.setdefault(child, (title, child_section, order))
                 order += 1

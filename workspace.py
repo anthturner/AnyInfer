@@ -793,6 +793,13 @@ def _check_docstrings() -> int:
 
 _MD_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 
+_GENERATED_ROUTES = ("/csharp/api/",)
+"""Site routes rendered from source rather than authored as Markdown files.
+
+They have no file to resolve here; the docs-build phase validates every link to them against
+the generated pages, so this relative-link check leaves them to it.
+"""
+
 _MD_SKIP_DIRS = {
     ".git",
     ".tmp-tests",
@@ -834,6 +841,8 @@ def _check_doc_links() -> int:
         for match in _MD_LINK.finditer(text):
             target = match.group(1).strip()
             if target.startswith(("http://", "https://", "mailto:", "#")) or not target:
+                continue
+            if target.startswith(_GENERATED_ROUTES):
                 continue
 
             # Strip an anchor; the file is what we can verify.
@@ -1078,6 +1087,12 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 (
                     "validate SDK API evidence ledger",
                     lambda: python(str(ROOT / "scripts" / "check_sdk_api_parity.py"), cwd=ROOT),
+                ),
+                (
+                    "validate C# documentation comments",
+                    lambda: python(
+                        str(ROOT / "scripts" / "check_csharp_docs.py"), "--build", cwd=ROOT
+                    ),
                 ),
                 (
                     "validate C# NuGet proof package",

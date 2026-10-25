@@ -1,0 +1,479 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Pair`2
+  commentId: T:ReferenceFixture.Pair`2
+  id: Pair`2
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.Pair`2.#ctor(`0,`1)
+  - ReferenceFixture.Pair`2.Left
+  - ReferenceFixture.Pair`2.Right
+  langs:
+  - csharp
+  - vb
+  name: Pair<TLeft, TRight>
+  nameWithType: Pair<TLeft, TRight>
+  fullName: ReferenceFixture.Pair<TLeft, TRight>
+  type: Class
+  source:
+    id: Pair
+    path: ReferenceFixture/Shapes.cs
+    startLine: 55
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A positional record with compiler-generated members.
+  example: []
+  syntax:
+    content: 'public sealed record Pair<TLeft, TRight> : IEquatable<Pair<TLeft, TRight>>'
+    typeParameters:
+    - id: TLeft
+      description: The left type.
+    - id: TRight
+      description: The right type.
+    content.vb: Public NotInheritable Class Pair(Of TLeft, TRight) Implements IEquatable(Of Pair(Of TLeft, TRight))
+  inheritance:
+  - System.Object
+  implements:
+  - System.IEquatable{ReferenceFixture.Pair`2}
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  nameWithType.vb: Pair(Of TLeft, TRight)
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight)
+  name.vb: Pair(Of TLeft, TRight)
+- uid: ReferenceFixture.Pair`2.#ctor(`0,`1)
+  commentId: M:ReferenceFixture.Pair`2.#ctor(`0,`1)
+  id: '#ctor(`0,`1)'
+  parent: ReferenceFixture.Pair`2
+  langs:
+  - csharp
+  - vb
+  name: Pair(TLeft, TRight)
+  nameWithType: Pair<TLeft, TRight>.Pair(TLeft, TRight)
+  fullName: ReferenceFixture.Pair<TLeft, TRight>.Pair(TLeft, TRight)
+  type: Constructor
+  source:
+    id: .ctor
+    path: ReferenceFixture/Shapes.cs
+    startLine: 55
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A positional record with compiler-generated members.
+  example: []
+  syntax:
+    content: public Pair(TLeft Left, TRight Right)
+    parameters:
+    - id: Left
+      type: '{TLeft}'
+      description: The left value.
+    - id: Right
+      type: '{TRight}'
+      description: The right value.
+    content.vb: Public Sub New(Left As TLeft, Right As TRight)
+  overload: ReferenceFixture.Pair`2.#ctor*
+  nameWithType.vb: Pair(Of TLeft, TRight).New(TLeft, TRight)
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight).New(TLeft, TRight)
+  name.vb: New(TLeft, TRight)
+- uid: ReferenceFixture.Pair`2.Left
+  commentId: P:ReferenceFixture.Pair`2.Left
+  id: Left
+  parent: ReferenceFixture.Pair`2
+  langs:
+  - csharp
+  - vb
+  name: Left
+  nameWithType: Pair<TLeft, TRight>.Left
+  fullName: ReferenceFixture.Pair<TLeft, TRight>.Left
+  type: Property
+  source:
+    id: Left
+    path: ReferenceFixture/Shapes.cs
+    startLine: 55
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: The left value.
+  example: []
+  syntax:
+    content: public TLeft Left { get; init; }
+    parameters: []
+    return:
+      type: '{TLeft}'
+    content.vb: Public Property Left As TLeft
+  overload: ReferenceFixture.Pair`2.Left*
+  nameWithType.vb: Pair(Of TLeft, TRight).Left
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight).Left
+- uid: ReferenceFixture.Pair`2.Right
+  commentId: P:ReferenceFixture.Pair`2.Right
+  id: Right
+  parent: ReferenceFixture.Pair`2
+  langs:
+  - csharp
+  - vb
+  name: Right
+  nameWithType: Pair<TLeft, TRight>.Right
+  fullName: ReferenceFixture.Pair<TLeft, TRight>.Right
+  type: Property
+  source:
+    id: Right
+    path: ReferenceFixture/Shapes.cs
+    startLine: 55
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: The right value.
+  example: []
+  syntax:
+    content: public TRight Right { get; init; }
+    parameters: []
+    return:
+      type: '{TRight}'
+    content.vb: Public Property Right As TRight
+  overload: ReferenceFixture.Pair`2.Right*
+  nameWithType.vb: Pair(Of TLeft, TRight).Right
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight).Right
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.IEquatable{ReferenceFixture.Pair`2}
+  commentId: T:System.IEquatable{ReferenceFixture.Pair`2}
+  parent: System
+  definition: System.IEquatable`1
+  href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  name: IEquatable<Pair<TLeft, TRight>>
+  nameWithType: IEquatable<Pair<TLeft, TRight>>
+  fullName: System.IEquatable<ReferenceFixture.Pair<TLeft, TRight>>
+  nameWithType.vb: IEquatable(Of Pair(Of TLeft, TRight))
+  fullName.vb: System.IEquatable(Of ReferenceFixture.Pair(Of TLeft, TRight))
+  name.vb: IEquatable(Of Pair(Of TLeft, TRight))
+  spec.csharp:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: <
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: <
+  - name: TLeft
+  - name: ','
+  - name: ' '
+  - name: TRight
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: TLeft
+  - name: ','
+  - name: ' '
+  - name: TRight
+  - name: )
+  - name: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.IEquatable`1
+  commentId: T:System.IEquatable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  name: IEquatable<T>
+  nameWithType: IEquatable<T>
+  fullName: System.IEquatable<T>
+  nameWithType.vb: IEquatable(Of T)
+  fullName.vb: System.IEquatable(Of T)
+  name.vb: IEquatable(Of T)
+  spec.csharp:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: ReferenceFixture.Pair`2.#ctor*
+  commentId: Overload:ReferenceFixture.Pair`2.#ctor
+  href: ReferenceFixture.Pair-2.html#ReferenceFixture_Pair_2__ctor__0__1_
+  name: Pair
+  nameWithType: Pair<TLeft, TRight>.Pair
+  fullName: ReferenceFixture.Pair<TLeft, TRight>.Pair
+  nameWithType.vb: Pair(Of TLeft, TRight).New
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight).New
+  name.vb: New
+- uid: '{TLeft}'
+  commentId: '!:TLeft'
+  definition: TLeft
+  name: TLeft
+  nameWithType: TLeft
+  fullName: TLeft
+- uid: '{TRight}'
+  commentId: '!:TRight'
+  definition: TRight
+  name: TRight
+  nameWithType: TRight
+  fullName: TRight
+- uid: TLeft
+  name: TLeft
+  nameWithType: TLeft
+  fullName: TLeft
+- uid: TRight
+  name: TRight
+  nameWithType: TRight
+  fullName: TRight
+- uid: ReferenceFixture.Pair`2.Left*
+  commentId: Overload:ReferenceFixture.Pair`2.Left
+  href: ReferenceFixture.Pair-2.html#ReferenceFixture_Pair_2_Left
+  name: Left
+  nameWithType: Pair<TLeft, TRight>.Left
+  fullName: ReferenceFixture.Pair<TLeft, TRight>.Left
+  nameWithType.vb: Pair(Of TLeft, TRight).Left
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight).Left
+- uid: ReferenceFixture.Pair`2.Right*
+  commentId: Overload:ReferenceFixture.Pair`2.Right
+  href: ReferenceFixture.Pair-2.html#ReferenceFixture_Pair_2_Right
+  name: Right
+  nameWithType: Pair<TLeft, TRight>.Right
+  fullName: ReferenceFixture.Pair<TLeft, TRight>.Right
+  nameWithType.vb: Pair(Of TLeft, TRight).Right
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight).Right

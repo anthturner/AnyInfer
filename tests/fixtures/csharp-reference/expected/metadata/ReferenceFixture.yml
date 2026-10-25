@@ -1,0 +1,200 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  id: ReferenceFixture
+  children:
+  - ReferenceFixture.Box`1
+  - ReferenceFixture.Box`1.Nested
+  - ReferenceFixture.Box`1.Nested.Depth
+  - ReferenceFixture.Constants
+  - ReferenceFixture.IShape
+  - ReferenceFixture.Measure
+  - ReferenceFixture.Meters
+  - ReferenceFixture.Overloads
+  - ReferenceFixture.Pair`2
+  - ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+  type: Namespace
+  assemblies:
+  - ReferenceFixture
+references:
+- uid: ReferenceFixture.Box`1
+  commentId: T:ReferenceFixture.Box`1
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>
+  nameWithType: Box<T>
+  fullName: ReferenceFixture.Box<T>
+  nameWithType.vb: Box(Of T)
+  fullName.vb: ReferenceFixture.Box(Of T)
+  name.vb: Box(Of T)
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: ReferenceFixture.Box`1.Nested
+  commentId: T:ReferenceFixture.Box`1.Nested
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>.Nested
+  nameWithType: Box<T>.Nested
+  fullName: ReferenceFixture.Box<T>.Nested
+  nameWithType.vb: Box(Of T).Nested
+  fullName.vb: ReferenceFixture.Box(Of T).Nested
+  name.vb: Box(Of T).Nested
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+- uid: ReferenceFixture.Box`1.Nested.Depth
+  commentId: T:ReferenceFixture.Box`1.Nested.Depth
+  parent: ReferenceFixture
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>.Nested.Depth
+  nameWithType: Box<T>.Nested.Depth
+  fullName: ReferenceFixture.Box<T>.Nested.Depth
+  nameWithType.vb: Box(Of T).Nested.Depth
+  fullName.vb: ReferenceFixture.Box(Of T).Nested.Depth
+  name.vb: Box(Of T).Nested.Depth
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+- uid: ReferenceFixture.Pair`2
+  commentId: T:ReferenceFixture.Pair`2
+  href: ReferenceFixture.Pair-2.html
+  name: Pair<TLeft, TRight>
+  nameWithType: Pair<TLeft, TRight>
+  fullName: ReferenceFixture.Pair<TLeft, TRight>
+  nameWithType.vb: Pair(Of TLeft, TRight)
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight)
+  name.vb: Pair(Of TLeft, TRight)
+  spec.csharp:
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: <
+  - name: TLeft
+  - name: ','
+  - name: ' '
+  - name: TRight
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: TLeft
+  - name: ','
+  - name: ' '
+  - name: TRight
+  - name: )
+- uid: ReferenceFixture.Meters
+  commentId: T:ReferenceFixture.Meters
+  parent: ReferenceFixture
+  href: ReferenceFixture.Meters.html
+  name: Meters
+  nameWithType: Meters
+  fullName: ReferenceFixture.Meters
+- uid: ReferenceFixture.Signatures
+  commentId: T:ReferenceFixture.Signatures
+  href: ReferenceFixture.Signatures.html
+  name: Signatures
+  nameWithType: Signatures
+  fullName: ReferenceFixture.Signatures
+- uid: ReferenceFixture.IShape
+  commentId: T:ReferenceFixture.IShape
+  parent: ReferenceFixture
+  href: ReferenceFixture.IShape.html
+  name: IShape
+  nameWithType: IShape
+  fullName: ReferenceFixture.IShape
+- uid: ReferenceFixture.Measure
+  commentId: T:ReferenceFixture.Measure
+  href: ReferenceFixture.Measure.html
+  name: Measure
+  nameWithType: Measure
+  fullName: ReferenceFixture.Measure
+- uid: ReferenceFixture.Overloads
+  commentId: T:ReferenceFixture.Overloads
+  href: ReferenceFixture.Overloads.html
+  name: Overloads
+  nameWithType: Overloads
+  fullName: ReferenceFixture.Overloads
+- uid: ReferenceFixture.Constants
+  commentId: T:ReferenceFixture.Constants
+  href: ReferenceFixture.Constants.html
+  name: Constants
+  nameWithType: Constants
+  fullName: ReferenceFixture.Constants
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture

@@ -1,0 +1,472 @@
+{
+  "schema_version": 1,
+  "assembly": "ReferenceFixture",
+  "symbols": [
+    {
+      "id": "E:ReferenceFixture.IShape.Changed",
+      "kind": "event",
+      "signature": "Changed",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "F:ReferenceFixture.Box\u00601.Nested.Depth.One",
+      "kind": "enum-value",
+      "signature": "One",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "F:ReferenceFixture.Box\u00601.Nested.Depth.Two",
+      "kind": "enum-value",
+      "signature": "Two",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "F:ReferenceFixture.Constants.Answer",
+      "kind": "field",
+      "signature": "Answer",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "F:ReferenceFixture.Constants.Name",
+      "kind": "field",
+      "signature": "Name",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Box\u00601.#ctor",
+      "kind": "constructor",
+      "signature": "Box\u003CT\u003E()",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Box\u00601.#ctor(\u00600)",
+      "kind": "constructor",
+      "signature": "Box\u003CT\u003E(T)",
+      "parameters": [
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Box\u00601.Map\u0060\u00601(System.Func{\u00600,\u0060\u00600})",
+      "kind": "method",
+      "signature": "Map\u003CTResult\u003E(Func\u003CT, TResult\u003E)",
+      "parameters": [
+        "selector"
+      ],
+      "type_parameters": [
+        "TResult"
+      ],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Box\u00601.Map\u0060\u00601(System.Func{\u00600,\u0060\u00600},\u0060\u00600)",
+      "kind": "method",
+      "signature": "Map\u003CTResult\u003E(Func\u003CT, TResult\u003E, TResult)",
+      "parameters": [
+        "selector",
+        "fallback"
+      ],
+      "type_parameters": [
+        "TResult"
+      ],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Box\u00601.Nested.#ctor",
+      "kind": "constructor",
+      "signature": "Nested()",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Box\u00601.OnChanged",
+      "kind": "method",
+      "signature": "OnChanged()",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Meters.#ctor(System.Double)",
+      "kind": "constructor",
+      "signature": "Meters(double)",
+      "parameters": [
+        "Value"
+      ],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Meters.op_Addition(ReferenceFixture.Meters,ReferenceFixture.Meters)",
+      "kind": "operator",
+      "signature": "op_Addition(Meters, Meters)",
+      "parameters": [
+        "left",
+        "right"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Meters.op_Explicit(ReferenceFixture.Meters)~System.Double",
+      "kind": "operator",
+      "signature": "op_Explicit(Meters)",
+      "parameters": [
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Meters.op_Implicit(System.Double)~ReferenceFixture.Meters",
+      "kind": "operator",
+      "signature": "op_Implicit(double)",
+      "parameters": [
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Overloads.#ctor",
+      "kind": "constructor",
+      "signature": "Overloads()",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Overloads.Format(System.Int32)",
+      "kind": "method",
+      "signature": "Format(int)",
+      "parameters": [
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Overloads.Format(System.Int32,System.Int32)",
+      "kind": "method",
+      "signature": "Format(int, int)",
+      "parameters": [
+        "value",
+        "width"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Overloads.ToString",
+      "kind": "method",
+      "signature": "ToString()",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": true
+    },
+    {
+      "id": "M:ReferenceFixture.Pair\u00602.#ctor(\u00600,\u00601)",
+      "kind": "constructor",
+      "signature": "Pair\u003CTLeft, TRight\u003E(TLeft, TRight)",
+      "parameters": [
+        "Left",
+        "Right"
+      ],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Add(System.Int32,System.Int32)",
+      "kind": "method",
+      "signature": "Add(int, int)",
+      "parameters": [
+        "left",
+        "right"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.CountAsync(System.Int32,System.Threading.CancellationToken)",
+      "kind": "method",
+      "signature": "CountAsync(int, CancellationToken)",
+      "parameters": [
+        "count",
+        "cancellationToken"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Depth(ReferenceFixture.Box{System.Int32}.Nested,ReferenceFixture.Box{System.String}.Nested.Depth)",
+      "kind": "method",
+      "signature": "Depth(Nested, Depth)",
+      "parameters": [
+        "nested",
+        "depth"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}},System.String,System.Int32,System.Nullable{System.Double},System.Threading.CancellationToken,ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}})",
+      "kind": "method",
+      "signature": "Long(IReadOnlyDictionary\u003Cstring, IReadOnlyList\u003CKeyValuePair\u003Cstring, Box\u003Cstring\u003E\u003E\u003E\u003E, string, int, double?, CancellationToken, Box\u003CPair\u003Cint, string\u003E\u003E)",
+      "parameters": [
+        "first",
+        "second",
+        "third",
+        "fourth",
+        "fifth",
+        "sixth"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Read(System.Int32@)",
+      "kind": "method",
+      "signature": "Read(in int)",
+      "parameters": [
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Sum(System.Int32[])",
+      "kind": "method",
+      "signature": "Sum(params int[])",
+      "parameters": [
+        "values"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Swap(System.Int32@,System.Int32@)",
+      "kind": "method",
+      "signature": "Swap(ref int, ref int)",
+      "parameters": [
+        "left",
+        "right"
+      ],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.TryParse(System.String,System.Int32@)",
+      "kind": "method",
+      "signature": "TryParse(string, out int)",
+      "parameters": [
+        "text",
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "M:ReferenceFixture.Signatures.Twice(System.String)",
+      "kind": "method",
+      "signature": "Twice(string)",
+      "parameters": [
+        "value"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "P:ReferenceFixture.Box\u00601.Value",
+      "kind": "property",
+      "signature": "Value",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "P:ReferenceFixture.IShape.Item(System.Int32)",
+      "kind": "indexer",
+      "signature": "Item[int]",
+      "parameters": [
+        "index"
+      ],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "P:ReferenceFixture.Meters.Value",
+      "kind": "property",
+      "signature": "Value",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "P:ReferenceFixture.Pair\u00602.Left",
+      "kind": "property",
+      "signature": "Left",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "P:ReferenceFixture.Pair\u00602.Right",
+      "kind": "property",
+      "signature": "Right",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Box\u00601",
+      "kind": "class",
+      "signature": "Box\u003CT\u003E",
+      "parameters": [],
+      "type_parameters": [
+        "T"
+      ],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Box\u00601.Nested",
+      "kind": "class",
+      "signature": "Nested",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Box\u00601.Nested.Depth",
+      "kind": "enum",
+      "signature": "Depth",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Constants",
+      "kind": "class",
+      "signature": "Constants",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.IShape",
+      "kind": "interface",
+      "signature": "IShape",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Measure",
+      "kind": "delegate",
+      "signature": "Measure",
+      "parameters": [
+        "shape"
+      ],
+      "type_parameters": [],
+      "returns": true,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Meters",
+      "kind": "record-struct",
+      "signature": "Meters",
+      "parameters": [
+        "Value"
+      ],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Overloads",
+      "kind": "record",
+      "signature": "Overloads",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Pair\u00602",
+      "kind": "record",
+      "signature": "Pair\u003CTLeft, TRight\u003E",
+      "parameters": [
+        "Left",
+        "Right"
+      ],
+      "type_parameters": [
+        "TLeft",
+        "TRight"
+      ],
+      "returns": false,
+      "inherits": false
+    },
+    {
+      "id": "T:ReferenceFixture.Signatures",
+      "kind": "class",
+      "signature": "Signatures",
+      "parameters": [],
+      "type_parameters": [],
+      "returns": false,
+      "inherits": false
+    }
+  ]
+}

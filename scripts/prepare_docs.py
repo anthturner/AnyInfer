@@ -13,6 +13,7 @@ import shutil
 from collections.abc import Callable
 from html import escape as html_escape
 from pathlib import Path
+from typing import Any
 
 try:  # Package import for tests and build scripts run from the repository root.
     from .docs_common import Page, build_pages, load_navigation, read_versions, redirects_for
@@ -59,8 +60,14 @@ def prepare(
     *,
     allow_outside_generated: bool = False,
     incremental: bool = False,
+    csharp_reference: Callable[[Path], Any] | None = None,
 ) -> dict[str, object]:
-    """Prepare all current documentation and return the manifest written to disk."""
+    """Prepare all current documentation and return the manifest written to disk.
+
+    ``csharp_reference`` builds the generated C# API reference for ``root``. By default it is
+    built whenever the checkout carries ``website/docfx.json``; the generated pages join the
+    ``csharp`` plugin and the manifest beside the authored pages.
+    """
     root = (root or Path(__file__).resolve().parents[1]).resolve()
     docs_dir = root / "docs"
     output_dir = output_dir or root / "website" / ".generated"
@@ -94,11 +101,21 @@ def prepare(
         metadata = _frontmatter(page, hide_toc=page.source in hidden_tocs)
         documents.append((destination, metadata + rendered))
 
+    reference = _csharp_reference(root, csharp_reference)
+    page_entries = [page.manifest() for page in pages]
+    generated: dict[str, object] = {}
+    if reference is not None:
+        first = max(page.order for page in pages) + 1
+        for offset, generated_page in enumerate(reference.pages):
+            page_entries.append(generated_page.manifest(first + offset))
+            documents.append((output_dir / "csharp" / generated_page.path, generated_page.content))
+        generated["csharp-api"] = {"sdk": "csharp", **reference.sidebar()}
     manifest: dict[str, object] = {
-        "pages": [page.manifest() for page in pages],
+        "pages": page_entries,
         "versions": read_versions(root),
         "redirects": redirects_for(pages),
         "navigation": navigation,
+        "generated": generated,
     }
     manifest_text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     if output_dir.exists() and not incremental:
@@ -115,6 +132,19 @@ def prepare(
     if incremental:
         _remove_stale_files(output_dir, expected)
     return manifest
+
+
+def _csharp_reference(root: Path, build: Callable[[Path], Any] | None) -> Any:
+    """Build the generated C# API reference, or return ``None`` for a docs-only test root."""
+    if build is None:
+        if not (root / "website" / "docfx.json").is_file():
+            return None
+        try:
+            module = importlib.import_module("scripts.generate_csharp_reference")
+        except ModuleNotFoundError:
+            module = importlib.import_module("generate_csharp_reference")
+        build = module.build
+    return build(root)
 
 
 def _validate_output_dir(root: Path, output_dir: Path, allow_outside_generated: bool) -> None:
@@ -294,8 +324,7 @@ def _prepare_markdown(
     content = _escape_mdx_syntax(content)
     if has_tabs:
         content = (
-            "import Tabs from '@theme/Tabs';\n"
-            "import TabItem from '@theme/TabItem';\n\n" + content
+            "import Tabs from '@theme/Tabs';\nimport TabItem from '@theme/TabItem';\n\n" + content
         )
     return content
 
@@ -490,7 +519,7 @@ def _convert_details(content: str) -> str:
 def _convert_html_and_attributes(content: str) -> str:
     def convert(part: str) -> str:
         part = re.sub(r'\s+markdown(?:="[^"]*")?', "", part)
-        part = re.sub(r'\bclass="', "className=\"", part)
+        part = re.sub(r'\bclass="', 'className="', part)
         part = re.sub(r"<(br|hr|img|input)(\s[^>]*?)?(?<!/)>", r"<\1\2 />", part)
         part = re.sub(
             r"^(?P<hashes>#{1,6})\s+(?P<title>.*?)\s+\{\s*(?P<classes>(?:\.[\w-]+\s*)+)\}\s*$",
@@ -528,7 +557,7 @@ def _styled_link(match: re.Match[str]) -> str:
     classes = " ".join(token[1:] for token in match.group("classes").split())
     return (
         f'<a className="{classes}" href="{html_escape(target, quote=True)}">'
-        f'{html_escape(label)}</a>'
+        f"{html_escape(label)}</a>"
     )
 
 
@@ -581,6 +610,7 @@ def _symbol_urls(prepared: list[tuple[Page, str]]) -> dict[str, str]:
 
 def _rewrite_generated_references(content: str, symbol_urls: dict[str, str]) -> str:
     """Point generated API references at documented anchors and drop false type links."""
+
     def replace(match: re.Match[str]) -> str:
         label, target = match.groups()
         destination = symbol_urls.get(target) or symbol_urls.get(target.rsplit(".", 1)[-1])
@@ -614,12 +644,11 @@ def _convert_material_icons(content: str) -> str:
 
 def _escape_mdx_syntax(content: str) -> str:
     """Escape prose braces and pseudo-tags while preserving Markdown code and known JSX."""
+
     def escape(part: str) -> str:
         tokens = _MDX_PROTECTED.split(part)
         for index in range(0, len(tokens), 2):
-            tokens[index] = re.sub(
-                r"<(https?://[^<>\s]+)>", r"[\1](\1)", tokens[index]
-            )
+            tokens[index] = re.sub(r"<(https?://[^<>\s]+)>", r"[\1](\1)", tokens[index])
             tokens[index] = re.sub(r"(?<!\\)([{}])", r"\\\1", tokens[index])
             tokens[index] = re.sub(r"<(?=[A-Za-z])", r"\\<", tokens[index])
         return "".join(tokens)

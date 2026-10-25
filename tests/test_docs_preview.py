@@ -54,6 +54,40 @@ def test_source_snapshot_ignores_generated_directories_and_watches_csharp_source
     assert _MODULE._source_snapshot(root) == before
 
 
+def test_source_snapshot_watches_native_reference_inputs_but_not_build_output(
+    tmp_path: Path,
+) -> None:
+    root = _root(tmp_path)
+    library = root / "src" / "csharp" / "AnyInfer"
+    library.mkdir()
+    (library / "Client.cs").write_text("/// <summary>One.</summary>\n", encoding="utf-8")
+    (library / "AnyInfer.csproj").write_text("<Project/>\n", encoding="utf-8")
+    (root / "website" / "docfx.json").write_text("{}\n", encoding="utf-8")
+    (root / ".config").mkdir()
+    (root / ".config" / "dotnet-tools.json").write_text("{}\n", encoding="utf-8")
+    (root / "src" / "csharp" / "global.json").write_text("{}\n", encoding="utf-8")
+
+    for path, text in (
+        (library / "Client.cs", "/// <summary>Two.</summary>\n"),
+        (library / "AnyInfer.csproj", "<Project Sdk='x'/>\n"),
+        (root / "website" / "docfx.json", '{"metadata": []}\n'),
+        (root / ".config" / "dotnet-tools.json", '{"version": 1}\n'),
+        (root / "src" / "csharp" / "global.json", '{"sdk": {}}\n'),
+    ):
+        before = _MODULE._source_snapshot(root)
+        path.write_text(text, encoding="utf-8")
+        assert _MODULE._source_snapshot(root) != before, path
+
+    before = _MODULE._source_snapshot(root)
+    for output in ("bin", "obj"):
+        (library / output).mkdir()
+        (library / output / "Generated.cs").write_text("// build output\n", encoding="utf-8")
+    cache = root / "website" / ".cache" / "csharp-reference"
+    cache.mkdir(parents=True)
+    (cache / "AnyInfer.AsyncClient.yml").write_text("items: []\n", encoding="utf-8")
+    assert _MODULE._source_snapshot(root) == before
+
+
 def test_preview_restages_a_changed_source_and_preserves_child_exit_code(tmp_path: Path) -> None:
     root = _root(tmp_path)
     source = root / "docs" / "guide.md"

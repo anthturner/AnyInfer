@@ -15,7 +15,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -27,6 +30,9 @@ _PLACEHOLDER = re.compile(
 _PLACEHOLDER_ANYWHERE = re.compile(r"\b(?:TODO|FIXME|TBD|XXX)\b")
 _INTERNAL_IDENTIFIER = re.compile(r"\bADR-\d+\b")
 _DOCUMENTED_KINDS = frozenset("TMPFE")
+ROOT = Path(__file__).resolve().parents[1]
+CSHARP = ROOT / "src" / "csharp"
+LIBRARY_XML = CSHARP / "AnyInfer" / "bin" / "Release" / "net8.0" / "AnyInfer.xml"
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +95,7 @@ def comment_findings(
 ) -> list[str]:
     """Return every missing or inadequate source comment in the inventory."""
     findings: list[str] = []
+    roots = {identifier[2:].split(".", 1)[0] for identifier in inventory}
     for symbol in sorted(inventory.values(), key=lambda item: item.id):
         member = comments.get(symbol.id)
         if member is None:
@@ -97,7 +104,18 @@ def comment_findings(
         findings.extend(
             f"{symbol.id}: {problem}" for problem in _member_problems(symbol, member, comments)
         )
+        findings.extend(
+            f"{symbol.id}: cref {cref!r} names a declaration outside the public surface"
+            for cref in _crefs(member)
+            if cref[:2] in {f"{kind}:" for kind in _DOCUMENTED_KINDS}
+            and cref[2:].split(".", 1)[0] in roots
+            and cref not in inventory
+        )
     return findings
+
+
+def _crefs(member: ET.Element) -> list[str]:
+    return [str(node.get("cref")) for node in member.iter() if node.get("cref")]
 
 
 def effective_comment(member: ET.Element, comments: Mapping[str, ET.Element]) -> ET.Element | None:
@@ -214,13 +232,63 @@ def reference_findings(inventory: Mapping[str, Symbol], rendered: Mapping[str, s
     return findings
 
 
+def build_library_documentation(output: Path) -> tuple[Path, Path]:
+    """Build the library with its XML documentation and write its documentation inventory.
+
+    Returns:
+        The inventory path and the compiler XML documentation file it should be checked with.
+    """
+    if shutil.which("dotnet") is None:
+        raise RuntimeError("the .NET SDK selected by src/csharp/global.json is required")
+    project = "AnyInfer.Maintenance/AnyInfer.Maintenance.csproj"
+    subprocess.run(
+        ["dotnet", "build", project, "--configuration", "Release"], cwd=CSHARP, check=True
+    )
+    inventory = output / "inventory.json"
+    subprocess.run(
+        [
+            "dotnet",
+            "run",
+            "--no-build",
+            "--project",
+            project,
+            "--configuration",
+            "Release",
+            "--",
+            "--documentation-api",
+            "--output",
+            str(inventory),
+        ],
+        cwd=CSHARP,
+        check=True,
+    )
+    if not LIBRARY_XML.is_file():
+        raise RuntimeError(f"the library build produced no XML documentation at {LIBRARY_XML}")
+    return inventory, LIBRARY_XML
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the requested checks and print every finding."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--inventory", type=Path, required=True)
+    parser.add_argument(
+        "--build",
+        action="store_true",
+        help="build the library and check its own inventory against its XML documentation",
+    )
+    parser.add_argument("--inventory", type=Path)
     parser.add_argument("--comments", type=Path, help="compiler XML documentation file")
     parser.add_argument("--reference-map", type=Path, help="generated ID-to-URL map (JSON)")
     arguments = parser.parse_args(argv)
+    if arguments.build:
+        with tempfile.TemporaryDirectory(prefix="anyinfer-csharp-docs-") as scratch:
+            try:
+                inventory_path, comments = build_library_documentation(Path(scratch))
+            except (RuntimeError, subprocess.CalledProcessError) as error:
+                print(f"C# documentation check could not build the library: {error}")
+                return 1
+            return main(["--inventory", str(inventory_path), "--comments", str(comments)])
+    if arguments.inventory is None:
+        parser.error("pass --build, or --inventory with --comments and/or --reference-map")
     if arguments.comments is None and arguments.reference_map is None:
         parser.error("pass --comments, --reference-map, or both")
     inventory = load_inventory(arguments.inventory)

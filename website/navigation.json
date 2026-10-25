@@ -267,6 +267,9 @@
         "C# SDK (prerelease) Reference": "reference/csharp-sdk.md"
       },
       {
+        "C# API Reference": "generated:csharp-api"
+      },
+      {
         "SDK Reference": [
           "reference/api/README.md",
           {

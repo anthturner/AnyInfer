@@ -1,0 +1,64 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Measure
+  commentId: T:ReferenceFixture.Measure
+  id: Measure
+  parent: ReferenceFixture
+  children: []
+  langs:
+  - csharp
+  - vb
+  name: Measure
+  nameWithType: Measure
+  fullName: ReferenceFixture.Measure
+  type: Delegate
+  source:
+    id: Measure
+    path: ReferenceFixture/Shapes.cs
+    startLine: 170
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A delegate type.
+  example: []
+  syntax:
+    content: public delegate double Measure(IShape shape)
+    parameters:
+    - id: shape
+      type: ReferenceFixture.IShape
+      description: The shape.
+    return:
+      type: System.Double
+      description: An area.
+    content.vb: Public Delegate Function Measure(shape As IShape) As Double
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: ReferenceFixture.IShape
+  commentId: T:ReferenceFixture.IShape
+  parent: ReferenceFixture
+  href: ReferenceFixture.IShape.html
+  name: IShape
+  nameWithType: IShape
+  fullName: ReferenceFixture.IShape
+- uid: System.Double
+  commentId: T:System.Double
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.double
+  name: double
+  nameWithType: double
+  fullName: double
+  nameWithType.vb: Double
+  fullName.vb: Double
+  name.vb: Double
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System

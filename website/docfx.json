@@ -15,7 +15,7 @@
       "memberLayout": "samePage",
       "enumSortOrder": "declaringOrder",
       "includePrivateMembers": false,
-      "disableGitFeatures": true
+      "disableGitFeatures": false
     }
   ]
 }

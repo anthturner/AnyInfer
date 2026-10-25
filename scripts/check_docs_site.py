@@ -44,6 +44,7 @@ def validate_site(
     *,
     baseline: Path | None = None,
     require_pagefind: bool = True,
+    require_generated_reference: bool = False,
 ) -> None:
     """Validate a built and exported site directory.
 
@@ -52,6 +53,9 @@ def validate_site(
         baseline: Optional legacy route/anchor inventory.  Omit for deliberately small
             test fixtures; production callers use the committed baseline by default.
         require_pagefind: Require the local Pagefind JavaScript and WebAssembly bundle.
+        require_generated_reference: Require the generated C# API reference to be present,
+            reachable from its section index, searchable, and exported. Production builds
+            always require it, so a build cannot publish without the native reference.
 
     Raises:
         ValueError: If a published route, link, fragment, export, or safety invariant fails.
@@ -114,6 +118,8 @@ def validate_site(
         raise ValueError("site CNAME must contain anyinfer.dev")
     if require_pagefind:
         _validate_pagefind(site)
+    if require_generated_reference:
+        _validate_generated_reference(site, manifest, routes, documents)
 
     if baseline is not None:
         _validate_legacy(site, baseline, routes, articles, redirects)
@@ -176,13 +182,18 @@ def _validate_links(site: Path, page_url: str, html: str, articles: dict[str, Ar
 
 def _local_destination(site: Path, path: str) -> Path:
     relative = path.lstrip("/")
-    if Path(relative).suffix:
+    # A trailing slash is always a directory route, even when a segment contains a dot
+    # (generated C# API routes such as /csharp/api/anyinfer.asyncclient/).
+    if Path(relative).suffix and not path.endswith("/"):
         return site / relative
     return page_file(site, path or "/")
 
 
 def _validate_redirects(
-    site: Path, routes: dict[str, dict], articles: dict[str, Article], redirects: dict,
+    site: Path,
+    routes: dict[str, dict],
+    articles: dict[str, Article],
+    redirects: dict,
 ) -> None:
     canonical = set(routes)
     for source, target in redirects.items():
@@ -234,6 +245,38 @@ def _validate_exports(site: Path, versions: dict) -> None:
                 f"documentation export exceeds section budget: {path.relative_to(site)}"
             )
         _reject_public_text(path.relative_to(site).as_posix(), text)
+
+
+def _validate_generated_reference(
+    site: Path, manifest: dict, routes: dict[str, dict], documents: dict[str, str]
+) -> None:
+    section = (manifest.get("generated") or {}).get("csharp-api")
+    if not isinstance(section, dict) or not section.get("namespaces"):
+        raise ValueError("site has no generated C# API reference")
+    generated = [url for url, page in routes.items() if page.get("generated")]
+    index = "/csharp/api/"
+    if index not in generated or len(generated) < 2:
+        raise ValueError("generated C# API reference has no index and type pages")
+    linked = {
+        urlsplit(urljoin(f"https://anyinfer.dev{index}", value)).path
+        for value in _links(documents[index])
+    }
+    unreachable = sorted(url for url in generated if url != index and url not in linked)
+    if unreachable:
+        raise ValueError(f"generated C# API pages missing from the index: {unreachable[:5]}")
+    for url in generated:
+        if 'data-pagefind-filter="sdk:csharp"' not in documents[url]:
+            raise ValueError(f"generated C# API page is not indexed for C# search: {url}")
+    full = (site / "llms-full.txt").read_text(encoding="utf-8")
+    missing = [url for url in generated if f"Source: https://anyinfer.dev{url}\n" not in full]
+    if missing:
+        raise ValueError(f"generated C# API pages missing from llms-full.txt: {missing[:5]}")
+
+
+def _links(html: str) -> list[str]:
+    links = _Links()
+    links.feed(html)
+    return links.values
 
 
 def _validate_pagefind(site: Path) -> None:
@@ -307,12 +350,14 @@ def main() -> int:
         default=ROOT / "tests/fixtures/docs_migration/legacy.json",
     )
     parser.add_argument("--allow-no-pagefind", action="store_true")
+    parser.add_argument("--allow-no-generated-reference", action="store_true")
     args = parser.parse_args()
     try:
         validate_site(
             args.site,
             baseline=args.baseline,
             require_pagefind=not args.allow_no_pagefind,
+            require_generated_reference=not args.allow_no_generated_reference,
         )
     except ValueError as error:
         print(f"docs site validation failed: {error}")

@@ -1,0 +1,1307 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Signatures
+  commentId: T:ReferenceFixture.Signatures
+  id: Signatures
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.Signatures.Add(System.Int32,System.Int32)
+  - ReferenceFixture.Signatures.CountAsync(System.Int32,System.Threading.CancellationToken)
+  - ReferenceFixture.Signatures.Depth(ReferenceFixture.Box{System.Int32}.Nested,ReferenceFixture.Box{System.String}.Nested.Depth)
+  - ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}},System.String,System.Int32,System.Nullable{System.Double},System.Threading.CancellationToken,ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}})
+  - ReferenceFixture.Signatures.Read(System.Int32@)
+  - ReferenceFixture.Signatures.Sum(System.Int32[])
+  - ReferenceFixture.Signatures.Swap(System.Int32@,System.Int32@)
+  - ReferenceFixture.Signatures.TryParse(System.String,System.Int32@)
+  - ReferenceFixture.Signatures.Twice(System.String)
+  langs:
+  - csharp
+  - vb
+  name: Signatures
+  nameWithType: Signatures
+  fullName: ReferenceFixture.Signatures
+  type: Class
+  source:
+    id: Signatures
+    path: ReferenceFixture/Shapes.cs
+    startLine: 82
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Reference, out, in, params, nullable and async-stream parameters.
+  example: []
+  syntax:
+    content: public static class Signatures
+    content.vb: Public Module Signatures
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: ReferenceFixture.Signatures.TryParse(System.String,System.Int32@)
+  commentId: M:ReferenceFixture.Signatures.TryParse(System.String,System.Int32@)
+  id: TryParse(System.String,System.Int32@)
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: TryParse(string?, out int)
+  nameWithType: Signatures.TryParse(string?, out int)
+  fullName: ReferenceFixture.Signatures.TryParse(string?, out int)
+  type: Method
+  source:
+    id: TryParse
+    path: ReferenceFixture/Shapes.cs
+    startLine: 88
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Tries to parse a value.
+  example: []
+  syntax:
+    content: public static bool TryParse(string? text, out int value)
+    parameters:
+    - id: text
+      type: System.String
+      description: The input text.
+    - id: value
+      type: System.Int32
+      description: The parsed value.
+    return:
+      type: System.Boolean
+      description: <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a> when parsing succeeded.
+    content.vb: Public Shared Function TryParse(text As String, value As Integer) As Boolean
+  overload: ReferenceFixture.Signatures.TryParse*
+  nameWithType.vb: Signatures.TryParse(String, Integer)
+  fullName.vb: ReferenceFixture.Signatures.TryParse(String, Integer)
+  name.vb: TryParse(String, Integer)
+- uid: ReferenceFixture.Signatures.Swap(System.Int32@,System.Int32@)
+  commentId: M:ReferenceFixture.Signatures.Swap(System.Int32@,System.Int32@)
+  id: Swap(System.Int32@,System.Int32@)
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Swap(ref int, ref int)
+  nameWithType: Signatures.Swap(ref int, ref int)
+  fullName: ReferenceFixture.Signatures.Swap(ref int, ref int)
+  type: Method
+  source:
+    id: Swap
+    path: ReferenceFixture/Shapes.cs
+    startLine: 93
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Swaps two values.
+  example: []
+  syntax:
+    content: public static void Swap(ref int left, ref int right)
+    parameters:
+    - id: left
+      type: System.Int32
+      description: The first value.
+    - id: right
+      type: System.Int32
+      description: The second value.
+    content.vb: Public Shared Sub Swap(left As Integer, right As Integer)
+  overload: ReferenceFixture.Signatures.Swap*
+  nameWithType.vb: Signatures.Swap(Integer, Integer)
+  fullName.vb: ReferenceFixture.Signatures.Swap(Integer, Integer)
+  name.vb: Swap(Integer, Integer)
+- uid: ReferenceFixture.Signatures.Read(System.Int32@)
+  commentId: M:ReferenceFixture.Signatures.Read(System.Int32@)
+  id: Read(System.Int32@)
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Read(in int)
+  nameWithType: Signatures.Read(in int)
+  fullName: ReferenceFixture.Signatures.Read(in int)
+  type: Method
+  source:
+    id: Read
+    path: ReferenceFixture/Shapes.cs
+    startLine: 98
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Reads a value without copying.
+  example: []
+  syntax:
+    content: public static int Read(in int value)
+    parameters:
+    - id: value
+      type: System.Int32
+      description: The value.
+    return:
+      type: System.Int32
+      description: The value.
+    content.vb: Public Shared Function Read(value As Integer) As Integer
+  overload: ReferenceFixture.Signatures.Read*
+  nameWithType.vb: Signatures.Read(Integer)
+  fullName.vb: ReferenceFixture.Signatures.Read(Integer)
+  name.vb: Read(Integer)
+- uid: ReferenceFixture.Signatures.Sum(System.Int32[])
+  commentId: M:ReferenceFixture.Signatures.Sum(System.Int32[])
+  id: Sum(System.Int32[])
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Sum(params int[])
+  nameWithType: Signatures.Sum(params int[])
+  fullName: ReferenceFixture.Signatures.Sum(params int[])
+  type: Method
+  source:
+    id: Sum
+    path: ReferenceFixture/Shapes.cs
+    startLine: 103
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Sums values.
+  example: []
+  syntax:
+    content: public static int Sum(params int[] values)
+    parameters:
+    - id: values
+      type: System.Int32[]
+      description: The values.
+    return:
+      type: System.Int32
+      description: The sum.
+    content.vb: Public Shared Function Sum(ParamArray values As Integer()) As Integer
+  overload: ReferenceFixture.Signatures.Sum*
+  nameWithType.vb: Signatures.Sum(ParamArray Integer())
+  fullName.vb: ReferenceFixture.Signatures.Sum(ParamArray Integer())
+  name.vb: Sum(ParamArray Integer())
+- uid: ReferenceFixture.Signatures.CountAsync(System.Int32,System.Threading.CancellationToken)
+  commentId: M:ReferenceFixture.Signatures.CountAsync(System.Int32,System.Threading.CancellationToken)
+  id: CountAsync(System.Int32,System.Threading.CancellationToken)
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: CountAsync(int, CancellationToken)
+  nameWithType: Signatures.CountAsync(int, CancellationToken)
+  fullName: ReferenceFixture.Signatures.CountAsync(int, System.Threading.CancellationToken)
+  type: Method
+  source:
+    id: CountAsync
+    path: ReferenceFixture/Shapes.cs
+    startLine: 109
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Streams numbers.
+  example: []
+  syntax:
+    content: public static IAsyncEnumerable<int> CountAsync(int count, CancellationToken cancellationToken = default)
+    parameters:
+    - id: count
+      type: System.Int32
+      description: How many numbers to produce.
+    - id: cancellationToken
+      type: System.Threading.CancellationToken
+      description: Stops enumeration.
+    return:
+      type: System.Collections.Generic.IAsyncEnumerable{System.Int32}
+      description: An asynchronous sequence.
+    content.vb: Public Shared Function CountAsync(count As Integer, cancellationToken As CancellationToken = Nothing) As IAsyncEnumerable(Of Integer)
+  overload: ReferenceFixture.Signatures.CountAsync*
+  nameWithType.vb: Signatures.CountAsync(Integer, CancellationToken)
+  fullName.vb: ReferenceFixture.Signatures.CountAsync(Integer, System.Threading.CancellationToken)
+  name.vb: CountAsync(Integer, CancellationToken)
+- uid: ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}},System.String,System.Int32,System.Nullable{System.Double},System.Threading.CancellationToken,ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}})
+  commentId: M:ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}},System.String,System.Int32,System.Nullable{System.Double},System.Threading.CancellationToken,ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}})
+  id: Long(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}},System.String,System.Int32,System.Nullable{System.Double},System.Threading.CancellationToken,ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}})
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Long(IReadOnlyDictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>?>>>?, string?, int, double?, CancellationToken, Box<Pair<int, string>>?)
+  nameWithType: Signatures.Long(IReadOnlyDictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>?>>>?, string?, int, double?, CancellationToken, Box<Pair<int, string>>?)
+  fullName: ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary<string, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string, ReferenceFixture.Box<string>?>>>?, string?, int, double?, System.Threading.CancellationToken, ReferenceFixture.Box<ReferenceFixture.Pair<int, string>>?)
+  type: Method
+  source:
+    id: Long
+    path: ReferenceFixture/Shapes.cs
+    startLine: 129
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A deliberately long signature.
+  example: []
+  syntax:
+    content: public static IReadOnlyDictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>?>>> Long(IReadOnlyDictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>?>>>? first = null, string? second = "default", int third = 3, double? fourth = null, CancellationToken fifth = default, Box<Pair<int, string>>? sixth = null)
+    parameters:
+    - id: first
+      type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}}
+      description: First.
+    - id: second
+      type: System.String
+      description: Second.
+    - id: third
+      type: System.Int32
+      description: Third.
+    - id: fourth
+      type: System.Nullable{System.Double}
+      description: Fourth.
+    - id: fifth
+      type: System.Threading.CancellationToken
+      description: Fifth.
+    - id: sixth
+      type: ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}}
+      description: Sixth.
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}}
+      description: A dictionary.
+    content.vb: Public Shared Function [Long](first As IReadOnlyDictionary(Of String, IReadOnlyList(Of KeyValuePair(Of String, Box(Of String)))) = Nothing, second As String = "default", third As Integer = 3, fourth As Double? = Nothing, fifth As CancellationToken = Nothing, sixth As Box(Of Pair(Of Integer, String)) = Nothing) As IReadOnlyDictionary(Of String, IReadOnlyList(Of KeyValuePair(Of String, Box(Of String))))
+  overload: ReferenceFixture.Signatures.Long*
+  nameWithType.vb: Signatures.Long(IReadOnlyDictionary(Of String, IReadOnlyList(Of KeyValuePair(Of String, Box(Of String)))), String, Integer, Double?, CancellationToken, Box(Of Pair(Of Integer, String)))
+  fullName.vb: ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary(Of String, System.Collections.Generic.IReadOnlyList(Of System.Collections.Generic.KeyValuePair(Of String, ReferenceFixture.Box(Of String)))), String, Integer, Double?, System.Threading.CancellationToken, ReferenceFixture.Box(Of ReferenceFixture.Pair(Of Integer, String)))
+  name.vb: Long(IReadOnlyDictionary(Of String, IReadOnlyList(Of KeyValuePair(Of String, Box(Of String)))), String, Integer, Double?, CancellationToken, Box(Of Pair(Of Integer, String)))
+- uid: ReferenceFixture.Signatures.Depth(ReferenceFixture.Box{System.Int32}.Nested,ReferenceFixture.Box{System.String}.Nested.Depth)
+  commentId: M:ReferenceFixture.Signatures.Depth(ReferenceFixture.Box{System.Int32}.Nested,ReferenceFixture.Box{System.String}.Nested.Depth)
+  id: Depth(ReferenceFixture.Box{System.Int32}.Nested,ReferenceFixture.Box{System.String}.Nested.Depth)
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Depth(Nested, Depth)
+  nameWithType: Signatures.Depth(Box<int>.Nested, Box<string>.Nested.Depth)
+  fullName: ReferenceFixture.Signatures.Depth(ReferenceFixture.Box<int>.Nested, ReferenceFixture.Box<string>.Nested.Depth)
+  type: Method
+  source:
+    id: Depth
+    path: ReferenceFixture/Shapes.cs
+    startLine: 141
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Accepts a nested type of a constructed generic type.
+  example: []
+  syntax:
+    content: public static int Depth(Box<int>.Nested nested, Box<string>.Nested.Depth depth)
+    parameters:
+    - id: nested
+      type: ReferenceFixture.Box{System.Int32}.Nested
+      description: The nested value.
+    - id: depth
+      type: ReferenceFixture.Box{System.String}.Nested.Depth
+      description: A nested enum of the same construction.
+    return:
+      type: System.Int32
+      description: The numeric depth.
+    content.vb: Public Shared Function Depth(nested As Box(Of Integer).Nested, depth As Box(Of String).Nested.Depth) As Integer
+  overload: ReferenceFixture.Signatures.Depth*
+  nameWithType.vb: Signatures.Depth(Box(Of Integer).Nested, Box(Of String).Nested.Depth)
+  fullName.vb: ReferenceFixture.Signatures.Depth(ReferenceFixture.Box(Of Integer).Nested, ReferenceFixture.Box(Of String).Nested.Depth)
+- uid: ReferenceFixture.Signatures.Twice(System.String)
+  commentId: M:ReferenceFixture.Signatures.Twice(System.String)
+  id: Twice(System.String)
+  isExtensionMethod: true
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Twice(string)
+  nameWithType: Signatures.Twice(string)
+  fullName: ReferenceFixture.Signatures.Twice(string)
+  type: Method
+  source:
+    id: Twice
+    path: ReferenceFixture/Shapes.cs
+    startLine: 146
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Extends a string.
+  example: []
+  syntax:
+    content: public static string Twice(this string value)
+    parameters:
+    - id: value
+      type: System.String
+      description: The receiver.
+    return:
+      type: System.String
+      description: The value repeated.
+    content.vb: Public Shared Function Twice(value As String) As String
+  overload: ReferenceFixture.Signatures.Twice*
+  nameWithType.vb: Signatures.Twice(String)
+  fullName.vb: ReferenceFixture.Signatures.Twice(String)
+  name.vb: Twice(String)
+- uid: ReferenceFixture.Signatures.Add(System.Int32,System.Int32)
+  commentId: M:ReferenceFixture.Signatures.Add(System.Int32,System.Int32)
+  id: Add(System.Int32,System.Int32)
+  parent: ReferenceFixture.Signatures
+  langs:
+  - csharp
+  - vb
+  name: Add(int, int)
+  nameWithType: Signatures.Add(int, int)
+  fullName: ReferenceFixture.Signatures.Add(int, int)
+  type: Method
+  source:
+    id: Add
+    path: ReferenceFixture/Shapes.cs
+    startLine: 152
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: An obsolete member.
+  example: []
+  syntax:
+    content: '[Obsolete("Use Sum instead.")]
+
+      public static int Add(int left, int right)'
+    parameters:
+    - id: left
+      type: System.Int32
+      description: The first addend.
+    - id: right
+      type: System.Int32
+      description: The second addend.
+    return:
+      type: System.Int32
+      description: The sum.
+    content.vb: '<Obsolete("Use Sum instead.")>
+
+      Public Shared Function Add(left As Integer, right As Integer) As Integer'
+  overload: ReferenceFixture.Signatures.Add*
+  attributes:
+  - type: System.ObsoleteAttribute
+    ctor: System.ObsoleteAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Use Sum instead.
+  nameWithType.vb: Signatures.Add(Integer, Integer)
+  fullName.vb: ReferenceFixture.Signatures.Add(Integer, Integer)
+  name.vb: Add(Integer, Integer)
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: ReferenceFixture.Signatures.TryParse*
+  commentId: Overload:ReferenceFixture.Signatures.TryParse
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_TryParse_System_String_System_Int32__
+  name: TryParse
+  nameWithType: Signatures.TryParse
+  fullName: ReferenceFixture.Signatures.TryParse
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: ReferenceFixture.Signatures.Swap*
+  commentId: Overload:ReferenceFixture.Signatures.Swap
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Swap_System_Int32__System_Int32__
+  name: Swap
+  nameWithType: Signatures.Swap
+  fullName: ReferenceFixture.Signatures.Swap
+- uid: ReferenceFixture.Signatures.Read*
+  commentId: Overload:ReferenceFixture.Signatures.Read
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Read_System_Int32__
+  name: Read
+  nameWithType: Signatures.Read
+  fullName: ReferenceFixture.Signatures.Read
+- uid: ReferenceFixture.Signatures.Sum*
+  commentId: Overload:ReferenceFixture.Signatures.Sum
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Sum_System_Int32___
+  name: Sum
+  nameWithType: Signatures.Sum
+  fullName: ReferenceFixture.Signatures.Sum
+- uid: System.Int32[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int[]
+  nameWithType: int[]
+  fullName: int[]
+  nameWithType.vb: Integer()
+  fullName.vb: Integer()
+  name.vb: Integer()
+  spec.csharp:
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: (
+  - name: )
+- uid: ReferenceFixture.Signatures.CountAsync*
+  commentId: Overload:ReferenceFixture.Signatures.CountAsync
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_CountAsync_System_Int32_System_Threading_CancellationToken_
+  name: CountAsync
+  nameWithType: Signatures.CountAsync
+  fullName: ReferenceFixture.Signatures.CountAsync
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
+- uid: System.Collections.Generic.IAsyncEnumerable{System.Int32}
+  commentId: T:System.Collections.Generic.IAsyncEnumerable{System.Int32}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IAsyncEnumerable`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  name: IAsyncEnumerable<int>
+  nameWithType: IAsyncEnumerable<int>
+  fullName: System.Collections.Generic.IAsyncEnumerable<int>
+  nameWithType.vb: IAsyncEnumerable(Of Integer)
+  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of Integer)
+  name.vb: IAsyncEnumerable(Of Integer)
+  spec.csharp:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+- uid: System.Collections.Generic.IAsyncEnumerable`1
+  commentId: T:System.Collections.Generic.IAsyncEnumerable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  name: IAsyncEnumerable<T>
+  nameWithType: IAsyncEnumerable<T>
+  fullName: System.Collections.Generic.IAsyncEnumerable<T>
+  nameWithType.vb: IAsyncEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
+  name.vb: IAsyncEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: ReferenceFixture.Signatures.Long*
+  commentId: Overload:ReferenceFixture.Signatures.Long
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Long_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Collections_Generic_IReadOnlyList_System_Collections_Generic_KeyValuePair_System_String_ReferenceFixture_Box_System_String_____System_String_System_Int32_System_Nullable_System_Double__System_Threading_CancellationToken_ReferenceFixture_Box_ReferenceFixture_Pair_System_Int32_System_String___
+  name: Long
+  nameWithType: Signatures.Long
+  fullName: ReferenceFixture.Signatures.Long
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>>>>
+  nameWithType: IReadOnlyDictionary<string, IReadOnlyList<KeyValuePair<string, Box<string>>>>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<string, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string, ReferenceFixture.Box<string>>>>
+  nameWithType.vb: IReadOnlyDictionary(Of String, IReadOnlyList(Of KeyValuePair(Of String, Box(Of String))))
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of String, System.Collections.Generic.IReadOnlyList(Of System.Collections.Generic.KeyValuePair(Of String, ReferenceFixture.Box(Of String))))
+  name.vb: IReadOnlyDictionary(Of String, IReadOnlyList(Of KeyValuePair(Of String, Box(Of String))))
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: ' '
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.Collections.Generic.KeyValuePair`2
+    name: KeyValuePair
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: ' '
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: ' '
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.Collections.Generic.KeyValuePair`2
+    name: KeyValuePair
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: ' '
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  - name: )
+  - name: )
+  - name: )
+- uid: System.Nullable{System.Double}
+  commentId: T:System.Nullable{System.Double}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.double
+  name: double?
+  nameWithType: double?
+  fullName: double?
+  nameWithType.vb: Double?
+  fullName.vb: Double?
+  name.vb: Double?
+  spec.csharp:
+  - uid: System.Double
+    name: double
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.double
+  - name: '?'
+  spec.vb:
+  - uid: System.Double
+    name: Double
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.double
+  - name: '?'
+- uid: ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}}
+  commentId: T:ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}}
+  parent: ReferenceFixture
+  definition: ReferenceFixture.Box`1
+  href: ReferenceFixture.Box-1.html
+  name: Box<Pair<int, string>>
+  nameWithType: Box<Pair<int, string>>
+  fullName: ReferenceFixture.Box<ReferenceFixture.Pair<int, string>>
+  nameWithType.vb: Box(Of Pair(Of Integer, String))
+  fullName.vb: ReferenceFixture.Box(Of ReferenceFixture.Pair(Of Integer, String))
+  name.vb: Box(Of Pair(Of Integer, String))
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: ' '
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: ' '
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: ' '
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: TKey
+  - name: ','
+  - name: ' '
+  - name: TValue
+  - name: )
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: ReferenceFixture.Box`1
+  commentId: T:ReferenceFixture.Box`1
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>
+  nameWithType: Box<T>
+  fullName: ReferenceFixture.Box<T>
+  nameWithType.vb: Box(Of T)
+  fullName.vb: ReferenceFixture.Box(Of T)
+  name.vb: Box(Of T)
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: ReferenceFixture.Signatures.Depth*
+  commentId: Overload:ReferenceFixture.Signatures.Depth
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Depth_ReferenceFixture_Box_System_Int32__Nested_ReferenceFixture_Box_System_String__Nested_Depth_
+  name: Depth
+  nameWithType: Signatures.Depth
+  fullName: ReferenceFixture.Signatures.Depth
+- uid: ReferenceFixture.Box{System.Int32}.Nested
+  commentId: T:ReferenceFixture.Box{System.Int32}.Nested
+  parent: ReferenceFixture
+  definition: ReferenceFixture.Box`1.Nested
+  href: ReferenceFixture.Box-1.html
+  name: Box<int>.Nested
+  nameWithType: Box<int>.Nested
+  fullName: ReferenceFixture.Box<int>.Nested
+  nameWithType.vb: Box(Of Integer).Nested
+  fullName.vb: ReferenceFixture.Box(Of Integer).Nested
+  name.vb: Box(Of Integer).Nested
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box{System.Int32}.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box{System.Int32}.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+- uid: ReferenceFixture.Box{System.String}.Nested.Depth
+  commentId: T:ReferenceFixture.Box{System.String}.Nested.Depth
+  parent: ReferenceFixture
+  definition: ReferenceFixture.Box`1.Nested.Depth
+  href: ReferenceFixture.Box-1.html
+  name: Box<string>.Nested.Depth
+  nameWithType: Box<string>.Nested.Depth
+  fullName: ReferenceFixture.Box<string>.Nested.Depth
+  nameWithType.vb: Box(Of String).Nested.Depth
+  fullName.vb: ReferenceFixture.Box(Of String).Nested.Depth
+  name.vb: Box(Of String).Nested.Depth
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box{System.String}.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box{System.String}.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box{System.String}.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box{System.String}.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+- uid: ReferenceFixture.Box`1.Nested
+  commentId: T:ReferenceFixture.Box`1.Nested
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>.Nested
+  nameWithType: Box<T>.Nested
+  fullName: ReferenceFixture.Box<T>.Nested
+  nameWithType.vb: Box(Of T).Nested
+  fullName.vb: ReferenceFixture.Box(Of T).Nested
+  name.vb: Box(Of T).Nested
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+- uid: ReferenceFixture.Box`1.Nested.Depth
+  commentId: T:ReferenceFixture.Box`1.Nested.Depth
+  parent: ReferenceFixture
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>.Nested.Depth
+  nameWithType: Box<T>.Nested.Depth
+  fullName: ReferenceFixture.Box<T>.Nested.Depth
+  nameWithType.vb: Box(Of T).Nested.Depth
+  fullName.vb: ReferenceFixture.Box(Of T).Nested.Depth
+  name.vb: Box(Of T).Nested.Depth
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+- uid: ReferenceFixture.Signatures.Twice*
+  commentId: Overload:ReferenceFixture.Signatures.Twice
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Twice_System_String_
+  name: Twice
+  nameWithType: Signatures.Twice
+  fullName: ReferenceFixture.Signatures.Twice
+- uid: ReferenceFixture.Signatures.Add*
+  commentId: Overload:ReferenceFixture.Signatures.Add
+  href: ReferenceFixture.Signatures.html#ReferenceFixture_Signatures_Add_System_Int32_System_Int32_
+  name: Add
+  nameWithType: Signatures.Add
+  fullName: ReferenceFixture.Signatures.Add

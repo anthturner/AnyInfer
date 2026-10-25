@@ -12,6 +12,7 @@ python -m venv .venv && . .venv/bin/activate       # or .venv\Scripts\activate
 python workspace.py setup                          # installs the project and dev extras
 npm --prefix website ci                            # requires Node 24 LTS
 python -m pip install --require-hashes -r website/requirements.lock
+(cd src/csharp && dotnet tool restore)             # pinned DocFX for the C# API reference
 python workspace.py check                          # every gate CI runs
 ```
 
@@ -67,7 +68,7 @@ first). It keeps going after a failure so one invocation tells you everything th
 | `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
 | `docs-build` | `scripts/build_docs.py build`: the prepared Docusaurus artifact, local Pagefind index, exports, and static checks that Pages publishes |
-| `csharp` | Record the pinned SDK version, restore and test `src/csharp/AnyInfer.sln`, validate a local prerelease package without publishing it, then run offline async SDK proof examples |
+| `csharp` | Record the pinned SDK version, check the generated compatibility-preset table, restore and test `src/csharp/AnyInfer.sln` (`-m:1`), validate the recorded C# observations, provider-binding inventory and API evidence ledger, check that every public declaration has complete documentation comments, validate a local prerelease package without publishing it, then run offline SDK examples |
 
 The full code-change CI pipeline invokes these phases as
 `python workspace.py check --only=<phase>`. Docs-only changes deliberately skip jobs that do
@@ -85,6 +86,16 @@ Documentation tooling uses Node 24, `npm --prefix website ci`, and the locked Py
 extraction requirements in `website/requirements.lock`. `python workspace.py docs` prepares
 the authored Markdown and serves Docusaurus on loopback; API `:::` placeholders remain
 supported source markers and are expanded from Python source during preparation.
+
+The generated C# API reference under `/csharp/api/` also needs the .NET SDK selected by
+`src/csharp/global.json` and the DocFX version pinned in `.config/dotnet-tools.json`, which
+`dotnet tool restore` (run from `src/csharp/`) installs; the build never downloads it.
+Preparation extracts metadata for `src/csharp/AnyInfer/AnyInfer.csproj` with the settings in
+`website/docfx.json`, renders one page per public type, and fails if any declaration the
+library's documentation inventory lists is missing from the rendered pages. Extraction is
+cached under `website/.cache/csharp-reference/` and repeated only when the native sources,
+project files, SDK or tool pins, DocFX settings, or renderer change; the preview server
+restages when any of those change.
 
 The formatter is not a default gate, since it reflows argv-style flag/value pairs into a
 less readable shape; `python workspace.py check --only=format --fix` formats anyway.

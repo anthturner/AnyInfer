@@ -68,6 +68,14 @@ jobs:
       # on a module it had never installed.
       - run: uv pip install --system -e src/python/anyinfer-store -e src/python/anyinfer-shared -e src/python/anyinfer-confidential
 
+      # The generated C# API reference needs the pinned SDK and DocFX tool; see ci.yml.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: src/csharp/global.json
+      - name: restore pinned documentation tools
+        working-directory: src/csharp
+        run: dotnet tool restore
+
       - name: build the site
         run: python workspace.py build docs
 

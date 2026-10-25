@@ -1,0 +1,131 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Box`1.Nested.Depth
+  commentId: T:ReferenceFixture.Box`1.Nested.Depth
+  id: Box`1.Nested.Depth
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.Box`1.Nested.Depth.One
+  - ReferenceFixture.Box`1.Nested.Depth.Two
+  langs:
+  - csharp
+  - vb
+  name: Box<T>.Nested.Depth
+  nameWithType: Box<T>.Nested.Depth
+  fullName: ReferenceFixture.Box<T>.Nested.Depth
+  type: Enum
+  source:
+    id: Depth
+    path: ReferenceFixture/Shapes.cs
+    startLine: 37
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A doubly nested enum.
+  example: []
+  syntax:
+    content: public enum Box<T>.Nested.Depth
+    content.vb: Public Enum Box(Of T).Nested.Depth
+  nameWithType.vb: Box(Of T).Nested.Depth
+  fullName.vb: ReferenceFixture.Box(Of T).Nested.Depth
+  name.vb: Box(Of T).Nested.Depth
+- uid: ReferenceFixture.Box`1.Nested.Depth.One
+  commentId: F:ReferenceFixture.Box`1.Nested.Depth.One
+  id: One
+  parent: ReferenceFixture.Box`1.Nested.Depth
+  langs:
+  - csharp
+  - vb
+  name: One
+  nameWithType: Box<T>.Nested.Depth.One
+  fullName: ReferenceFixture.Box<T>.Nested.Depth.One
+  type: Field
+  source:
+    id: One
+    path: ReferenceFixture/Shapes.cs
+    startLine: 40
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: The first level.
+  example: []
+  syntax:
+    content: One = 1
+    return:
+      type: ReferenceFixture.Box`1.Nested.Depth
+  nameWithType.vb: Box(Of T).Nested.Depth.One
+  fullName.vb: ReferenceFixture.Box(Of T).Nested.Depth.One
+- uid: ReferenceFixture.Box`1.Nested.Depth.Two
+  commentId: F:ReferenceFixture.Box`1.Nested.Depth.Two
+  id: Two
+  parent: ReferenceFixture.Box`1.Nested.Depth
+  langs:
+  - csharp
+  - vb
+  name: Two
+  nameWithType: Box<T>.Nested.Depth.Two
+  fullName: ReferenceFixture.Box<T>.Nested.Depth.Two
+  type: Field
+  source:
+    id: Two
+    path: ReferenceFixture/Shapes.cs
+    startLine: 42
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: The second level.
+  example: []
+  syntax:
+    content: Two = 2
+    return:
+      type: ReferenceFixture.Box`1.Nested.Depth
+  nameWithType.vb: Box(Of T).Nested.Depth.Two
+  fullName.vb: ReferenceFixture.Box(Of T).Nested.Depth.Two
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: ReferenceFixture.Box`1.Nested.Depth
+  commentId: T:ReferenceFixture.Box`1.Nested.Depth
+  parent: ReferenceFixture
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>.Nested.Depth
+  nameWithType: Box<T>.Nested.Depth
+  fullName: ReferenceFixture.Box<T>.Nested.Depth
+  nameWithType.vb: Box(Of T).Nested.Depth
+  fullName.vb: ReferenceFixture.Box(Of T).Nested.Depth
+  name.vb: Box(Of T).Nested.Depth
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Nested
+    href: ReferenceFixture.Box-1.Nested.html
+  - name: .
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Depth
+    href: ReferenceFixture.Box-1.Nested.Depth.html

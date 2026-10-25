@@ -31,27 +31,54 @@ def _root(tmp_path: Path) -> Path:
     (tmp_path / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
     props = tmp_path / "src" / "csharp" / "Directory.Build.props"
     props.parent.mkdir(parents=True)
-    props.write_text("<Project><PropertyGroup><Version>4.5.6-proof</Version></PropertyGroup></Project>", encoding="utf-8")
+    props.write_text(
+        "<Project><PropertyGroup><Version>4.5.6-proof</Version></PropertyGroup></Project>",
+        encoding="utf-8",
+    )
     (tmp_path / "website" / "navigation.json").write_text(
         json.dumps(
             [
                 {"Home": "index.md"},
-                {"Integrate": [{"Python": "guides/python-sdk.md"}, {"C#": "guides/csharp-sdk.md"}]},
-                {"Reference": [{"API": ["reference/api/README.md", {"Client": "reference/api/client.md"}]}, {"C# ref": "reference/csharp-sdk.md"}]},
+                {
+                    "Integrate": [
+                        {"Python": "guides/python-sdk.md"},
+                        {"C#": "guides/csharp-sdk.md"},
+                    ]
+                },
+                {
+                    "Reference": [
+                        {
+                            "API": [
+                                "reference/api/README.md",
+                                {"Client": "reference/api/client.md"},
+                            ]
+                        },
+                        {"C# ref": "reference/csharp-sdk.md"},
+                    ]
+                },
             ]
         ),
         encoding="utf-8",
     )
-    (tmp_path / "docs" / "index.md").write_text("# Home\n\n{{ extra.anyinfer_version }}\n", encoding="utf-8")
+    (tmp_path / "docs" / "index.md").write_text(
+        "# Home\n\n{{ extra.anyinfer_version }}\n", encoding="utf-8"
+    )
     (tmp_path / "docs" / "downloads.md").write_text("# Downloads\n", encoding="utf-8")
     (tmp_path / "docs" / "guides" / "python-sdk.md").write_text("# Python\n", encoding="utf-8")
-    (tmp_path / "docs" / "guides" / "csharp-sdk.md").write_text("# C#\n\n--8<-- \"examples/csharp-sdk/Sample.cs\"\n", encoding="utf-8")
-    (tmp_path / "docs" / "reference" / "csharp-sdk.md").write_text("# C# reference\n", encoding="utf-8")
+    (tmp_path / "docs" / "guides" / "csharp-sdk.md").write_text(
+        '# C#\n\n--8<-- "examples/csharp-sdk/Sample.cs"\n', encoding="utf-8"
+    )
+    (tmp_path / "docs" / "reference" / "csharp-sdk.md").write_text(
+        "# C# reference\n", encoding="utf-8"
+    )
     (tmp_path / "docs" / "reference" / "api" / "README.md").write_text("# API\n", encoding="utf-8")
     (tmp_path / "docs" / "reference" / "api" / "client.md").write_text(
-        '# Client\n\n[Python](../../guides/python-sdk.md#start)\n\n::: anyinfer.Client\n', encoding="utf-8"
+        "# Client\n\n[Python](../../guides/python-sdk.md#start)\n\n::: anyinfer.Client\n",
+        encoding="utf-8",
     )
-    (tmp_path / "examples" / "csharp-sdk" / "Sample.cs").write_text("var value = 1;\n", encoding="utf-8")
+    (tmp_path / "examples" / "csharp-sdk" / "Sample.cs").write_text(
+        "var value = 1;\n", encoding="utf-8"
+    )
     binary = tmp_path / "examples" / "csharp-sdk" / "bin"
     binary.mkdir()
     (binary / "private.dll").write_bytes(b"not a documentation asset")
@@ -82,8 +109,12 @@ def test_prepare_stages_original_paths_and_expands_stateful_markers(tmp_path: Pa
     )
     manifest = prepare(root, renderer=lambda symbol: f"## {symbol}\n")
     generated = root / "website" / ".generated"
-    staged_python = (generated / "python" / "guides" / "python-sdk.mdx").read_text(encoding="utf-8")
-    staged_client = (generated / "python" / "reference" / "api" / "client.md").read_text(encoding="utf-8")
+    staged_python = (generated / "python" / "guides" / "python-sdk.mdx").read_text(
+        encoding="utf-8"
+    )
+    staged_client = (generated / "python" / "reference" / "api" / "client.md").read_text(
+        encoding="utf-8"
+    )
     staged_csharp = (generated / "csharp" / "guides" / "csharp-sdk.md").read_text(encoding="utf-8")
 
     assert "slug: /" in staged_python
@@ -108,20 +139,26 @@ def test_prepare_stages_original_paths_and_expands_stateful_markers(tmp_path: Pa
         ("hide_table_of_contents: false\n", False),
     ],
 )
-def test_prepare_preserves_authored_toc_visibility(tmp_path: Path, header: str, hidden: bool) -> None:
+def test_prepare_preserves_authored_toc_visibility(
+    tmp_path: Path, header: str, hidden: bool
+) -> None:
     root = _root(tmp_path)
     (root / "docs" / "downloads.md").write_text(
         f"---\n{header}---\n\n# Downloads\n\n## Options\n", encoding="utf-8"
     )
     prepare(root, renderer=lambda symbol: f"## {symbol}\n")
-    staged = (root / "website" / ".generated" / "shared" / "downloads.md").read_text(encoding="utf-8")
+    staged = (root / "website" / ".generated" / "shared" / "downloads.md").read_text(
+        encoding="utf-8"
+    )
     assert ("hide_table_of_contents: true" in staged) is hidden
     assert "## Options" in staged
 
 
 def test_prepare_rejects_missing_snippets_and_api_directive_leaks(tmp_path: Path) -> None:
     root = _root(tmp_path)
-    (root / "docs" / "guides" / "python-sdk.md").write_text('--8<-- "missing.cs"\n', encoding="utf-8")
+    (root / "docs" / "guides" / "python-sdk.md").write_text(
+        '--8<-- "missing.cs"\n', encoding="utf-8"
+    )
     with pytest.raises(ValueError, match="does not exist"):
         prepare(root, renderer=lambda symbol: symbol)
 
@@ -130,10 +167,12 @@ def test_prepare_rejects_missing_snippets_and_api_directive_leaks(tmp_path: Path
         prepare(root, renderer=lambda symbol: f"::: {symbol}\n")
 
 
-def test_prepare_expands_a_snippet_inside_an_existing_fence_without_nesting(tmp_path: Path) -> None:
+def test_prepare_expands_a_snippet_inside_an_existing_fence_without_nesting(
+    tmp_path: Path,
+) -> None:
     root = _root(tmp_path)
     (root / "docs" / "guides" / "csharp-sdk.md").write_text(
-        "```csharp\n--8<-- \"examples/csharp-sdk/Sample.cs\"\n```\n", encoding="utf-8"
+        '```csharp\n--8<-- "examples/csharp-sdk/Sample.cs"\n```\n', encoding="utf-8"
     )
     prepare(root, renderer=lambda symbol: symbol)
     staged = (root / "website" / ".generated" / "csharp" / "guides" / "csharp-sdk.md").read_text(
@@ -145,7 +184,16 @@ def test_prepare_expands_a_snippet_inside_an_existing_fence_without_nesting(tmp_
 
 def test_real_material_heading_and_downloads_syntax_becomes_safe_mdx() -> None:
     repository = Path(__file__).parents[1]
-    page = Page("reference/errors.md", "shared", "reference/errors", "/reference/errors/", "/reference/errors/", "Errors", "Reference", 0)
+    page = Page(
+        "reference/errors.md",
+        "shared",
+        "reference/errors",
+        "/reference/errors/",
+        "/reference/errors/",
+        "Errors",
+        "Reference",
+        0,
+    )
     errors = _prepare_markdown(
         (repository / "docs" / "reference" / "errors.md").read_text(encoding="utf-8"),
         page,
@@ -155,9 +203,27 @@ def test_real_material_heading_and_downloads_syntax_becomes_safe_mdx() -> None:
     )
     downloads = _prepare_markdown(
         (repository / "docs" / "downloads.md").read_text(encoding="utf-8"),
-        Page("downloads.md", "shared", "downloads", "/downloads/", "/downloads/", "Downloads", "Home", 0),
+        Page(
+            "downloads.md",
+            "shared",
+            "downloads",
+            "/downloads/",
+            "/downloads/",
+            "Downloads",
+            "Home",
+            0,
+        ),
         {
-            "serve/README.md": Page("serve/README.md", "shared", "serve/README", "/serve/", "/serve/", "Sidecar", "Integrate", 1)
+            "serve/README.md": Page(
+                "serve/README.md",
+                "shared",
+                "serve/README",
+                "/serve/",
+                "/serve/",
+                "Sidecar",
+                "Integrate",
+                1,
+            )
         },
         repository,
         lambda symbol: symbol,
@@ -170,14 +236,28 @@ def test_real_material_heading_and_downloads_syntax_becomes_safe_mdx() -> None:
     assert "{ .anyinfer-button" not in downloads
     assert 'className="anyinfer-card-grid anyinfer-download-grid"' in downloads
     assert downloads.count("releases/latest/download/") == 10
-    assert '<a className="anyinfer-button anyinfer-button-secondary" href="/serve/">Sidecar documentation →</a>' in downloads
+    assert (
+        '<a className="anyinfer-button anyinfer-button-secondary" href="/serve/">Sidecar documentation →</a>'
+        in downloads
+    )
 
 
-def test_mdx_escaping_preserves_code_but_escapes_prose_braces_and_pseudo_tags(tmp_path: Path) -> None:
+def test_mdx_escaping_preserves_code_but_escapes_prose_braces_and_pseudo_tags(
+    tmp_path: Path,
+) -> None:
     root = _root(tmp_path)
-    page = Page("guides/python-sdk.md", "python", "guides/python-sdk", "/", "/python/", "Python", "Integrate", 0)
+    page = Page(
+        "guides/python-sdk.md",
+        "python",
+        "guides/python-sdk",
+        "/",
+        "/python/",
+        "Python",
+        "Integrate",
+        0,
+    )
     rendered = _prepare_markdown(
-        "Outside {brace} and Type<T>.\n\n`{\"literal\": true}`\n",
+        'Outside {brace} and Type<T>.\n\n`{"literal": true}`\n',
         page,
         {page.source: page},
         root,
@@ -218,7 +298,16 @@ def test_default_renderer_cache_hits_and_source_change_invalidates(tmp_path: Pat
 
 def test_mdx_escaping_preserves_generated_html_anchors(tmp_path: Path) -> None:
     root = _root(tmp_path)
-    page = Page("guides/python-sdk.md", "python", "guides/python-sdk", "/", "/python/", "Python", "Integrate", 0)
+    page = Page(
+        "guides/python-sdk.md",
+        "python",
+        "guides/python-sdk",
+        "/",
+        "/python/",
+        "Python",
+        "Integrate",
+        0,
+    )
     rendered = _prepare_markdown(
         '<a id="anyinfer.Client"></a>\n\nType<T>\n\n<https://anyinfer.dev/llms.txt>\n',
         page,
@@ -234,7 +323,16 @@ def test_mdx_escaping_preserves_generated_html_anchors(tmp_path: Path) -> None:
 
 def test_real_headings_keep_legacy_ids_and_tab_ids_attach_to_tab_items() -> None:
     repository = Path(__file__).parents[1]
-    errors_page = Page("reference/errors.md", "shared", "reference/errors", "/reference/errors/", "/reference/errors/", "Errors", "Reference", 0)
+    errors_page = Page(
+        "reference/errors.md",
+        "shared",
+        "reference/errors",
+        "/reference/errors/",
+        "/reference/errors/",
+        "Errors",
+        "Reference",
+        0,
+    )
     errors = _prepare_markdown(
         (repository / "docs" / "reference" / "errors.md").read_text(encoding="utf-8"),
         errors_page,
@@ -242,7 +340,16 @@ def test_real_headings_keep_legacy_ids_and_tab_ids_attach_to_tab_items() -> None
         repository,
         lambda symbol: symbol,
     )
-    glossary_page = Page("reference/glossary.md", "shared", "reference/glossary", "/reference/glossary/", "/reference/glossary/", "Glossary", "Reference", 0)
+    glossary_page = Page(
+        "reference/glossary.md",
+        "shared",
+        "reference/glossary",
+        "/reference/glossary/",
+        "/reference/glossary/",
+        "Glossary",
+        "Reference",
+        0,
+    )
     glossary = _prepare_markdown(
         (repository / "docs" / "reference" / "glossary.md").read_text(encoding="utf-8"),
         glossary_page,
@@ -266,8 +373,26 @@ def test_real_headings_keep_legacy_ids_and_tab_ids_attach_to_tab_items() -> None
 
 
 def test_generated_references_use_global_symbol_map_and_drop_unresolved_types() -> None:
-    first = Page("reference/api/one.md", "python", "reference/api/one", "/api/one/", "/python/api/one/", "One", "Reference", 0)
-    second = Page("reference/api/two.md", "python", "reference/api/two", "/api/two/", "/python/api/two/", "Two", "Reference", 1)
+    first = Page(
+        "reference/api/one.md",
+        "python",
+        "reference/api/one",
+        "/api/one/",
+        "/python/api/one/",
+        "One",
+        "Reference",
+        0,
+    )
+    second = Page(
+        "reference/api/two.md",
+        "python",
+        "reference/api/two",
+        "/api/two/",
+        "/python/api/two/",
+        "Two",
+        "Reference",
+        1,
+    )
     symbols = _symbol_urls(
         [(first, '<a id="anyinfer.Sourced"></a>'), (second, '<a id="anyinfer.Client"></a>')]
     )
@@ -312,3 +437,99 @@ def test_incremental_prepare_preserves_unchanged_files_updates_changes_and_remov
     assert page.stat().st_mtime_ns != before_page_mtime
     assert copied_asset.stat().st_mtime_ns != before_asset_mtime
     assert not stale.exists()
+
+
+def _generated_reference(*type_names: str) -> object:
+    """Render a small generated C# reference with the real renderer's page shape."""
+    from scripts.generate_csharp_reference import GeneratedPage, Reference
+
+    pages = [
+        GeneratedPage(
+            uid="index",
+            path="api/index.md",
+            slug="/api/",
+            url="/csharp/api/",
+            title="C# API reference",
+            label="Overview",
+            namespace="",
+            kind="index",
+            origin=None,
+            content="---\nslug: /api/\n---\n\n# C# API reference\n",
+        )
+    ]
+    for name in type_names:
+        slug = f"n.{name.lower()}"
+        pages.append(
+            GeneratedPage(
+                uid=f"T:N.{name}",
+                path=f"api/{slug}.md",
+                slug=f"/api/{slug}/",
+                url=f"/csharp/api/{slug}/",
+                title=f"{name} class",
+                label=name,
+                namespace="N",
+                kind="class",
+                origin=f"src/csharp/AnyInfer/{name}.cs",
+                content=f"---\nslug: /api/{slug}/\n---\n\n# {name} class\n",
+            )
+        )
+    return Reference(
+        tuple(pages),
+        {f"T:N.{name}": f"/csharp/api/n.{name.lower()}/" for name in type_names},
+        (("N", tuple(pages[1:])),),
+    )
+
+
+def test_prepare_stages_generated_csharp_pages_into_the_csharp_plugin_and_manifest(
+    tmp_path: Path,
+) -> None:
+    root = _root(tmp_path)
+    manifest = prepare(
+        root,
+        renderer=lambda symbol: symbol,
+        csharp_reference=lambda _root: _generated_reference("Alpha"),
+    )
+    generated = root / "website" / ".generated" / "csharp" / "api"
+    assert (generated / "index.md").is_file() and (generated / "n.alpha.md").is_file()
+    entries = {page["url"]: page for page in manifest["pages"]}
+    alpha = entries["/csharp/api/n.alpha/"]
+    assert alpha["sdk"] == "csharp" and alpha["generated"] is True
+    assert alpha["origin"] == "src/csharp/AnyInfer/Alpha.cs"
+    assert alpha["order"] > max(
+        page["order"] for page in manifest["pages"] if not page.get("generated")
+    )
+    section = manifest["generated"]["csharp-api"]
+    assert section["sdk"] == "csharp" and section["index"] == "api/index"
+    assert section["namespaces"] == [
+        {"label": "N", "items": [{"id": "api/n.alpha", "label": "Alpha"}]}
+    ]
+    # Generated pages never become legacy redirects; authored routes are unchanged.
+    assert all("/api/n." not in target for target in manifest["redirects"].values())
+
+
+def test_incremental_prepare_removes_generated_pages_for_removed_types(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    prepare(
+        root,
+        renderer=lambda symbol: symbol,
+        csharp_reference=lambda _root: _generated_reference("Alpha", "Beta"),
+    )
+    generated = root / "website" / ".generated" / "csharp" / "api"
+    assert (generated / "n.beta.md").is_file()
+    prepare(
+        root,
+        renderer=lambda symbol: symbol,
+        incremental=True,
+        csharp_reference=lambda _root: _generated_reference("Alpha"),
+    )
+    assert (generated / "n.alpha.md").is_file()
+    assert not (generated / "n.beta.md").exists()
+
+
+def test_docs_only_roots_without_docfx_configuration_skip_the_native_reference(
+    tmp_path: Path,
+) -> None:
+    root = _root(tmp_path)
+    manifest = prepare(root, renderer=lambda symbol: symbol)
+    assert manifest["generated"] == {}
+    assert not any(page.get("generated") for page in manifest["pages"])

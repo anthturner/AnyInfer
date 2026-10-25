@@ -54,15 +54,20 @@ def _docusaurus_command(root: Path) -> list[str]:
 def _source_snapshot(root: Path) -> tuple[tuple[str, int, int], ...]:
     """Return metadata for authored inputs that require restaging on change."""
     paths: list[Path] = []
-    for directory in (
-        root / "docs",
-        root / "src" / "python",
-        root / "examples" / "csharp-sdk",
-    ):
+    patterns = {
+        root / "docs": ("*",),
+        root / "src" / "python": ("*.py",),
+        root / "examples" / "csharp-sdk": ("*",),
+        # Native sources and comments feed the generated C# API reference.
+        root / "src" / "csharp" / "AnyInfer": ("*.cs", "*.csproj"),
+        root / "src" / "csharp" / "AnyInfer.Maintenance": ("*.cs", "*.csproj"),
+    }
+    for directory, globs in patterns.items():
         if directory.is_dir():
             paths.extend(
                 path
-                for path in directory.rglob("*.py" if directory.name == "python" else "*")
+                for pattern in globs
+                for path in directory.rglob(pattern)
                 if path.is_file()
                 and not any(part in _IGNORED_WATCH_PARTS for part in path.relative_to(root).parts)
             )
@@ -72,7 +77,10 @@ def _source_snapshot(root: Path) -> tuple[tuple[str, int, int], ...]:
             root / "pyproject.toml",
             root / "website" / "navigation.json",
             root / "website" / "requirements.lock",
+            root / "website" / "docfx.json",
             root / "src" / "csharp" / "Directory.Build.props",
+            root / "src" / "csharp" / "global.json",
+            root / ".config" / "dotnet-tools.json",
         )
         if path.is_file()
     )

@@ -31,8 +31,26 @@ def _make_site(tmp_path: Path) -> Path:
     (site / "python/api/client/index.html").write_text(client, encoding="utf-8")
     manifest = {
         "pages": [
-            {"source": "index.md", "sdk": "shared", "id": "home", "slug": "/", "url": "/", "title": "Home", "section": "Home", "order": 0},
-            {"source": "reference/api/client.md", "sdk": "python", "id": "reference/api/client", "slug": "/api/client/", "url": "/python/api/client/", "title": "Client", "section": "Reference", "order": 1},
+            {
+                "source": "index.md",
+                "sdk": "shared",
+                "id": "home",
+                "slug": "/",
+                "url": "/",
+                "title": "Home",
+                "section": "Home",
+                "order": 0,
+            },
+            {
+                "source": "reference/api/client.md",
+                "sdk": "python",
+                "id": "reference/api/client",
+                "slug": "/api/client/",
+                "url": "/python/api/client/",
+                "title": "Client",
+                "section": "Reference",
+                "order": 1,
+            },
         ],
         "versions": {"python": "0.1.3", "csharp": "0.1.0-proof"},
         "redirects": {"/reference/api/client/": "/python/api/client/#client"},
@@ -89,3 +107,68 @@ def test_validate_site_rejects_broken_artifacts(tmp_path: Path, mutation: str, m
 def test_validate_site_requires_local_pagefind_bundle(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Pagefind"):
         validate_site(_make_site(tmp_path), baseline=None)
+
+
+def _add_generated_reference(site: Path, *, indexed: bool = True, exported: bool = True) -> None:
+    manifest = json.loads((site / "docs-manifest.json").read_text(encoding="utf-8"))
+    search = '<meta data-pagefind-filter="sdk:csharp">' if indexed else ""
+    pages = {
+        "/csharp/api/": '<a href="/csharp/api/n.alpha/">Alpha</a>',
+        "/csharp/api/n.alpha/": '<h1 id="alpha">Alpha</h1><a id="member-0123456789abcdef"></a>',
+    }
+    for order, (url, body) in enumerate(pages.items(), 10):
+        directory = site / url.strip("/")
+        directory.mkdir(parents=True)
+        (directory / "index.html").write_text(
+            f"<html><head>{search}</head><body><article>{body}<p>{url}</p></article></body></html>",
+            encoding="utf-8",
+        )
+        manifest["pages"].append(
+            {
+                "source": f"generated:csharp-api/{url}",
+                "sdk": "csharp",
+                "id": url,
+                "slug": url,
+                "url": url,
+                "title": url,
+                "section": "C# API Reference",
+                "order": order,
+                "generated": True,
+            }
+        )
+    manifest["generated"] = {
+        "csharp-api": {"sdk": "csharp", "namespaces": [{"label": "N", "items": []}]}
+    }
+    (site / "docs-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    if exported:
+        with (site / "llms-full.txt").open("a", encoding="utf-8") as handle:
+            for url in pages:
+                handle.write(f"\nSource: https://anyinfer.dev{url}\n\n{url}\n")
+
+
+def test_validate_site_accepts_a_complete_generated_reference(tmp_path: Path) -> None:
+    site = _make_site(tmp_path)
+    _add_generated_reference(site)
+    validate_site(site, baseline=None, require_pagefind=False, require_generated_reference=True)
+
+
+@pytest.mark.parametrize(
+    ("variant", "match"),
+    [
+        ("absent", "no generated C# API reference"),
+        ("unindexed", "not indexed for C# search"),
+        ("unexported", "missing from llms-full.txt"),
+    ],
+)
+def test_validate_site_rejects_an_incomplete_generated_reference(
+    tmp_path: Path, variant: str, match: str
+) -> None:
+    site = _make_site(tmp_path)
+    if variant != "absent":
+        _add_generated_reference(
+            site, indexed=variant != "unindexed", exported=variant != "unexported"
+        )
+    with pytest.raises(ValueError, match=match):
+        validate_site(
+            site, baseline=None, require_pagefind=False, require_generated_reference=True
+        )

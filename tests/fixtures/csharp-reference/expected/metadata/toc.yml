@@ -1,0 +1,37 @@
+### YamlMime:TableOfContent
+items:
+- uid: ReferenceFixture
+  name: ReferenceFixture
+  type: Namespace
+  items:
+  - uid: ReferenceFixture.Box`1
+    name: Box<T>
+    type: Class
+  - uid: ReferenceFixture.Box`1.Nested
+    name: Box<T>.Nested
+    type: Class
+  - uid: ReferenceFixture.Box`1.Nested.Depth
+    name: Box<T>.Nested.Depth
+    type: Enum
+  - uid: ReferenceFixture.Constants
+    name: Constants
+    type: Class
+  - uid: ReferenceFixture.IShape
+    name: IShape
+    type: Interface
+  - uid: ReferenceFixture.Measure
+    name: Measure
+    type: Delegate
+  - uid: ReferenceFixture.Meters
+    name: Meters
+    type: Struct
+  - uid: ReferenceFixture.Overloads
+    name: Overloads
+    type: Class
+  - uid: ReferenceFixture.Pair`2
+    name: Pair<TLeft, TRight>
+    type: Class
+  - uid: ReferenceFixture.Signatures
+    name: Signatures
+    type: Class
+memberLayout: SamePage

@@ -1,0 +1,127 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.IShape
+  commentId: T:ReferenceFixture.IShape
+  id: IShape
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.IShape.Changed
+  - ReferenceFixture.IShape.Item(System.Int32)
+  langs:
+  - csharp
+  - vb
+  name: IShape
+  nameWithType: IShape
+  fullName: ReferenceFixture.IShape
+  type: Interface
+  source:
+    id: IShape
+    path: ReferenceFixture/Shapes.cs
+    startLine: 157
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: An interface with an event and an indexer.
+  example: []
+  syntax:
+    content: public interface IShape
+    content.vb: Public Interface IShape
+- uid: ReferenceFixture.IShape.Changed
+  commentId: E:ReferenceFixture.IShape.Changed
+  id: Changed
+  parent: ReferenceFixture.IShape
+  langs:
+  - csharp
+  - vb
+  name: Changed
+  nameWithType: IShape.Changed
+  fullName: ReferenceFixture.IShape.Changed
+  type: Event
+  source:
+    id: Changed
+    path: ReferenceFixture/Shapes.cs
+    startLine: 160
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Raised when the shape changes.
+  example: []
+  syntax:
+    content: event EventHandler? Changed
+    return:
+      type: System.EventHandler
+    content.vb: Event Changed As EventHandler
+- uid: ReferenceFixture.IShape.Item(System.Int32)
+  commentId: P:ReferenceFixture.IShape.Item(System.Int32)
+  id: Item(System.Int32)
+  parent: ReferenceFixture.IShape
+  langs:
+  - csharp
+  - vb
+  name: this[int]
+  nameWithType: IShape.this[int]
+  fullName: ReferenceFixture.IShape.this[int]
+  type: Property
+  source:
+    id: this[]
+    path: ReferenceFixture/Shapes.cs
+    startLine: 164
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Gets a coordinate.
+  example: []
+  syntax:
+    content: int this[int index] { get; }
+    parameters:
+    - id: index
+      type: System.Int32
+      description: The coordinate index.
+    return:
+      type: System.Int32
+    content.vb: ReadOnly Default Property this[](index As Integer) As Integer
+  overload: ReferenceFixture.IShape.Item*
+  nameWithType.vb: IShape.this[](Integer)
+  fullName.vb: ReferenceFixture.IShape.this[](Integer)
+  name.vb: this[](Integer)
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: System.EventHandler
+  commentId: T:System.EventHandler
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.eventhandler
+  name: EventHandler
+  nameWithType: EventHandler
+  fullName: System.EventHandler
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: ReferenceFixture.IShape.Item*
+  commentId: Overload:ReferenceFixture.IShape.Item
+  href: ReferenceFixture.IShape.html#ReferenceFixture_IShape_Item_System_Int32_
+  name: this
+  nameWithType: IShape.this
+  fullName: ReferenceFixture.IShape.this
+  nameWithType.vb: IShape.this[]
+  fullName.vb: ReferenceFixture.IShape.this[]
+  name.vb: this[]
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer

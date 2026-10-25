@@ -1,0 +1,489 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Overloads
+  commentId: T:ReferenceFixture.Overloads
+  id: Overloads
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.Overloads.#ctor
+  - ReferenceFixture.Overloads.Format(System.Int32)
+  - ReferenceFixture.Overloads.Format(System.Int32,System.Int32)
+  - ReferenceFixture.Overloads.ToString
+  langs:
+  - csharp
+  - vb
+  name: Overloads
+  nameWithType: Overloads
+  fullName: ReferenceFixture.Overloads
+  type: Class
+  source:
+    id: Overloads
+    path: ReferenceFixture/Shapes.cs
+    startLine: 173
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Overloads that share documentation through <code>inheritdoc</code>.
+  example: []
+  syntax:
+    content: 'public sealed record Overloads : IEquatable<Overloads>'
+    content.vb: Public NotInheritable Class [Overloads] Implements IEquatable(Of Overloads)
+  inheritance:
+  - System.Object
+  implements:
+  - System.IEquatable{ReferenceFixture.Overloads}
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+- uid: ReferenceFixture.Overloads.#ctor
+  commentId: M:ReferenceFixture.Overloads.#ctor
+  id: '#ctor'
+  parent: ReferenceFixture.Overloads
+  langs:
+  - csharp
+  - vb
+  name: Overloads()
+  nameWithType: Overloads.Overloads()
+  fullName: ReferenceFixture.Overloads.Overloads()
+  type: Constructor
+  source:
+    id: .ctor
+    path: ReferenceFixture/Shapes.cs
+    startLine: 176
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Creates the formatter; declared so the public constructor is documented.
+  example: []
+  syntax:
+    content: public Overloads()
+    content.vb: Public Sub New()
+  overload: ReferenceFixture.Overloads.#ctor*
+  nameWithType.vb: Overloads.New()
+  fullName.vb: ReferenceFixture.Overloads.New()
+  name.vb: New()
+- uid: ReferenceFixture.Overloads.Format(System.Int32,System.Int32)
+  commentId: M:ReferenceFixture.Overloads.Format(System.Int32,System.Int32)
+  id: Format(System.Int32,System.Int32)
+  parent: ReferenceFixture.Overloads
+  langs:
+  - csharp
+  - vb
+  name: Format(int, int)
+  nameWithType: Overloads.Format(int, int)
+  fullName: ReferenceFixture.Overloads.Format(int, int)
+  type: Method
+  source:
+    id: Format
+    path: ReferenceFixture/Shapes.cs
+    startLine: 182
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Formats a value.
+  example: []
+  syntax:
+    content: public string Format(int value, int width)
+    parameters:
+    - id: value
+      type: System.Int32
+      description: The value to format.
+    - id: width
+      type: System.Int32
+      description: The minimum width.
+    return:
+      type: System.String
+      description: The formatted text.
+    content.vb: Public Function Format(value As Integer, width As Integer) As String
+  overload: ReferenceFixture.Overloads.Format*
+  nameWithType.vb: Overloads.Format(Integer, Integer)
+  fullName.vb: ReferenceFixture.Overloads.Format(Integer, Integer)
+  name.vb: Format(Integer, Integer)
+- uid: ReferenceFixture.Overloads.Format(System.Int32)
+  commentId: M:ReferenceFixture.Overloads.Format(System.Int32)
+  id: Format(System.Int32)
+  parent: ReferenceFixture.Overloads
+  langs:
+  - csharp
+  - vb
+  name: Format(int)
+  nameWithType: Overloads.Format(int)
+  fullName: ReferenceFixture.Overloads.Format(int)
+  type: Method
+  source:
+    id: Format
+    path: ReferenceFixture/Shapes.cs
+    startLine: 186
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Formats a value with the default width.
+  example: []
+  syntax:
+    content: public string Format(int value)
+    parameters:
+    - id: value
+      type: System.Int32
+      description: The value to format.
+    return:
+      type: System.String
+      description: The formatted text.
+    content.vb: Public Function Format(value As Integer) As String
+  overload: ReferenceFixture.Overloads.Format*
+  nameWithType.vb: Overloads.Format(Integer)
+  fullName.vb: ReferenceFixture.Overloads.Format(Integer)
+  name.vb: Format(Integer)
+- uid: ReferenceFixture.Overloads.ToString
+  commentId: M:ReferenceFixture.Overloads.ToString
+  id: ToString
+  parent: ReferenceFixture.Overloads
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: Overloads.ToString()
+  fullName: ReferenceFixture.Overloads.ToString()
+  type: Method
+  source:
+    id: ToString
+    path: ReferenceFixture/Shapes.cs
+    startLine: 190
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: An explicitly declared record member stays in the inventory.
+  example: []
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+      description: A fixed description.
+    content.vb: Public Overrides Function ToString() As String
+  overridden: System.Object.ToString
+  overload: ReferenceFixture.Overloads.ToString*
+references:
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.IEquatable{ReferenceFixture.Overloads}
+  commentId: T:System.IEquatable{ReferenceFixture.Overloads}
+  parent: System
+  definition: System.IEquatable`1
+  href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  name: IEquatable<Overloads>
+  nameWithType: IEquatable<Overloads>
+  fullName: System.IEquatable<ReferenceFixture.Overloads>
+  nameWithType.vb: IEquatable(Of Overloads)
+  fullName.vb: System.IEquatable(Of ReferenceFixture.Overloads)
+  name.vb: IEquatable(Of Overloads)
+  spec.csharp:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: <
+  - uid: ReferenceFixture.Overloads
+    name: Overloads
+    href: ReferenceFixture.Overloads.html
+  - name: '>'
+  spec.vb:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - uid: ReferenceFixture.Overloads
+    name: Overloads
+    href: ReferenceFixture.Overloads.html
+  - name: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.IEquatable`1
+  commentId: T:System.IEquatable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  name: IEquatable<T>
+  nameWithType: IEquatable<T>
+  fullName: System.IEquatable<T>
+  nameWithType.vb: IEquatable(Of T)
+  fullName.vb: System.IEquatable(Of T)
+  name.vb: IEquatable(Of T)
+  spec.csharp:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.IEquatable`1
+    name: IEquatable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iequatable-1
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: ReferenceFixture.Overloads.#ctor*
+  commentId: Overload:ReferenceFixture.Overloads.#ctor
+  href: ReferenceFixture.Overloads.html#ReferenceFixture_Overloads__ctor
+  name: Overloads
+  nameWithType: Overloads.Overloads
+  fullName: ReferenceFixture.Overloads.Overloads
+  nameWithType.vb: Overloads.New
+  fullName.vb: ReferenceFixture.Overloads.New
+  name.vb: New
+- uid: ReferenceFixture.Overloads.Format*
+  commentId: Overload:ReferenceFixture.Overloads.Format
+  href: ReferenceFixture.Overloads.html#ReferenceFixture_Overloads_Format_System_Int32_System_Int32_
+  name: Format
+  nameWithType: Overloads.Format
+  fullName: ReferenceFixture.Overloads.Format
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: ReferenceFixture.Overloads.ToString*
+  commentId: Overload:ReferenceFixture.Overloads.ToString
+  href: ReferenceFixture.Overloads.html#ReferenceFixture_Overloads_ToString
+  name: ToString
+  nameWithType: Overloads.ToString
+  fullName: ReferenceFixture.Overloads.ToString

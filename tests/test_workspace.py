@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import re
 import sys
 import tomllib
@@ -301,6 +302,10 @@ class TestVerbs:
                 ROOT,
             ),
             (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_docs.py"), "--build"],
+                ROOT,
+            ),
+            (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_package.py")],
                 ROOT,
             ),
@@ -396,6 +401,21 @@ class TestVerbs:
         assert not re.search(r"run: python workspace\.py (?!check|build docs)", workflow), (
             "CI must not run a gate outside `workspace check`"
         )
+
+    def test_every_site_build_restores_the_pinned_native_reference_tools_first(self):
+        """The generated C# API reference needs the pinned SDK and DocFX before the build."""
+        for name, build in (
+            ("ci.yml", "workspace.py check --only=docs-build"),
+            ("docs-site.yml", "workspace.py build docs"),
+        ):
+            workflow = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+            build_at = workflow.index(build)
+            setup_at = workflow.rfind("actions/setup-dotnet@", 0, build_at)
+            restore_at = workflow.rfind("run: dotnet tool restore", 0, build_at)
+            assert setup_at >= 0 and restore_at > setup_at, name
+            assert "global-json-file: src/csharp/global.json" in workflow[setup_at:restore_at], name
+        manifest = json.loads((ROOT / ".config" / "dotnet-tools.json").read_text(encoding="utf-8"))
+        assert re.fullmatch(r"\d+\.\d+\.\d+", manifest["tools"]["docfx"]["version"])
 
     def test_pages_deploy_isolated_from_reruns_and_upload_retries(self):
         workflow = (ROOT / ".github" / "workflows" / "docs-site.yml").read_text(encoding="utf-8")
@@ -513,8 +533,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and fourteen C# steps.
-        assert len(calls) == 27
+        # in-process docs gates and fifteen C# steps.
+        assert len(calls) == 28
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

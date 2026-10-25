@@ -1,0 +1,699 @@
+### YamlMime:ManagedReference
+items:
+- uid: ReferenceFixture.Box`1
+  commentId: T:ReferenceFixture.Box`1
+  id: Box`1
+  parent: ReferenceFixture
+  children:
+  - ReferenceFixture.Box`1.#ctor
+  - ReferenceFixture.Box`1.#ctor(`0)
+  - ReferenceFixture.Box`1.Map``1(System.Func{`0,``0})
+  - ReferenceFixture.Box`1.Map``1(System.Func{`0,``0},``0)
+  - ReferenceFixture.Box`1.OnChanged
+  - ReferenceFixture.Box`1.Value
+  langs:
+  - csharp
+  - vb
+  name: Box<T>
+  nameWithType: Box<T>
+  fullName: ReferenceFixture.Box<T>
+  type: Class
+  source:
+    id: Box
+    path: ReferenceFixture/Shapes.cs
+    startLine: 5
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Holds <code class="typeparamref">T</code> values and links to <xref href="ReferenceFixture.Pair%602" data-throw-if-not-resolved="false"></xref>.
+  remarks: 'Escaping check: <code>a &lt; b &amp;&amp; c &gt; d</code> and braces {literal}.'
+  example: []
+  syntax:
+    content: 'public class Box<T> where T : notnull'
+    typeParameters:
+    - id: T
+      description: The stored value type.
+    content.vb: Public Class Box(Of T)
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  nameWithType.vb: Box(Of T)
+  fullName.vb: ReferenceFixture.Box(Of T)
+  name.vb: Box(Of T)
+- uid: ReferenceFixture.Box`1.#ctor
+  commentId: M:ReferenceFixture.Box`1.#ctor
+  id: '#ctor'
+  parent: ReferenceFixture.Box`1
+  langs:
+  - csharp
+  - vb
+  name: Box()
+  nameWithType: Box<T>.Box()
+  fullName: ReferenceFixture.Box<T>.Box()
+  type: Constructor
+  source:
+    id: .ctor
+    path: ReferenceFixture/Shapes.cs
+    startLine: 8
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Creates an empty box.
+  example: []
+  syntax:
+    content: public Box()
+    content.vb: Public Sub New()
+  overload: ReferenceFixture.Box`1.#ctor*
+  nameWithType.vb: Box(Of T).New()
+  fullName.vb: ReferenceFixture.Box(Of T).New()
+  name.vb: New()
+- uid: ReferenceFixture.Box`1.#ctor(`0)
+  commentId: M:ReferenceFixture.Box`1.#ctor(`0)
+  id: '#ctor(`0)'
+  parent: ReferenceFixture.Box`1
+  langs:
+  - csharp
+  - vb
+  name: Box(T)
+  nameWithType: Box<T>.Box(T)
+  fullName: ReferenceFixture.Box<T>.Box(T)
+  type: Constructor
+  source:
+    id: .ctor
+    path: ReferenceFixture/Shapes.cs
+    startLine: 12
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Creates a box holding <code class="paramref">value</code>.
+  example: []
+  syntax:
+    content: public Box(T value)
+    parameters:
+    - id: value
+      type: '{T}'
+      description: The initial value.
+    content.vb: Public Sub New(value As T)
+  overload: ReferenceFixture.Box`1.#ctor*
+  nameWithType.vb: Box(Of T).New(T)
+  fullName.vb: ReferenceFixture.Box(Of T).New(T)
+  name.vb: New(T)
+- uid: ReferenceFixture.Box`1.Value
+  commentId: P:ReferenceFixture.Box`1.Value
+  id: Value
+  parent: ReferenceFixture.Box`1
+  langs:
+  - csharp
+  - vb
+  name: Value
+  nameWithType: Box<T>.Value
+  fullName: ReferenceFixture.Box<T>.Value
+  type: Property
+  source:
+    id: Value
+    path: ReferenceFixture/Shapes.cs
+    startLine: 15
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Gets the stored value, or <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/null">null</a> when empty.
+  example: []
+  syntax:
+    content: public T? Value { get; }
+    parameters: []
+    return:
+      type: '{T}'
+    content.vb: Public ReadOnly Property Value As T
+  overload: ReferenceFixture.Box`1.Value*
+  nameWithType.vb: Box(Of T).Value
+  fullName.vb: ReferenceFixture.Box(Of T).Value
+- uid: ReferenceFixture.Box`1.Map``1(System.Func{`0,``0})
+  commentId: M:ReferenceFixture.Box`1.Map``1(System.Func{`0,``0})
+  id: Map``1(System.Func{`0,``0})
+  parent: ReferenceFixture.Box`1
+  langs:
+  - csharp
+  - vb
+  name: Map<TResult>(Func<T, TResult>)
+  nameWithType: Box<T>.Map<TResult>(Func<T, TResult>)
+  fullName: ReferenceFixture.Box<T>.Map<TResult>(System.Func<T, TResult>)
+  type: Method
+  source:
+    id: Map
+    path: ReferenceFixture/Shapes.cs
+    startLine: 22
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Projects the value.
+  example: []
+  syntax:
+    content: 'public Box<TResult> Map<TResult>(Func<T, TResult> selector) where TResult : notnull'
+    parameters:
+    - id: selector
+      type: System.Func{{T},{TResult}}
+      description: The projection.
+    typeParameters:
+    - id: TResult
+      description: The projected type.
+    return:
+      type: ReferenceFixture.Box{{TResult}}
+      description: A new box.
+    content.vb: Public Function Map(Of TResult)(selector As Func(Of T, TResult)) As Box(Of TResult)
+  overload: ReferenceFixture.Box`1.Map*
+  exceptions:
+  - type: System.InvalidOperationException
+    commentId: T:System.InvalidOperationException
+    description: The box is empty.
+  nameWithType.vb: Box(Of T).Map(Of TResult)(Func(Of T, TResult))
+  fullName.vb: ReferenceFixture.Box(Of T).Map(Of TResult)(System.Func(Of T, TResult))
+  name.vb: Map(Of TResult)(Func(Of T, TResult))
+- uid: ReferenceFixture.Box`1.Map``1(System.Func{`0,``0},``0)
+  commentId: M:ReferenceFixture.Box`1.Map``1(System.Func{`0,``0},``0)
+  id: Map``1(System.Func{`0,``0},``0)
+  parent: ReferenceFixture.Box`1
+  langs:
+  - csharp
+  - vb
+  name: Map<TResult>(Func<T, TResult>, TResult)
+  nameWithType: Box<T>.Map<TResult>(Func<T, TResult>, TResult)
+  fullName: ReferenceFixture.Box<T>.Map<TResult>(System.Func<T, TResult>, TResult)
+  type: Method
+  source:
+    id: Map
+    path: ReferenceFixture/Shapes.cs
+    startLine: 30
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: Overload taking a fallback.
+  example: []
+  syntax:
+    content: 'public Box<TResult> Map<TResult>(Func<T, TResult> selector, TResult fallback) where TResult : notnull'
+    parameters:
+    - id: selector
+      type: System.Func{{T},{TResult}}
+      description: The projection.
+    - id: fallback
+      type: '{TResult}'
+      description: The value used when the box is empty.
+    typeParameters:
+    - id: TResult
+      description: The projected type.
+    return:
+      type: ReferenceFixture.Box{{TResult}}
+      description: A new box.
+    content.vb: Public Function Map(Of TResult)(selector As Func(Of T, TResult), fallback As TResult) As Box(Of TResult)
+  overload: ReferenceFixture.Box`1.Map*
+  nameWithType.vb: Box(Of T).Map(Of TResult)(Func(Of T, TResult), TResult)
+  fullName.vb: ReferenceFixture.Box(Of T).Map(Of TResult)(System.Func(Of T, TResult), TResult)
+  name.vb: Map(Of TResult)(Func(Of T, TResult), TResult)
+- uid: ReferenceFixture.Box`1.OnChanged
+  commentId: M:ReferenceFixture.Box`1.OnChanged
+  id: OnChanged
+  parent: ReferenceFixture.Box`1
+  langs:
+  - csharp
+  - vb
+  name: OnChanged()
+  nameWithType: Box<T>.OnChanged()
+  fullName: ReferenceFixture.Box<T>.OnChanged()
+  type: Method
+  source:
+    id: OnChanged
+    path: ReferenceFixture/Shapes.cs
+    startLine: 47
+  assemblies:
+  - ReferenceFixture
+  namespace: ReferenceFixture
+  summary: A protected member visible to subclasses.
+  example: []
+  syntax:
+    content: protected virtual void OnChanged()
+    content.vb: Protected Overridable Sub OnChanged()
+  overload: ReferenceFixture.Box`1.OnChanged*
+  nameWithType.vb: Box(Of T).OnChanged()
+  fullName.vb: ReferenceFixture.Box(Of T).OnChanged()
+references:
+- uid: ReferenceFixture.Pair`2
+  commentId: T:ReferenceFixture.Pair`2
+  href: ReferenceFixture.Pair-2.html
+  name: Pair<TLeft, TRight>
+  nameWithType: Pair<TLeft, TRight>
+  fullName: ReferenceFixture.Pair<TLeft, TRight>
+  nameWithType.vb: Pair(Of TLeft, TRight)
+  fullName.vb: ReferenceFixture.Pair(Of TLeft, TRight)
+  name.vb: Pair(Of TLeft, TRight)
+  spec.csharp:
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: <
+  - name: TLeft
+  - name: ','
+  - name: ' '
+  - name: TRight
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Pair`2
+    name: Pair
+    href: ReferenceFixture.Pair-2.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: TLeft
+  - name: ','
+  - name: ' '
+  - name: TRight
+  - name: )
+- uid: ReferenceFixture
+  commentId: N:ReferenceFixture
+  name: ReferenceFixture
+  nameWithType: ReferenceFixture
+  fullName: ReferenceFixture
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: ' '
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: ReferenceFixture.Box`1.#ctor*
+  commentId: Overload:ReferenceFixture.Box`1.#ctor
+  href: ReferenceFixture.Box-1.html#ReferenceFixture_Box_1__ctor
+  name: Box
+  nameWithType: Box<T>.Box
+  fullName: ReferenceFixture.Box<T>.Box
+  nameWithType.vb: Box(Of T).New
+  fullName.vb: ReferenceFixture.Box(Of T).New
+  name.vb: New
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: ReferenceFixture.Box`1.Value*
+  commentId: Overload:ReferenceFixture.Box`1.Value
+  href: ReferenceFixture.Box-1.html#ReferenceFixture_Box_1_Value
+  name: Value
+  nameWithType: Box<T>.Value
+  fullName: ReferenceFixture.Box<T>.Value
+  nameWithType.vb: Box(Of T).Value
+  fullName.vb: ReferenceFixture.Box(Of T).Value
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: ReferenceFixture.Box`1.Map*
+  commentId: Overload:ReferenceFixture.Box`1.Map
+  href: ReferenceFixture.Box-1.html#ReferenceFixture_Box_1_Map__1_System_Func__0___0__
+  name: Map
+  nameWithType: Box<T>.Map
+  fullName: ReferenceFixture.Box<T>.Map
+  nameWithType.vb: Box(Of T).Map
+  fullName.vb: ReferenceFixture.Box(Of T).Map
+- uid: System.Func{{T},{TResult}}
+  commentId: T:System.Func{`0,``0}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: ' '
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: ','
+  - name: ' '
+  - name: TResult
+  - name: )
+- uid: ReferenceFixture.Box{{TResult}}
+  commentId: T:ReferenceFixture.Box{``0}
+  parent: ReferenceFixture
+  definition: ReferenceFixture.Box`1
+  href: ReferenceFixture.Box-1.html
+  name: Box<TResult>
+  nameWithType: Box<TResult>
+  fullName: ReferenceFixture.Box<TResult>
+  nameWithType.vb: Box(Of TResult)
+  fullName.vb: ReferenceFixture.Box(Of TResult)
+  name.vb: Box(Of TResult)
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: TResult
+  - name: )
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: ' '
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: ','
+  - name: ' '
+  - name: TResult
+  - name: )
+- uid: ReferenceFixture.Box`1
+  commentId: T:ReferenceFixture.Box`1
+  href: ReferenceFixture.Box-1.html
+  name: Box<T>
+  nameWithType: Box<T>
+  fullName: ReferenceFixture.Box<T>
+  nameWithType.vb: Box(Of T)
+  fullName.vb: ReferenceFixture.Box(Of T)
+  name.vb: Box(Of T)
+  spec.csharp:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: ReferenceFixture.Box`1
+    name: Box
+    href: ReferenceFixture.Box-1.html
+  - name: (
+  - name: Of
+  - name: ' '
+  - name: T
+  - name: )
+- uid: '{TResult}'
+  commentId: '!:TResult'
+  definition: TResult
+  name: TResult
+  nameWithType: TResult
+  fullName: TResult
+- uid: TResult
+  commentId: '!:TResult'
+  name: TResult
+  nameWithType: TResult
+  fullName: TResult
+- uid: ReferenceFixture.Box`1.OnChanged*
+  commentId: Overload:ReferenceFixture.Box`1.OnChanged
+  href: ReferenceFixture.Box-1.html#ReferenceFixture_Box_1_OnChanged
+  name: OnChanged
+  nameWithType: Box<T>.OnChanged
+  fullName: ReferenceFixture.Box<T>.OnChanged
+  nameWithType.vb: Box(Of T).OnChanged
+  fullName.vb: ReferenceFixture.Box(Of T).OnChanged

@@ -1,0 +1,203 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ReferenceFixture</name>
+    </assembly>
+    <members>
+        <member name="T:ReferenceFixture.Box`1">
+            <summary>Holds <typeparamref name="T"/> values and links to <see cref="T:ReferenceFixture.Pair`2"/>.</summary>
+            <typeparam name="T">The stored value type.</typeparam>
+            <remarks>Escaping check: <c>a &lt; b &amp;&amp; c &gt; d</c> and braces {literal}.</remarks>
+        </member>
+        <member name="M:ReferenceFixture.Box`1.#ctor">
+            <summary>Creates an empty box.</summary>
+        </member>
+        <member name="M:ReferenceFixture.Box`1.#ctor(`0)">
+            <summary>Creates a box holding <paramref name="value"/>.</summary>
+            <param name="value">The initial value.</param>
+        </member>
+        <member name="P:ReferenceFixture.Box`1.Value">
+            <summary>Gets the stored value, or <see langword="null"/> when empty.</summary>
+        </member>
+        <member name="M:ReferenceFixture.Box`1.Map``1(System.Func{`0,``0})">
+            <summary>Projects the value.</summary>
+            <typeparam name="TResult">The projected type.</typeparam>
+            <param name="selector">The projection.</param>
+            <returns>A new box.</returns>
+            <exception cref="T:System.InvalidOperationException">The box is empty.</exception>
+        </member>
+        <member name="M:ReferenceFixture.Box`1.Map``1(System.Func{`0,``0},``0)">
+            <summary>Overload taking a fallback.</summary>
+            <typeparam name="TResult">The projected type.</typeparam>
+            <param name="selector">The projection.</param>
+            <param name="fallback">The value used when the box is empty.</param>
+            <returns>A new box.</returns>
+        </member>
+        <member name="T:ReferenceFixture.Box`1.Nested">
+            <summary>A nested type whose implicit public constructor is deliberately undeclared.</summary>
+        </member>
+        <member name="T:ReferenceFixture.Box`1.Nested.Depth">
+            <summary>A doubly nested enum.</summary>
+        </member>
+        <member name="F:ReferenceFixture.Box`1.Nested.Depth.One">
+            <summary>The first level.</summary>
+        </member>
+        <member name="F:ReferenceFixture.Box`1.Nested.Depth.Two">
+            <summary>The second level.</summary>
+        </member>
+        <member name="M:ReferenceFixture.Box`1.OnChanged">
+            <summary>A protected member visible to subclasses.</summary>
+        </member>
+        <member name="T:ReferenceFixture.Pair`2">
+            <summary>A positional record with compiler-generated members.</summary>
+            <param name="Left">The left value.</param>
+            <param name="Right">The right value.</param>
+            <typeparam name="TLeft">The left type.</typeparam>
+            <typeparam name="TRight">The right type.</typeparam>
+        </member>
+        <member name="M:ReferenceFixture.Pair`2.#ctor(`0,`1)">
+            <summary>A positional record with compiler-generated members.</summary>
+            <param name="Left">The left value.</param>
+            <param name="Right">The right value.</param>
+            <typeparam name="TLeft">The left type.</typeparam>
+            <typeparam name="TRight">The right type.</typeparam>
+        </member>
+        <member name="P:ReferenceFixture.Pair`2.Left">
+            <summary>The left value.</summary>
+        </member>
+        <member name="P:ReferenceFixture.Pair`2.Right">
+            <summary>The right value.</summary>
+        </member>
+        <member name="T:ReferenceFixture.Meters">
+            <summary>A value with operators and conversions.</summary>
+            <remarks>
+            Its positional <c>Value</c> parameter is deliberately undocumented: the compiler reports no
+            warning for that gap, so it is a negative control for the documentation checker.
+            </remarks>
+        </member>
+        <member name="M:ReferenceFixture.Meters.#ctor(System.Double)">
+            <summary>A value with operators and conversions.</summary>
+            <remarks>
+            Its positional <c>Value</c> parameter is deliberately undocumented: the compiler reports no
+            warning for that gap, so it is a negative control for the documentation checker.
+            </remarks>
+        </member>
+        <member name="M:ReferenceFixture.Meters.op_Addition(ReferenceFixture.Meters,ReferenceFixture.Meters)">
+            <summary>Adds two lengths.</summary>
+            <param name="left">The left operand.</param>
+            <param name="right">The right operand.</param>
+            <returns>The sum.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Meters.op_Implicit(System.Double)~ReferenceFixture.Meters">
+            <summary>Converts a raw number.</summary>
+            <param name="value">The raw value.</param>
+            <returns>A length of <paramref name="value"/> meters.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Meters.op_Explicit(ReferenceFixture.Meters)~System.Double">
+            <summary>Reads the raw number.</summary>
+            <param name="value">The length.</param>
+            <returns>The number of meters.</returns>
+        </member>
+        <member name="T:ReferenceFixture.Signatures">
+            <summary>Reference, out, in, params, nullable and async-stream parameters.</summary>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.TryParse(System.String,System.Int32@)">
+            <summary>Tries to parse a value.</summary>
+            <param name="text">The input text.</param>
+            <param name="value">The parsed value.</param>
+            <returns><see langword="true"/> when parsing succeeded.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Swap(System.Int32@,System.Int32@)">
+            <summary>Swaps two values.</summary>
+            <param name="left">The first value.</param>
+            <param name="right">The second value.</param>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Read(System.Int32@)">
+            <summary>Reads a value without copying.</summary>
+            <param name="value">The value.</param>
+            <returns>The value.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Sum(System.Int32[])">
+            <summary>Sums values.</summary>
+            <param name="values">The values.</param>
+            <returns>The sum.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.CountAsync(System.Int32,System.Threading.CancellationToken)">
+            <summary>Streams numbers.</summary>
+            <param name="count">How many numbers to produce.</param>
+            <param name="cancellationToken">Stops enumeration.</param>
+            <returns>An asynchronous sequence.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Long(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Collections.Generic.IReadOnlyList{System.Collections.Generic.KeyValuePair{System.String,ReferenceFixture.Box{System.String}}}},System.String,System.Int32,System.Nullable{System.Double},System.Threading.CancellationToken,ReferenceFixture.Box{ReferenceFixture.Pair{System.Int32,System.String}})">
+            <summary>A deliberately long signature.</summary>
+            <param name="first">First.</param>
+            <param name="second">Second.</param>
+            <param name="third">Third.</param>
+            <param name="fourth">Fourth.</param>
+            <param name="fifth">Fifth.</param>
+            <param name="sixth">Sixth.</param>
+            <returns>A dictionary.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Depth(ReferenceFixture.Box{System.Int32}.Nested,ReferenceFixture.Box{System.String}.Nested.Depth)">
+            <summary>Accepts a nested type of a constructed generic type.</summary>
+            <param name="nested">The nested value.</param>
+            <param name="depth">A nested enum of the same construction.</param>
+            <returns>The numeric depth.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Twice(System.String)">
+            <summary>Extends a string.</summary>
+            <param name="value">The receiver.</param>
+            <returns>The value repeated.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Signatures.Add(System.Int32,System.Int32)">
+            <summary>An obsolete member.</summary>
+            <param name="left">The first addend.</param>
+            <param name="right">The second addend.</param>
+            <returns>The sum.</returns>
+        </member>
+        <member name="T:ReferenceFixture.IShape">
+            <summary>An interface with an event and an indexer.</summary>
+        </member>
+        <member name="E:ReferenceFixture.IShape.Changed">
+            <summary>Raised when the shape changes.</summary>
+        </member>
+        <member name="P:ReferenceFixture.IShape.Item(System.Int32)">
+            <summary>Gets a coordinate.</summary>
+            <param name="index">The coordinate index.</param>
+        </member>
+        <member name="T:ReferenceFixture.Measure">
+            <summary>A delegate type.</summary>
+            <param name="shape">The shape.</param>
+            <returns>An area.</returns>
+        </member>
+        <member name="T:ReferenceFixture.Overloads">
+            <summary>Overloads that share documentation through <c>inheritdoc</c>.</summary>
+        </member>
+        <member name="M:ReferenceFixture.Overloads.#ctor">
+            <summary>Creates the formatter; declared so the public constructor is documented.</summary>
+        </member>
+        <member name="M:ReferenceFixture.Overloads.Format(System.Int32,System.Int32)">
+            <summary>Formats a value.</summary>
+            <param name="value">The value to format.</param>
+            <param name="width">The minimum width.</param>
+            <returns>The formatted text.</returns>
+        </member>
+        <member name="M:ReferenceFixture.Overloads.Format(System.Int32)">
+            <summary>Formats a value with the default width.</summary>
+            <inheritdoc cref="M:ReferenceFixture.Overloads.Format(System.Int32,System.Int32)"/>
+        </member>
+        <member name="M:ReferenceFixture.Overloads.ToString">
+            <summary>An explicitly declared record member stays in the inventory.</summary>
+            <returns>A fixed description.</returns>
+        </member>
+        <member name="T:ReferenceFixture.Constants">
+            <summary>A constant holder.</summary>
+        </member>
+        <member name="F:ReferenceFixture.Constants.Answer">
+            <summary>A public constant.</summary>
+        </member>
+        <member name="F:ReferenceFixture.Constants.Name">
+            <summary>A static read-only field.</summary>
+        </member>
+    </members>
+</doc>
