@@ -140,7 +140,8 @@ def _classify(source: str) -> tuple[str, str]:
     if source == "guides/csharp-quickstart.md":
         return "csharp", "/quickstart/"
     if source.startswith("examples/csharp-") and source.endswith(".md"):
-        return "csharp", f"/examples/{source.removeprefix('examples/csharp-').removesuffix('.md')}/"
+        topic = source.removeprefix("examples/csharp-").removesuffix(".md")
+        return "csharp", f"/examples/{topic}/"
     stem = source.removesuffix(".md")
     if stem.endswith("/README"):
         stem = stem[: -len("/README")]

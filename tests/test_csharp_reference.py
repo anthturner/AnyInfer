@@ -12,10 +12,14 @@ import copy
 import json
 import shutil
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from scripts import generate_csharp_reference as reference
 from scripts.check_csharp_docs import (
     comment_findings,
@@ -176,7 +180,8 @@ def test_unresolved_reference_into_the_documented_assembly_fails(
         'See <xref href="ReferenceFixture.Internal.Hidden" data-throw-if-not-resolved="false"></xref>.'
     )
     with pytest.raises(
-        reference.ReferenceError, match=r"unresolved reference to ReferenceFixture\.Internal\.Hidden"
+        reference.ReferenceError,
+        match=r"unresolved reference to ReferenceFixture\.Internal\.Hidden",
     ):
         _render(mutated)
 
@@ -187,7 +192,9 @@ def test_unknown_markup_and_foreign_assemblies_fail(documents: list[dict[str, ob
         "items"
     ][0]
     item["summary"] = "A <blink>new</blink> tag."
-    with pytest.raises(reference.ReferenceError, match=r"unsupported documentation markup <blink>"):
+    with pytest.raises(
+        reference.ReferenceError, match=r"unsupported documentation markup <blink>"
+    ):
         _render(mutated)
     mutated = copy.deepcopy(documents)
     mutated[0]["items"][0]["assemblies"] = ["SomethingElse"]
