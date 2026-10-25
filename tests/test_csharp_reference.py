@@ -262,6 +262,32 @@ def test_source_links_are_repository_relative(rendered: reference.Reference) -> 
     assert f"ReferenceFixture/Shapes.cs#L{line})" in box
 
 
+def test_absolute_source_paths_inside_the_checkout_become_repository_relative(
+    documents: list[dict[str, object]],
+) -> None:
+    # Without Git metadata, as in a linked worktree, DocFX records absolute source paths.
+    absolute = copy.deepcopy(documents)
+    for document in absolute:
+        for item in document["items"]:
+            source = item.get("source")
+            if isinstance(source, dict) and source.get("path"):
+                source["path"] = str(
+                    ROOT / "tests/fixtures/csharp-reference/ReferenceFixture/Shapes.cs"
+                )
+    pages = [page for page in _render(absolute).pages if page.kind != "index"]
+    assert pages and all(
+        page.origin == "tests/fixtures/csharp-reference/ReferenceFixture/Shapes.cs"
+        for page in pages
+    )
+    assert all(str(ROOT) not in page.content for page in pages)
+
+    outside = copy.deepcopy(documents)
+    item = next(item for document in outside for item in document["items"] if item.get("source"))
+    item["source"]["path"] = str(ROOT.parent / "elsewhere" / "Shapes.cs")
+    with pytest.raises(reference.ReferenceError, match="outside the repository"):
+        _render(outside)
+
+
 def test_index_and_sidebar_list_every_type_page(rendered: reference.Reference) -> None:
     index = _page(rendered, "index")
     types = [page for page in rendered.pages if page.kind != "index"]

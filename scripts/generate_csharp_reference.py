@@ -699,7 +699,18 @@ def _source(
     source = item.get("source")
     if not isinstance(source, dict) or not source.get("path"):
         return None, None
-    path = PurePosixPath(os.path.normpath(str(docfx_root / str(source["path"])))).as_posix()
+    recorded = str(source["path"])
+    if Path(recorded).is_absolute():
+        # DocFX records absolute paths when it finds no Git metadata, as in a linked worktree
+        # whose .git is a file; keep only the part inside this checkout.
+        try:
+            path = Path(recorded).resolve().relative_to(ROOT).as_posix()
+        except ValueError:
+            raise ReferenceError(
+                f"{item['uid']} has a source path outside the repository: {recorded}"
+            ) from None
+    else:
+        path = PurePosixPath(os.path.normpath(str(docfx_root / recorded))).as_posix()
     if path.startswith("../") or path.startswith("/"):
         raise ReferenceError(f"{item['uid']} has a source path outside the repository: {path}")
     line = source.get("startLine")

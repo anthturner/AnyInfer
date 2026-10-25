@@ -166,6 +166,41 @@ def _index_archived_page(site: Path, url: str, sdk: str, version: str) -> None:
     path.write_text(html, encoding="utf-8")
 
 
+def _navigation_groups(manifest: dict) -> dict[str, str]:
+    """Map each generated page ID to the navigation group that lists it, such as a namespace."""
+    groups: dict[str, str] = {}
+    for generated in (manifest.get("generated") or {}).values():
+        for group in generated.get("namespaces", []):
+            for item in group.get("items", []):
+                groups[item["id"]] = group["label"]
+    return groups
+
+
+def _topic_bundles(
+    entries: list[tuple[dict, str]], chunks: list[str], groups: dict[str, str], header: str
+) -> list[tuple[str, str, list[str]]]:
+    """Split an oversized section into named bundles that each fit the section budget.
+
+    Pages listed under a navigation group share one bundle named after the group; any other page
+    is a bundle of its own, numbered by its position. A group too large for one bundle is split
+    into one bundle per page.
+    """
+    bundles: dict[str, tuple[str, list[tuple[dict, str]]]] = {}
+    for number, ((page, _), chunk) in enumerate(zip(entries, chunks, strict=True), 1):
+        group = groups.get(page.get("id", ""))
+        key = re.sub(r"[^a-z0-9]+", "-", group.lower()).strip("-") if group else str(number)
+        bundles.setdefault(key, (group or page["title"], []))[1].append((page, chunk))
+    result: list[tuple[str, str, list[str]]] = []
+    for key, (title, members) in bundles.items():
+        text = header + "".join(chunk for _, chunk in members)
+        if len(members) == 1 or len(text.encode("utf-8")) <= SECTION_MAX_BYTES:
+            result.append((key, title, [chunk for _, chunk in members]))
+            continue
+        for number, (page, chunk) in enumerate(members, 1):
+            result.append((f"{key}-{number}", f"{title}: {page['title']}", [chunk]))
+    return result
+
+
 def export_site(site: Path, manifest: dict) -> None:
     """Export current article content and preserve old links using static files."""
     sections: dict[str, list[tuple[dict, str]]] = {}
@@ -208,6 +243,7 @@ def export_site(site: Path, manifest: dict) -> None:
     if archive_lines:
         index.extend(["Archived SDK documentation (not in the text exports):", *archive_lines, ""])
     full = [f"# AnyInfer — full documentation\n\n{version_line}\n"]
+    groups = _navigation_groups(manifest)
     for section, entries in sections.items():
         slug = re.sub(r"[^a-z0-9]+", "-", section.lower().replace("c#", "csharp")).strip("-")
         header = f"# AnyInfer — {section}\n\n{version_line}\n"
@@ -227,10 +263,10 @@ def export_site(site: Path, manifest: dict) -> None:
         else:
             # Stable topic parts preserve the original section URL without raising its limit.
             links = [header, "This section is split into topic bundles:\n"]
-            for number, ((page, _), chunk) in enumerate(zip(entries, chunks, strict=True), 1):
-                name = f"llms/{slug}-{number}.txt"
-                _write(site, name, header + chunk, bounded=True)
-                links.append(f"- {page['title']}: {ORIGIN}/{name}\n")
+            for key, title, bundle in _topic_bundles(entries, chunks, groups, header):
+                name = f"llms/{slug}-{key}.txt"
+                _write(site, name, header + "".join(bundle), bounded=True)
+                links.append(f"- {title}: {ORIGIN}/{name}\n")
             _write(site, f"llms/{slug}.txt", "\n".join(links), bounded=True)
     _write(site, "llms.txt", "\n".join(index))
     _write(site, "llms-full.txt", "\n".join(full))
