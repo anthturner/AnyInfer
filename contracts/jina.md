@@ -1,10 +1,12 @@
 # jina — Protocol Contract
 
 Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-10-12 — against Jina's product documentation and its own model
-publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-still JS-only and unfetchable headlessly — reconfirmed 2026-10-12, a ~4KB `<div
-id="app">` shell with no inline schema. Not yet verified against live traffic.
+Last verified: 2026-10-26 — against Jina's product documentation, its own model
+publications, and the docs.jina.ai API reference (sources below); the interactive API
+reference (`api.jina.ai/redoc`) is still JS-only and unfetchable headlessly (last
+confirmed 2026-10-12). The per-endpoint request/response schemas inside
+`docs.jina.ai/openapi.json` / `api.md` were not reached this run (oversized pages, only
+the first 100K characters read). Not yet verified against live traffic.
 
 ## Upstream sources
 - https://jina.ai/embeddings/ (request shape, task vocabulary, models)
@@ -16,6 +18,8 @@ id="app">` shell with no inline schema. Not yet verified against live traffic.
 - https://huggingface.co/jinaai/jina-reranker-v3 and Jina's reranker announcement posts
   (rerank response shape: `results[]` with `index`/`relevance_score`,
   `usage.total_tokens`)
+- https://docs.jina.ai/api.md and https://docs.jina.ai/openapi.json (shared error body
+  and error-code table; added 2026-10-26)
 
 ## Wire contract
 
@@ -67,23 +71,30 @@ id="app">` shell with no inline schema. Not yet verified against live traffic.
 - **Cross-batch comparability: not documented** — refuse-by-default stands.
 
 ### Errors
-- **Not yet verified.** Jina's error bodies are documented only in the interactive
-  reference (`api.jina.ai/redoc`), which is JS-rendered and unfetchable headlessly, and no
-  live lane has run. The adapter maps HTTP status alone through the shared status
-  classification and reads no provider-specific error field — which is safe precisely
-  because nothing here claims to know the body shape. Confirming it is the first task of
-  the live lane, tracked on the watchlist below.
+- **Documented 2026-10-26** (source: https://docs.jina.ai/api.md, error section): failures
+  carry `detail`, a machine `code` (e.g. `INPUT_TOKEN_LIMIT_EXCEEDED` 400,
+  `INPUT_MODEL_NOT_FOUND` 400, `AUTH_INVALID_API_KEY`/`AUTH_MISSING_API_KEY` 401,
+  `AUTHZ_INSUFFICIENT_BALANCE` 403, `RATE_*_LIMIT_EXCEEDED` 429, `INTERNAL_ERROR` 500,
+  `SERVICE_UNAVAILABLE` 503, `SERVICE_TIMEOUT` 504) and `request_id`; only
+  `/v1/chat/completions` uses an OpenAI envelope, and embeddings/rerank are stated not to
+  be exceptions. Not yet seen on live traffic, and the per-endpoint schema was not read.
+- The adapter maps HTTP status alone through the shared status classification and reads no
+  provider-specific error field, so nothing breaks; whether to surface `detail`/`code`/
+  `request_id` is a proposed adapter follow-up, not applied here.
 
 ### Streaming
 Embeddings and rerank responses are not streamed.
 
-### Published static model capabilities (verified 2026-10-15)
+### Published static model capabilities (verified 2026-10-15; omni/rerank rechecked 2026-10-26)
 - `jina-embeddings-v5-text-small` and `jina-embeddings-v5-omni-small`: 1,024
-  dimensions; Matryoshka choices 32/64/128/256/512/1,024; 32,768-token text input.
+  dimensions; Matryoshka choices 32/64/128/256/512/1,024 (the omni page lists 768 as well
+  — 32/64/128/256/512/768/1,024; the text page says only "32 to 1024"); 32,768-token text
+  input.
 - `jina-embeddings-v5-text-nano` and `jina-embeddings-v5-omni-nano`: 768 dimensions;
   Matryoshka choices 32/64/128/256/512/768; 8,192-token text input.
 - `jina-reranker-v3.5`: native `top_n`; a 131,072-token shared window for the query
-  and all documents, with automatic truncation. That is not a per-document ceiling, so
+  and all documents, with automatic truncation (the v3 model card additionally states up
+  to 64 documents processed at once in that window — not a request ceiling). That is not a per-document ceiling, so
   `max_tokens_per_document` remains unset.
 
 The omni models accept multimodal inputs upstream, but AnyInfer's embedding request is
