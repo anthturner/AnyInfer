@@ -1,7 +1,8 @@
 # voyage — Protocol Contract
 
 Status: **implemented** — `providers/voyage.py`, embeddings and reranker.
-Last verified: 2026-10-12 — against live Voyage documentation (sources below). Not yet
+Last verified: 2026-10-26 — against live Voyage documentation (sources below; every
+request/response/error assertion rechecked, no wire change). Not yet
 verified against live traffic; flagged in the watchlist.
 
 ## Upstream sources
@@ -51,7 +52,10 @@ counterpart to TEI's retrieval-only shape.
   rather than trusting arrival order; out-of-range or duplicate indexes are rejected.
 - Usage reports **only** `total_tokens` — mapped to `Usage.total_tokens`, with
   `input_tokens` left unknown rather than assumed equal.
-- **Unverified:** per-model default dimensions (not stated) — `dimensions` stays `None`.
+- **Per-model default dimensions:** the reference (2026-10-26) states `output_dimension`
+  null uses the model default and, for voyage-4-large/-4/-4-lite, voyage-3-large/-3.5/
+  -3.5-lite and voyage-code-3, allows 2048/1024 (default)/512/256; other models support
+  only their single default, which is not stated. `dimensions` stays `None` for those.
 
 ### Rerank request fields (verified 2026-08-12)
 - `model` (required), `query` (required), `documents` (required, list of strings —
