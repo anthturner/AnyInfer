@@ -1,10 +1,10 @@
 # jina — Protocol Contract
 
 Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-10-12 — against Jina's product documentation and its own model
+Last verified: 2026-11-02 — against Jina's product documentation and its own model
 publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-still JS-only and unfetchable headlessly — reconfirmed 2026-10-12, a ~4KB `<div
-id="app">` shell with no inline schema. Not yet verified against live traffic.
+still JS-only and unfetchable headlessly — reconfirmed 2026-11-02, a ~4KB HTML shell
+with no inline schema. Not yet verified against live traffic.
 
 ## Upstream sources
 - https://jina.ai/embeddings/ (request shape, task vocabulary, models)
@@ -79,7 +79,8 @@ Embeddings and rerank responses are not streamed.
 
 ### Published static model capabilities (verified 2026-10-15)
 - `jina-embeddings-v5-text-small` and `jina-embeddings-v5-omni-small`: 1,024
-  dimensions; Matryoshka choices 32/64/128/256/512/1,024; 32,768-token text input.
+  dimensions; Matryoshka choices 32/64/128/256/512/768/1,024 (the omni article lists 768
+  for small; the text article gives only the range 32–1,024); 32,768-token text input.
 - `jina-embeddings-v5-text-nano` and `jina-embeddings-v5-omni-nano`: 768 dimensions;
   Matryoshka choices 32/64/128/256/512/768; 8,192-token text input.
 - `jina-reranker-v3.5`: native `top_n`; a 131,072-token shared window for the query
@@ -96,3 +97,8 @@ text-only. They are listed here only for their verified text-compatible operatio
 - `late_chunking`, multimodal inputs (v4/m0 and v5-omni), quantized
   `embedding_type` values — unmodelled; reachable via `provider_options`.
 - A listing endpoint, if one appears.
+- Jina's HF model card for `jina-reranker-v3` says up to 64 documents are processed
+  simultaneously within the 131K context; the reranker page still says no hard document
+  limit. Watch for a stated per-request document cap.
+- The embeddings page does not itself list `dimensions` or the `embedding_type` values;
+  `dimensions` is confirmed only by the v5-omni article's API example.
