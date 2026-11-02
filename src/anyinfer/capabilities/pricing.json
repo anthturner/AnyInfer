@@ -2084,9 +2084,9 @@
       },
       {
         "model": "moonshotai/Kimi-K2.6-TEE",
-        "input_per_1m": "0.45",
-        "output_per_1m": "1.95",
-        "last_verified": "2026-10-12",
+        "input_per_1m": "0.39",
+        "output_per_1m": "1.8",
+        "last_verified": "2026-11-02",
         "source": "https://chutes.ai/pricing"
       },
       {
@@ -2098,9 +2098,9 @@
       },
       {
         "model": "zai-org/GLM-5.1-TEE",
-        "input_per_1m": "0.98",
-        "output_per_1m": "3.08",
-        "last_verified": "2026-08-07",
+        "input_per_1m": "0.9",
+        "output_per_1m": "2.9",
+        "last_verified": "2026-11-02",
         "source": "https://chutes.ai/pricing"
       },
       {
